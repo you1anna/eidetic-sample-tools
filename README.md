@@ -11,8 +11,9 @@ Target sound: hypnotic / dub / raw / hard-groove techno (~130–150 BPM).
 | Dir | Status | What it does |
 |---|---|---|
 | [`sample-tools/`](sample-tools/) | ✅ built | Convert + sync curated samples to each device's spec (16-bit/44.1 WAV; mono for Digitakt). Manifest-driven CLI. |
+| [`library-tools/`](library-tools/) | ✅ built | Manifest-only sample review/indexing by category, loop/one-shot type, BPM, key, tempo fit, plus dry-run classify and de-dupe tools. |
 | `inbox-sort/` | planned | Classify/rename new downloads from `SAMPLES/00_INBOX/` into role folders. |
-| `inventory/` | planned | Walk the library, emit a CSV (format, duration, BPM estimate) to drive curation. |
+| `inventory/` | folded into `library-tools` for now | `sample-review` emits TSV indexes that drive curation without moving originals. |
 
 ## Storage & workflow
 

@@ -1,9 +1,13 @@
 # library-tools
 
-Two light, **reversible** tools that tidy the bulk of the SSD sample library.
-Both default to **dry-run** and **never delete** — they only move files, write a
-plan manifest, and (on `--apply`) an undo manifest.
+Light, safety-first tools that review and tidy the bulk of the SSD sample
+library. Review is **manifest-only**; tidy tools default to **dry-run** and
+**never delete** — they only move files, write a plan manifest, and (on
+`--apply`) an undo manifest.
 
+- `sample-review` — proposes role folders and hardware-friendly filenames in a
+  TSV manifest for human review. It indexes category, loop/one-shot type, BPM,
+  key, and tempo fit. It never moves or renames originals.
 - `sample-classify` — sorts `_PACKS/`, `DRUM-KITS/`, `00_INBOX/` into sound-type
   buckets: `LOOPS/ ONE-SHOTS/ PADS-DRONES/ OTHER/`, keeping one level of pack
   grouping (`<bucket>/<pack>/...`). Curated role folders are left untouched.
@@ -22,7 +26,11 @@ plan manifest, and (on `--apply`) an undo manifest.
 ```bash
 lc() { ~/.venvs/library-tools/bin/sample-classify "$@"; }
 ld() { ~/.venvs/library-tools/bin/sample-dedupe "$@"; }
+lr() { ~/.venvs/library-tools/bin/sample-review "$@"; }
 
+lr --no-probe --summary
+lr --no-probe --output manifests/review.tsv
+lr --no-probe --output manifests/review.tsv --index-dir manifests/index
 lc                 # dry-run: counts table + plan manifest, nothing moved
 lc --no-probe      # faster dry-run, keyword signals only (skip duration probe)
 lc --apply         # move files into buckets, write undo manifest
@@ -31,6 +39,36 @@ ld --apply         # move dupes to _TO-DELETE/dupes/, write undo manifest
 ```
 
 Run classify **before** dedupe so dedupe sees the final layout.
+
+Run review before any apply step when improving the library taxonomy. It keeps
+musical axes separate: `main_category` (kicks, bass, vocals, etc.),
+`sample_type` (loop, one-shot, texture, unknown), explicit `bpm`/`key`,
+`tempo_fit`, proposed hardware-friendly names, and warnings such as names longer
+than the Digitakt's 24-character comfort limit.
+
+Tempo fit is advisory, not a delete decision: `techno-core` = 130-150 BPM,
+`techno-adjacent` = 124-129, `house-lower` = below 124, `too-fast` = above 150,
+and `unknown` = no explicit BPM. Lower-BPM house material stays indexed because
+it may still be useful for pitching, chopping, resampling, or dub/hypnotic
+texture work.
+
+`--index-dir` writes split TSV indexes for later tooling:
+
+```text
+high-confidence/<CATEGORY>.tsv
+tempo/techno-core.tsv
+tempo/techno-adjacent.tsv
+tempo/house-lower.tsv
+tempo/too-fast.tsv
+tempo/unknown.tsv
+review-needed.tsv
+```
+
+Review extracts BPM only from explicit tags (`132 BPM`, `132bpm`, `[132]`) or
+standalone numbers in paths already identified as loops/grooves. That keeps drum
+machine names like `707`, `808`, `909`, `303`, and `SH101` from becoming bogus
+tempo data. Key extraction is similarly conservative: obvious `Am`, `A minor`,
+`C#`, etc. are indexed; unknown keys stay blank rather than guessed.
 
 ## Classification rules
 
