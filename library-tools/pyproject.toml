@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "librarytools"
+version = "0.1.0"
+description = "Sort the SSD sample library by sound type and de-dupe it (reversible)."
+requires-python = ">=3.12"
+dependencies = []  # stdlib + ffprobe via subprocess
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+sample-classify = "librarytools.classify:main"
+sample-dedupe = "librarytools.dedupe:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
