@@ -56,3 +56,42 @@ def test_unmatched_no_duration_is_other():
 def test_folder_keyword_counts():
     b, _ = classify_path(Path("_PACKS/Techno Loops/bd.wav"))
     assert b == "LOOPS"
+
+
+from librarytools import classify as classify_mod
+from librarytools import config
+
+
+def test_dest_rel_keeps_pack_and_subpath():
+    rel = Path("_PACKS/Riemann Tribal/loops/bd 132.wav")
+    dest = classify_mod.dest_rel(rel, "LOOPS")
+    assert dest == Path("LOOPS/Riemann Tribal/loops/bd 132.wav")
+
+
+def test_dest_rel_drum_kits_uses_vendor_as_pack():
+    rel = Path("DRUM-KITS/Goldbaby/kick hit.wav")
+    dest = classify_mod.dest_rel(rel, "ONE-SHOTS")
+    assert dest == Path("ONE-SHOTS/Goldbaby/kick hit.wav")
+
+
+def test_dest_rel_loose_file_uses_underscore_loose():
+    rel = Path("00_INBOX/random loop.wav")
+    dest = classify_mod.dest_rel(rel, "LOOPS")
+    assert dest == Path("LOOPS/_loose/random loop.wav")
+
+
+def test_build_plan_classifies_in_scope_audio(tmp_path: Path):
+    root = tmp_path
+    (root / "_PACKS" / "PackA").mkdir(parents=True)
+    (root / "_PACKS" / "PackA" / "drum loop.wav").write_text("x")
+    (root / "_PACKS" / "PackA" / "kick hit.wav").write_text("x")
+    (root / "_PACKS" / "PackA" / "._sneaky.wav").write_text("x")  # AppleDouble: ignored
+    (root / "_PACKS" / "PackA" / "notes.txt").write_text("x")      # non-audio: ignored
+    (root / "KICKS").mkdir()                                       # out of scope
+    (root / "KICKS" / "curated.wav").write_text("x")
+
+    plan = classify_mod.build_plan(root=root, probe_durations=False)
+    by_name = {m.src.name: m for m in plan}
+    assert set(by_name) == {"drum loop.wav", "kick hit.wav"}
+    assert by_name["drum loop.wav"].dest == root / "LOOPS" / "PackA" / "drum loop.wav"
+    assert by_name["kick hit.wav"].dest == root / "ONE-SHOTS" / "PackA" / "kick hit.wav"
