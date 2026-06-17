@@ -6,15 +6,15 @@ from pathlib import Path
 from librarytools import review
 
 
-def test_maschine_drum_folders_map_to_role_folders():
+def test_vendor_drum_folders_map_to_role_folders():
     assert review.classify_role(
-        Path("_PACKS/Maschine 2 Factory Library/Samples/Drums/Kick/Kick 909.wav")
+        Path("_PACKS/Vendor Library/Samples/Drums/Kick/Kick 909.wav")
     ).role == "KICKS"
     assert review.classify_role(
-        Path("_PACKS/Maschine 2 Factory Library/Samples/Drums/Clap/Clap 808.wav")
+        Path("_PACKS/Vendor Library/Samples/Drums/Clap/Clap 808.wav")
     ).role == "CLAP-SNARE"
     assert review.classify_role(
-        Path("_PACKS/Maschine 2 Factory Library/Samples/Drums/Hihat/ClosedHH 70sDnB.wav")
+        Path("_PACKS/Vendor Library/Samples/Drums/Hihat/ClosedHH 70sDnB.wav")
     ).role == "HATS-CYM"
 
 
@@ -72,9 +72,9 @@ def test_hardware_name_preserves_extension_and_flags_digitakt_length():
     assert "digitakt-name>24" in item.warnings
 
 
-def test_maschine_bracketed_bpm_is_indexed_as_techno_core_loop():
+def test_bracketed_bpm_is_indexed_as_techno_core_loop():
     item = review.build_item(
-        Path("/samples/_PACKS/Maschine 2 Factory Library/Samples/Loops/Guitar/GuitarFunk01 [130].wav"),
+        Path("/samples/_PACKS/Vendor Library/Samples/Loops/Guitar/GuitarFunk01 [130].wav"),
         Path("/samples"),
     )
 
@@ -82,7 +82,7 @@ def test_maschine_bracketed_bpm_is_indexed_as_techno_core_loop():
     assert item.sample_type == "loop"
     assert item.bpm == "130"
     assert item.tempo_fit == "techno-core"
-    assert item.proposed_name.startswith("130_guitarfunk01_")
+    assert item.proposed_name.startswith("130_guitarfunk01_vendor-library")
 
 
 def test_kick_one_shot_keeps_tempo_unknown():
