@@ -283,7 +283,7 @@ def duration(path: Path) -> float | None:
             cmd, capture_output=True, text=True, check=True
         ).stdout.strip()
         return float(out)
-    except (subprocess.CalledProcessError, ValueError):
+    except (subprocess.CalledProcessError, OSError, ValueError):
         return None
 ```
 
