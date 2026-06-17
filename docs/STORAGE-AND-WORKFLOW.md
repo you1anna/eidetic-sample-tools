@@ -69,6 +69,7 @@ What that implies for tooling:
 |---|---|---|
 | `sample-tools/` | ✅ built | Convert + sync curated samples to device specs (mono for DT). |
 | `inventory/` | planned | Scan library → CSV (format, duration, **BPM + key estimate**) to power search/curation. |
+| `library-tools/` | ✅ built | Sort `_PACKS`/`DRUM-KITS`/`00_INBOX` by sound type (loops/one-shots/pads-drones/other) + de-dupe to `_TO-DELETE/dupes/`. Reversible, dry-run default. |
 | `inbox-sort/` | planned | Fast intake of new downloads from `SAMPLES/00_INBOX/` into roles + naming. |
 | vocal/loop prep | idea | Trim silence, normalise, BPM/key-tag vocal cuts & loops → clean drops into Ableton + OT. |
 | jam/stem intake | idea | Organise + label recorded Ableton jam stems so good moments become reusable library assets. |
