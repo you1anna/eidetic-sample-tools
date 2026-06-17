@@ -14,12 +14,19 @@ Target sound: hypnotic / dub / raw / hard-groove techno (~130–150 BPM).
 | `inbox-sort/` | planned | Classify/rename new downloads from `SAMPLES/00_INBOX/` into role folders. |
 | `inventory/` | planned | Walk the library, emit a CSV (format, duration, BPM estimate) to drive curation. |
 
+## Storage & workflow
+
+See **[`docs/STORAGE-AND-WORKFLOW.md`](docs/STORAGE-AND-WORKFLOW.md)** for the storage
+strategy (the SSD should move from exFAT → **APFS** since it's Mac-only; cards stay exFAT;
+**backup is the current top priority — there is none yet**) and the creative-workflow vision
+the tooling is built to serve (hardware jam → Ableton, resample in the OT, finish in Ableton).
+
 ## Note on layout
 
-This repo lives at the **root of the SSD (exFAT)**, but Python virtualenvs do **not**
-belong on exFAT (no exec bits / symlinks). Each tool's venv lives on the Mac under
-`~/.venvs/` and is editable-installed against the source here. See each tool's
-`README.md` for setup.
+This repo lives at the **root of the SSD (exFAT for now)**, but Python virtualenvs do **not**
+belong on exFAT (no exec bits / symlinks). Each tool's venv lives on the Mac under `~/.venvs/`
+and is editable-installed against the source here — and **each machine needs its own venv**.
+See each tool's `README.md` for setup.
 
 The library itself lives at `/Volumes/Extreme SSD/Production/SAMPLES/` (not in this
 repo) — see its `README.md` for the taxonomy and naming convention.
