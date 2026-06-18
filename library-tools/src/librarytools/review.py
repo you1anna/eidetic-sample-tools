@@ -72,6 +72,29 @@ def _parts_text(rel: Path) -> str:
     return " / ".join(part.lower().replace("_", " ").replace(".", " ") for part in rel.parts)
 
 
+def _tokens(rel: Path) -> set[str]:
+    """Whole-token set of the normalised path (folders + filename)."""
+    return {t for t in _TOKEN_SPLIT_RE.split(_parts_text(rel)) if t}
+
+
+# Short, ambiguous instrument codes matched ONLY as whole tokens, so 'chord'
+# never hits 'ch' and 'ohio' never hits 'oh'. Drum-machine model names excluded.
+ROLE_ABBREV_TOKEN: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("HATS-CYM", ("hh", "hho", "hhc", "ohh", "chh")),
+    ("CLAP-SNARE", ("rs",)),
+)
+
+# Unambiguous instrument stems matched as a token PREFIX, so fused names like
+# 'CowHigh' -> 'cowhigh' and 'Congas' still classify.
+ROLE_ABBREV_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("PERC", (
+        "cow", "clave", "cabasa", "conga", "block", "tamb", "agogo",
+        "quijada", "timbale", "timb", "tabla", "triangle", "guiro",
+        "maraca", "whistle",
+    )),
+)
+
+
 def classify_role(rel: Path, duration: float | None = None) -> RoleResult:
     """Classify an in-scope sample path into the library's role taxonomy."""
     text = _parts_text(rel)
@@ -95,6 +118,17 @@ def classify_role(rel: Path, duration: float | None = None) -> RoleResult:
         matched = _contains(text, needles)
         if matched:
             return RoleResult(role, "high", f"path:{matched}")
+
+    tokens = _tokens(rel)
+    for role, codes in ROLE_ABBREV_TOKEN:
+        hit = tokens.intersection(codes)
+        if hit:
+            return RoleResult(role, "high", f"token:{sorted(hit)[0]}")
+    for role, stems in ROLE_ABBREV_PREFIX:
+        for tok in sorted(tokens):
+            stem = next((s for s in stems if tok.startswith(s)), None)
+            if stem:
+                return RoleResult(role, "high", f"token:{stem}")
 
     loop = _contains(text, ("loop", "loops", "groove", "grooves"))
     if loop or _BPM_RE.search(str(rel)):
