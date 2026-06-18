@@ -31,3 +31,8 @@ See each tool's `README.md` for setup.
 
 The library itself lives at `/Volumes/Extreme SSD/Production/SAMPLES/` (not in this
 repo) — see its `README.md` for the taxonomy and naming convention.
+
+For low-token, human-run curation steps, start with
+[`library-tools/README.md`](library-tools/README.md#low-token-manual-workflow):
+refresh the manifest index locally, inspect focused TSV slices, then bring back
+small examples/counts when the rules need improving.

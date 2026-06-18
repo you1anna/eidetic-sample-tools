@@ -40,6 +40,75 @@ ld --apply         # move dupes to _TO-DELETE/dupes/, write undo manifest
 
 Run classify **before** dedupe so dedupe sees the final layout.
 
+## Low-token manual workflow
+
+Use this section when you want to make progress yourself before asking AI to
+reason over the library. The key idea: generate small summaries and inspect
+focused TSV slices locally instead of pasting huge manifests into chat.
+
+### 1. Refresh the manifest index
+
+```bash
+cd "/Volumes/Extreme SSD/eidetic-music-tools/library-tools"
+lr() { ~/.venvs/library-tools/bin/sample-review "$@"; }
+
+lr --no-probe --summary
+lr --no-probe --output manifests/review-latest.tsv --index-dir manifests/index-latest
+```
+
+This writes review data only; it does **not** move, rename, convert, or delete
+samples. Re-run it after you add/remove packs.
+
+### 2. Inspect the useful slices yourself
+
+Open these TSVs in Numbers, LibreOffice, VS Code, or a text editor:
+
+- `manifests/index-latest/high-confidence/KICKS.tsv`
+- `manifests/index-latest/high-confidence/BASS.tsv`
+- `manifests/index-latest/high-confidence/DRUM-LOOPS.tsv`
+- `manifests/index-latest/tempo/techno-core.tsv`
+- `manifests/index-latest/tempo/techno-adjacent.tsv`
+- `manifests/index-latest/tempo/house-lower.tsv`
+- `manifests/index-latest/review-needed.tsv`
+
+Good human-managed checks:
+
+- Sort by `main_category`, `sample_type`, `bpm`, `key`, and `tempo_fit`.
+- Skim `review-needed.tsv` for obvious missing keywords or pack patterns.
+- Check `house-lower.tsv` manually; lower-BPM house material may still be useful
+  for pitching, chopping, dub texture, or resampling.
+- Check `warnings` for `digitakt-name>24`, but leave hardware-bank curation until
+  the library index is cleaner.
+- Pick 10-30 representative bad rows when asking AI to improve rules. Do not send
+  the whole manifest.
+
+### 3. Cheap terminal summaries
+
+These commands help you get signal without token burn:
+
+```bash
+wc -l manifests/index-latest/*.tsv manifests/index-latest/tempo/*.tsv
+sed -n '1,25p' manifests/index-latest/review-needed.tsv
+rg -n "house-lower|too-fast|unknown" manifests/review-latest.tsv
+find "/Volumes/Extreme SSD/Production/SAMPLES" -name '._*' | wc -l
+```
+
+Use the counts and a handful of example rows as the AI prompt. That is usually
+enough context to improve rules without spending tokens on thousands of rows.
+
+### 4. Safe dry-runs only
+
+These are useful checks and do not mutate samples:
+
+```bash
+lc --no-probe
+ld
+```
+
+Avoid `lc --apply` or `ld --apply` until the manifest review looks sane and you
+have a backup. `ld` can be run to estimate duplicate candidates, but actual
+staging should wait until the category/index pass has settled.
+
 Run review before any apply step when improving the library taxonomy. It keeps
 musical axes separate: `main_category` (kicks, bass, vocals, etc.),
 `sample_type` (loop, one-shot, texture, unknown), explicit `bpm`/`key`,
