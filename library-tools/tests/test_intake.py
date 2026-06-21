@@ -68,3 +68,28 @@ def test_slug_collision_gets_suffix(tmp_path: Path):
     plan = intake.build_plan(root=root)
 
     assert plan[0].dest == root / "PACKS" / "filterheadz-hardgroove-techno-2"
+
+
+def test_apply_moves_pack_and_records_manifest(tmp_path: Path):
+    root = tmp_path / "SAMPLES"
+    _mk(root, "Filterheadz Hardgroove Techno/a.wav")
+
+    rc = intake.main(["--apply", "--root", str(root)])
+
+    assert rc == 0
+    dest = root / "PACKS" / "filterheadz-hardgroove-techno"
+    assert (dest / "a.wav").is_file()                       # pack moved whole
+    assert not (root / "Filterheadz Hardgroove Techno").exists()
+    manifest = (root / "PACKS" / "_manifest.tsv").read_text()
+    assert "filterheadz-hardgroove-techno\tFilterheadz Hardgroove Techno\t" in manifest
+
+
+def test_dry_run_moves_nothing(tmp_path: Path):
+    root = tmp_path / "SAMPLES"
+    _mk(root, "Some Pack/a.wav")
+
+    rc = intake.main(["--root", str(root)])   # no --apply
+
+    assert rc == 0
+    assert (root / "Some Pack" / "a.wav").is_file()         # untouched
+    assert not (root / "PACKS").exists()

@@ -6,7 +6,10 @@ librarytools.moves for never-overwrite, undo-logged, dry-run-by-default moves.
 
 from __future__ import annotations
 
+import argparse
 import re
+import sys
+from datetime import date
 from pathlib import Path
 
 from . import config, moves, review
@@ -80,3 +83,53 @@ def build_plan(root: Path = config.SAMPLES_ROOT) -> list[moves.Move]:
         claimed.add(dest)
         plan.append(moves.Move(entry, dest, f"pack|{entry.name}"))
     return plan
+
+
+def record_manifest(plan: list[moves.Move], packs_root: Path) -> None:
+    """Append slug<TAB>original<TAB>date for each planned pack (for traceability)."""
+    if not plan:
+        return
+    packs_root.mkdir(parents=True, exist_ok=True)
+    today = date.today().isoformat()
+    with (packs_root / "_manifest.tsv").open("a", encoding="utf-8") as fh:
+        for m in plan:
+            original = m.tag.split("|", 1)[1]
+            fh.write(f"{m.dest.name}\t{original}\t{today}\n")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(
+        prog="sample-intake",
+        description="Route stray vendor packs into PACKS/ with clean names (dry-run by default).",
+    )
+    ap.add_argument("--apply", action="store_true", help="perform the moves (default: dry-run)")
+    ap.add_argument("--root", type=Path, default=config.SAMPLES_ROOT, help="library root")
+    args = ap.parse_args(argv)
+
+    if not args.root.is_dir():
+        print(f"root not found: {args.root}", file=sys.stderr)
+        return 2
+
+    plan = build_plan(root=args.root)
+    manifest = config.manifest_path("intake")
+    moves.write_plan(manifest, plan)
+    print(f"[{'APPLY' if args.apply else 'DRY-RUN'}] intake {args.root}")
+    print(f"  stray packs: {len(plan)}")
+    for m in plan:
+        print(f"    {m.tag.split('|', 1)[1]}  ->  PACKS/{m.dest.name}")
+    print(f"  plan written: {manifest}")
+
+    if not args.apply:
+        print("  (dry-run — re-run with --apply to move packs)")
+        return 0
+
+    undo = config.manifest_path("undo-intake")
+    counts = moves.apply_plan(plan, undo)
+    record_manifest(plan, args.root / "PACKS")
+    print(f"  moved: {counts['moved']}; skipped(exists): {counts['exists']}; missing: {counts['missing']}")
+    print(f"  undo written: {undo}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
