@@ -15,6 +15,11 @@ SAMPLES_ROOT: Path = Path(
     os.environ.get("SAMPLES_ROOT", "/Volumes/Extreme SSD/Production/SAMPLES")
 )
 
+# Two-zone model: CURATED/ = role folders (renamed by convention);
+# PACKS/ = whole vendor packs kept intact.
+CURATED_ROOT: Path = SAMPLES_ROOT / "CURATED"
+PACKS_ROOT: Path = SAMPLES_ROOT / "PACKS"
+
 # Top-level folders classify is allowed to read from (the messy bulk).
 IN_SCOPE: tuple[str, ...] = ("_PACKS", "DRUM-KITS", "00_INBOX")
 
