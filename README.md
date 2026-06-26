@@ -14,6 +14,10 @@ Target sound: hypnotic / dub / raw / hard-groove techno (~130–150 BPM).
 | [`library-tools/`](library-tools/) | ✅ built | Manifest-only sample review/indexing by category, loop/one-shot type, BPM, key, tempo fit, plus dry-run classify, de-dupe, sort, and **intake** tools. Two-zone model: `CURATED/` (role folders) + `PACKS/` (whole vendor packs). |
 | `inbox-sort/` | ✅ folded into `library-tools` as `sample-intake` | Detects whole vendor packs dropped at the top level / `00_INBOX/`, normalizes their names, and moves them into `PACKS/` (reversible, dry-run by default). |
 | `inventory/` | folded into `library-tools` for now | `sample-review` emits TSV indexes that drive curation without moving originals. |
+| `midi-tools/` | 📋 specced | Generate techno MIDI (Euclidean / bassline / hats) as `.mid` for Ableton + hardware. Spec/plan: [`docs/superpowers/`](docs/superpowers/) `2026-06-26-midi-generator*`. **Build first.** |
+| `ableton-tools/` | 📋 specced | Read-only Ableton `.als` introspection: index tempo/key/samples, find missing media, surface reusable loops. Spec/plan: `2026-06-26-ableton-als-introspection*`. |
+| `analysis-tools/` | 📋 specced | Tier-A1 bounce analysis: LUFS / true-peak / spectral / mono-compat / BPM / key; feeds `sample-tools` export. Spec/plan: `2026-06-26-bounce-analysis-a1*`. |
+| `stem-tools/` | 📋 specced | `demucs` stem separation (drums/bass/vocals/other) for resampling + vocal sourcing. Spec/plan: `2026-06-26-stem-separation*`. **Build last (heavy).** |
 
 ## Storage & workflow
 
