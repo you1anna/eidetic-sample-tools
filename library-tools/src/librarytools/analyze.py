@@ -9,10 +9,10 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import config
+from . import config, probe, review
 
 AUDIO_EXTS: frozenset[str] = config.SOURCE_EXTS
 DOC_EXTS: frozenset[str] = frozenset({".pdf", ".txt", ".md", ".rtf", ".nfo", ".url"})
@@ -38,6 +38,25 @@ class SourceRow:
     source_name: str
     processing_tag: str
     processing_reason: str
+
+
+@dataclass(frozen=True)
+class FeatureRow:
+    path: Path
+    source_kind: str
+    source_name: str
+    role: str
+    sample_type: str
+    bpm: str
+    key: str
+    tempo_fit: str
+    duration: float | None
+    proposed_name: str
+    review_reason: str
+    processing_tag: str
+    processing_reason: str
+    character_tags: str
+    tag_reasons: str
 
 
 def _is_ignored(path: Path) -> bool:
@@ -207,6 +226,132 @@ def write_source_registry(path: Path, rows: list[SourceRow]) -> None:
                 row.source_name,
                 row.processing_tag,
                 row.processing_reason,
+            ])
+
+
+def _is_sample_source(row: SourceRow) -> bool:
+    return row.source_kind in {"curated-sample", "vendor-pack-audio", "octatrack-set-audio"}
+
+
+def _has(text: str, *needles: str) -> bool:
+    return any(needle in text for needle in needles)
+
+
+def derive_character_tags(row: FeatureRow) -> tuple[str, str]:
+    tags: list[str] = []
+    reasons: list[str] = []
+    text = row.path.as_posix().lower().replace("_", " ").replace("-", " ")
+
+    def add(tag: str, reason: str) -> None:
+        if tag not in tags:
+            tags.append(tag)
+            reasons.append(reason)
+
+    if row.role == "KICKS":
+        if _has(text, "sub"):
+            add("subby", "path:sub")
+        if row.duration is not None and row.duration <= 0.75:
+            add("short", f"duration={row.duration:.2f}s")
+        if _has(text, "rumble"):
+            add("rumble-long", "path:rumble")
+    if row.role == "HATS-CYM":
+        if _has(text, "metallic", "metal"):
+            add("metallic", "path:metallic")
+        if _has(text, "tight", "closed") or (row.duration is not None and row.duration <= 0.35):
+            add("tight", f"duration={row.duration:.2f}s" if row.duration is not None else "path:tight")
+    if row.role == "PERC":
+        if _has(text, "wood", "clave", "block"):
+            add("wood", "path:wood-family")
+        if _has(text, "tribal", "conga", "tom", "cowbell"):
+            add("tribal", "path:tribal-family")
+    if row.role == "DRUM-LOOPS":
+        if _has(text, "sparse"):
+            add("sparse", "path:sparse")
+        if _has(text, "busy"):
+            add("busy", "path:busy")
+        if _has(text, "top") and row.bpm:
+            add(f"top-{row.bpm}", f"path:top;bpm={row.bpm}")
+    if row.role == "DRONE-ATMOS":
+        if _has(text, "dub", "wash"):
+            add("dub-wash", "path:dub/wash")
+    if row.processing_tag:
+        add(row.processing_tag, row.processing_reason)
+
+    return ";".join(tags), ";".join(reasons)
+
+
+def build_feature_rows(
+    root: Path,
+    sources: list[SourceRow],
+    probe_durations: bool = False,
+) -> list[FeatureRow]:
+    rows: list[FeatureRow] = []
+    for source in sources:
+        if not _is_sample_source(source):
+            continue
+        full_path = root / source.path
+        duration = probe.duration(full_path) if probe_durations else None
+        item = review.build_item(full_path, root, probe_durations=False)
+        row = FeatureRow(
+            path=source.path,
+            source_kind=source.source_kind,
+            source_name=source.source_name,
+            role=item.role,
+            sample_type=item.sample_type,
+            bpm=item.bpm,
+            key=item.key,
+            tempo_fit=item.tempo_fit,
+            duration=duration,
+            proposed_name=item.proposed_name,
+            review_reason=item.reason,
+            processing_tag=source.processing_tag,
+            processing_reason=source.processing_reason,
+            character_tags="",
+            tag_reasons="",
+        )
+        tags, reasons = derive_character_tags(row)
+        rows.append(replace(row, character_tags=tags, tag_reasons=reasons))
+    return rows
+
+
+def write_features(path: Path, rows: list[FeatureRow]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh, delimiter="\t")
+        writer.writerow([
+            "path",
+            "source_kind",
+            "source_name",
+            "role",
+            "sample_type",
+            "bpm",
+            "key",
+            "tempo_fit",
+            "duration",
+            "proposed_name",
+            "review_reason",
+            "processing_tag",
+            "processing_reason",
+            "character_tags",
+            "tag_reasons",
+        ])
+        for row in rows:
+            writer.writerow([
+                row.path.as_posix(),
+                row.source_kind,
+                row.source_name,
+                row.role,
+                row.sample_type,
+                row.bpm,
+                row.key,
+                row.tempo_fit,
+                f"{row.duration:.3f}" if row.duration is not None else "",
+                row.proposed_name,
+                row.review_reason,
+                row.processing_tag,
+                row.processing_reason,
+                row.character_tags,
+                row.tag_reasons,
             ])
 
 

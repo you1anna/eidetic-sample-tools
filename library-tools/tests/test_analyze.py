@@ -107,3 +107,56 @@ def test_write_source_registry_outputs_tsv(tmp_path: Path):
     rows = list(csv.DictReader(out.open(), delimiter="\t"))
     assert rows[0]["path"] == "PACKS/Plain Vendor/Kicks/Vendor Kick.wav"
     assert rows[0]["source_kind"] == "vendor-pack-audio"
+
+
+def test_build_feature_rows_reuses_review_roles_and_processing_tags(tmp_path: Path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    src = _make(root / "PACKS" / "Caught on Tape 808+909" / "AUDIO" / "COT_BD_TapeSat.wav")
+    _make(root / "PACKS" / "Caught on Tape 808+909" / "project.work")
+    monkeypatch.setattr(analyze.probe, "duration", lambda path: 0.42 if path == src else None)
+    registry = analyze.build_source_registry(root, analyze.detect_ot_sets(root))
+
+    rows = analyze.build_feature_rows(root, registry, probe_durations=True)
+
+    assert len(rows) == 1
+    assert rows[0].path == Path("PACKS/Caught on Tape 808+909/AUDIO/COT_BD_TapeSat.wav")
+    assert rows[0].role == "KICKS"
+    assert rows[0].sample_type == "one-shot"
+    assert rows[0].duration == 0.42
+    assert "short" in rows[0].character_tags
+    assert "tape-saturated" in rows[0].character_tags
+    assert "filename_suffix:TapeSat" in rows[0].tag_reasons
+
+
+def test_character_tags_use_path_bpm_and_duration_signals(tmp_path: Path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    kick = _make(root / "PACKS" / "Vendor" / "Sub Kicks" / "Sub Kick.wav")
+    hat = _make(root / "PACKS" / "Vendor" / "Metallic Hats" / "Tight Hat.wav")
+    loop = _make(root / "PACKS" / "Vendor" / "Drum Loops" / "Sparse Top Loop 132 BPM.wav")
+    durations = {kick: 0.5, hat: 0.2, loop: 4.0}
+    monkeypatch.setattr(analyze.probe, "duration", lambda path: durations[path])
+    registry = analyze.build_source_registry(root, analyze.detect_ot_sets(root))
+
+    rows = {
+        row.path.as_posix(): row
+        for row in analyze.build_feature_rows(root, registry, probe_durations=True)
+    }
+
+    assert rows["PACKS/Vendor/Sub Kicks/Sub Kick.wav"].character_tags == "subby;short"
+    assert rows["PACKS/Vendor/Metallic Hats/Tight Hat.wav"].character_tags == "metallic;tight"
+    assert rows["PACKS/Vendor/Drum Loops/Sparse Top Loop 132 BPM.wav"].character_tags == "sparse;top-132"
+
+
+def test_write_features_outputs_tsv(tmp_path: Path):
+    root = tmp_path / "SAMPLES"
+    _make(root / "PACKS" / "Vendor" / "Kicks" / "Kick.wav")
+    out = tmp_path / "features.tsv"
+    registry = analyze.build_source_registry(root, analyze.detect_ot_sets(root))
+    features = analyze.build_feature_rows(root, registry, probe_durations=False)
+
+    analyze.write_features(out, features)
+
+    rows = list(csv.DictReader(out.open(), delimiter="\t"))
+    assert rows[0]["path"] == "PACKS/Vendor/Kicks/Kick.wav"
+    assert rows[0]["role"] == "KICKS"
+    assert "path:kick" in rows[0]["review_reason"]
