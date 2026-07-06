@@ -18,6 +18,7 @@ sample-dedupe = "librarytools.dedupe:main"
 sample-intake = "librarytools.intake:main"
 sample-review = "librarytools.review:main"
 sample-sort = "librarytools.sort:main"
+sample-analyze = "librarytools.analyze:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
