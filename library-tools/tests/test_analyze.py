@@ -213,3 +213,30 @@ def test_write_crates_outputs_manifest_text_files(tmp_path: Path):
     written = tmp_path / "crates" / "digitakt" / "punchy-techno-kit.txt"
     assert written.exists()
     assert "PACKS/Vendor/Kicks/Kick.wav" in written.read_text()
+
+
+def test_main_writes_full_pilot_artifacts_without_moving_sources(tmp_path: Path):
+    root = tmp_path / "SAMPLES"
+    ot_audio = _make(root / "PACKS" / "Caught on Tape 808+909" / "AUDIO" / "COT_BD_TapeSat.wav")
+    _make(root / "PACKS" / "Caught on Tape 808+909" / "project.work")
+    vendor = _make(root / "PACKS" / "Vendor" / "Hats" / "Tight Hat.wav")
+    out = tmp_path / "pilot"
+
+    code = analyze.main([
+        "--root", str(root),
+        "--pilot",
+        "--no-probe",
+        "--output-dir", str(out),
+    ])
+
+    assert code == 0
+    assert ot_audio.exists()
+    assert vendor.exists()
+    assert (out / "ot-sets-latest.tsv").exists()
+    assert (out / "source-registry-latest.tsv").exists()
+    assert (out / "sample-features-latest.tsv").exists()
+    assert (out / "crates" / "digitakt" / "punchy-techno-kit.txt").exists()
+    assert (out / "crates" / "octatrack" / "caught-on-tape-808-909-set.txt").exists()
+    report = (out / "reports" / "pilot.md").read_text()
+    assert "OT Sets: 1" in report
+    assert "Feature Rows: 2" in report

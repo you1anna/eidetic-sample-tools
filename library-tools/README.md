@@ -8,6 +8,9 @@ library. Review is **manifest-only**; tidy tools default to **dry-run** and
 - `sample-review` — proposes role folders and hardware-friendly filenames in a
   TSV manifest for human review. It indexes category, loop/one-shot type, BPM,
   key, and tempo fit. It never moves or renames originals.
+- `sample-analyze` — writes a read-only sample-intelligence pilot: Octatrack Set
+  registry, source registry, feature/tag TSV, device crate suggestions, and a
+  short report.
 - `sample-sort` — the apply step for `sample-review`'s classification: moves
   confidently-classified files **flat** into their role folder
   (`<ROLE>/<proposed_name>`), using the same name/BPM/key analysis. Dry-run by
@@ -44,6 +47,7 @@ ls --apply                # move classified files into <ROLE>/, write undo manif
 ls --include-review --apply   # also gather low-confidence files into _REVIEW/
 ld                 # dry-run: how many dupes, ~GB reclaimable
 ld --apply         # move dupes to _TO-DELETE/dupes/, write undo manifest
+~/.venvs/library-tools/bin/sample-analyze --pilot --no-probe
 ```
 
 Run sort (or the older classify) **before** dedupe so dedupe sees the final layout.
@@ -66,6 +70,31 @@ lr --no-probe --output manifests/review-latest.tsv --index-dir manifests/index-l
 
 This writes review data only; it does **not** move, rename, convert, or delete
 samples. Re-run it after you add/remove packs.
+
+### Sample intelligence pilot
+
+`sample-analyze` is the next read-only layer after `sample-review`. It registers
+Octatrack Sets as intact sources, indexes audio/doc/project files by source kind,
+derives first-pass character tags with reason strings, and writes small suggested
+crate manifests for Digitakt, TR-8S, Octatrack, and Ableton.
+
+```bash
+~/.venvs/library-tools/bin/sample-analyze --pilot --no-probe
+```
+
+Generated artifacts land under `manifests/sample-intelligence-pilot/`:
+
+```text
+ot-sets-latest.tsv
+source-registry-latest.tsv
+sample-features-latest.tsv
+crates/<device>/*.txt
+reports/pilot.md
+```
+
+The command is manifest-only: it does not move, delete, rewrite, convert, or copy
+sample files. Drop `--no-probe` when you want duration-based tags and have
+`ffprobe` available.
 
 ### 2. Inspect the useful slices yourself
 

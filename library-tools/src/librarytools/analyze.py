@@ -417,6 +417,45 @@ def write_crates(output_dir: Path, crates: dict[str, list[CrateEntry]]) -> None:
                 fh.write(f"{entry.path.as_posix()}\n")
 
 
+def write_report(
+    path: Path,
+    ot_sets: list[OtSet],
+    sources: list[SourceRow],
+    features: list[FeatureRow],
+    crates: dict[str, list[CrateEntry]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    source_counts: dict[str, int] = {}
+    for row in sources:
+        source_counts[row.source_kind] = source_counts.get(row.source_kind, 0) + 1
+    role_counts: dict[str, int] = {}
+    for row in features:
+        role_counts[row.role] = role_counts.get(row.role, 0) + 1
+
+    lines = [
+        "# Sample Intelligence Pilot",
+        "",
+        f"OT Sets: {len(ot_sets)}",
+        f"Source Rows: {len(sources)}",
+        f"Feature Rows: {len(features)}",
+        "",
+        "## Source Kinds",
+    ]
+    if source_counts:
+        lines.extend(f"- {kind}: {count}" for kind, count in sorted(source_counts.items()))
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Roles"])
+    if role_counts:
+        lines.extend(f"- {role}: {count}" for role, count in sorted(role_counts.items()))
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Crates"])
+    for name, entries in sorted(crates.items()):
+        lines.append(f"- {name}: {len(entries)}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def write_ot_sets(path: Path, sets: list[OtSet]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fh:
@@ -459,6 +498,7 @@ def main(argv: list[str] | None = None) -> int:
         help="directory for generated sample intelligence artifacts",
     )
     ap.add_argument("--pilot", action="store_true", help="run the phase-1 pilot output set")
+    ap.add_argument("--no-probe", action="store_true", help="skip ffprobe duration features")
     args = ap.parse_args(argv)
 
     if not args.root.is_dir():
@@ -466,9 +506,21 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     sets = detect_ot_sets(args.root)
+    sources = build_source_registry(args.root, sets)
+    features = build_feature_rows(args.root, sources, probe_durations=not args.no_probe)
+    crates = build_crates(features, ot_sets=sets)
+
     write_ot_sets(args.output_dir / "ot-sets-latest.tsv", sets)
+    write_source_registry(args.output_dir / "source-registry-latest.tsv", sources)
+    write_features(args.output_dir / "sample-features-latest.tsv", features)
+    write_crates(args.output_dir, crates)
+    write_report(args.output_dir / "reports" / "pilot.md", sets, sources, features, crates)
+
     print(f"[MANIFEST-ONLY] sample intelligence {args.root}")
     print(f"  ot sets: {len(sets)}")
+    print(f"  source rows: {len(sources)}")
+    print(f"  feature rows: {len(features)}")
+    print(f"  crates: {len(crates)}")
     print(f"  output dir: {args.output_dir}")
     return 0
 
