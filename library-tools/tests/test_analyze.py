@@ -244,6 +244,35 @@ def test_write_features_outputs_tsv(tmp_path: Path):
     assert "path:kick" in rows[0]["review_reason"]
 
 
+def test_curated_role_folder_is_authoritative_for_feature_rows(tmp_path: Path):
+    root = tmp_path / "SAMPLES"
+    _make(
+        root
+        / "CURATED"
+        / "SYNTH-STAB-CHORD"
+        / "Systematic.Sounds.Robert.Babicz.Hands.On.303"
+        / "Bass 303 Loop.wav"
+    )
+    registry = analyze.build_source_registry(root, analyze.detect_ot_sets(root))
+
+    rows = analyze.build_feature_rows(root, registry, probe_durations=False)
+
+    assert rows[0].path == Path(
+        "CURATED/SYNTH-STAB-CHORD/Systematic.Sounds.Robert.Babicz.Hands.On.303/Bass 303 Loop.wav"
+    )
+    assert rows[0].role == "SYNTH-STAB-CHORD"
+
+
+def test_no_kick_loop_in_curated_drum_loops_stays_drum_loop(tmp_path: Path):
+    root = tmp_path / "SAMPLES"
+    _make(root / "CURATED" / "DRUM-LOOPS" / "TR-8 Grooves" / "S2S_125BPM_Loop 10_No Kick.wav")
+    registry = analyze.build_source_registry(root, analyze.detect_ot_sets(root))
+
+    rows = analyze.build_feature_rows(root, registry, probe_durations=False)
+
+    assert rows[0].role == "DRUM-LOOPS"
+
+
 def test_build_feature_rows_adds_acoustic_features_and_reasons(tmp_path: Path, monkeypatch):
     root = tmp_path / "SAMPLES"
     kick = _make(root / "PACKS" / "Vendor" / "Kicks" / "Kick.wav")
@@ -405,6 +434,18 @@ def test_cluster_labels_fall_back_to_acoustic_traits_when_tags_are_empty():
     labels = {row.cluster_label for row in rows}
 
     assert labels == {"subby-tonal-short", "bright-noisy-short"}
+
+
+def test_cluster_within_role_skips_demo_preview_candidates():
+    rows = analyze.cluster_within_role([
+        _feature_row("CURATED/KICKS/Good Kick 0.wav", sub_ratio=0.85, tail_ms=120, centroid_hz=80, flatness=0.02, tags="subby;short"),
+        _feature_row("CURATED/KICKS/Good Kick 1.wav", sub_ratio=0.86, tail_ms=121, centroid_hz=81, flatness=0.02, tags="subby;short"),
+        _feature_row("CURATED/KICKS/AUDIO DEMO/TUNED KICKS DEMO.mp3", sub_ratio=0.87, tail_ms=122, centroid_hz=82, flatness=0.02, tags="subby;short"),
+    ])
+
+    paths = {row.path.as_posix() for row in rows}
+    assert "CURATED/KICKS/Good Kick 0.wav" in paths
+    assert "CURATED/KICKS/AUDIO DEMO/TUNED KICKS DEMO.mp3" not in paths
 
 
 def test_write_clusters_outputs_representative_tsv(tmp_path: Path):

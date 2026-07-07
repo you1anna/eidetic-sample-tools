@@ -405,6 +405,16 @@ def derive_character_tags(row: FeatureRow) -> tuple[str, str]:
     return ";".join(tags), ";".join(reasons)
 
 
+def _curated_folder_role(rel: Path) -> str | None:
+    if (
+        len(rel.parts) >= 2
+        and rel.parts[0] == "CURATED"
+        and rel.parts[1] in review.ROLE_FOLDERS
+    ):
+        return rel.parts[1]
+    return None
+
+
 def build_feature_rows(
     root: Path,
     sources: list[SourceRow],
@@ -424,12 +434,16 @@ def build_feature_rows(
             probe.duration(full_path) if probe_durations else None
         )
         item = review.build_item(full_path, root, probe_durations=False)
+        role = _curated_folder_role(source.path) or item.role
+        sample_type = review.sample_type(source.path, role, duration)
+        proposed_name = review.proposed_name(source.path, role)
+        review_reason = f"curated-role:{role}" if role != item.role else item.reason
         row = FeatureRow(
             path=source.path,
             source_kind=source.source_kind,
             source_name=source.source_name,
-            role=item.role,
-            sample_type=item.sample_type,
+            role=role,
+            sample_type=sample_type,
             bpm=item.bpm,
             key=item.key,
             tempo_fit=item.tempo_fit,
@@ -451,8 +465,8 @@ def build_feature_rows(
             onset_density=values["onset_density"],
             zcr=values["zcr"],
             audio_error=acoustic.error if acoustic and acoustic.error else "",
-            proposed_name=item.proposed_name,
-            review_reason=item.reason,
+            proposed_name=proposed_name,
+            review_reason=review_reason,
             processing_tag=source.processing_tag,
             processing_reason=source.processing_reason,
             character_tags="",
@@ -529,6 +543,9 @@ CLUSTER_FEATURES: tuple[str, ...] = (
 
 
 def _cluster_vector(row: FeatureRow) -> list[float] | None:
+    text = row.path.as_posix().lower().replace("_", " ").replace("-", " ")
+    if _has(text, *DEVICE_SKIP_TOKENS):
+        return None
     if row.audio_error:
         return None
     values: list[float] = []
