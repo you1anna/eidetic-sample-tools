@@ -96,6 +96,24 @@ The command is manifest-only: it does not move, delete, rewrite, convert, or cop
 sample files. Drop `--no-probe` when you want duration-based tags and have
 `ffprobe` available.
 
+What this is useful for:
+
+- Confirming Octatrack-native packs are seen as intact Sets, not flattened
+  folders.
+- Producing small, device-shaped audition lists instead of broad alphabetical
+  dumps.
+- Surfacing obvious rule mistakes in the path/tag heuristics before any export
+  or physical library move.
+
+What it does **not** prove yet:
+
+- That the chosen sounds are musically good.
+- That a Digitakt/TR-8S bank is performance-ready.
+- That filename/path-derived tags are semantically correct.
+
+Treat the crates as shortlist manifests for ear-checking. Promote only
+human-auditioned favourites into stable export manifests.
+
 ### 2. Inspect the useful slices yourself
 
 Open these TSVs in Numbers, LibreOffice, VS Code, or a text editor:
