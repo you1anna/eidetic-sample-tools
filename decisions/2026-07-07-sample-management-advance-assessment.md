@@ -35,3 +35,23 @@ Verification:
 ## Next Move
 
 Robin should audition the regenerated KICKS representatives first, then mark useful/poor labels. The next agent build step is a manifest-only near-duplicate report using the cached acoustic features; do not move or delete samples until that report is reviewed.
+
+## Follow-Up Advance Pass
+
+Date: 2026-07-07
+
+The Active -> Operationalising gate is still not met. The exact blockers are:
+
+- No human ear-check has validated the regenerated representative clusters.
+- The SSD is still an unbacked exFAT production archive, so physical sample moves or operating routines remain too risky.
+
+Action taken without crossing the gate:
+
+- Generated a read-only KICKS audition packet from the current pilot artifacts:
+  - `library-tools/manifests/sample-intelligence-pilot/audition/kicks-representatives.md`
+  - `library-tools/manifests/sample-intelligence-pilot/audition/kicks-representatives.m3u`
+  - `library-tools/manifests/sample-intelligence-pilot/audition/all-representatives.tsv`
+- The KICKS queue contains 8 representative files, one per current KICKS cluster.
+- The all-representatives TSV contains 88 representative rows plus header.
+
+Recommendation remains: hold project-state advancement, audition the KICKS packet, then build the read-only near-duplicate manifest from concrete audition/duplicate-management needs.
