@@ -4,12 +4,58 @@ import csv
 from pathlib import Path
 
 from librarytools import analyze
+from librarytools.featurecache import FeatureRecord
 
 
 def _make(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x")
     return path
+
+
+def _feature_row(
+    path: str,
+    *,
+    sub_ratio: float,
+    tail_ms: float,
+    centroid_hz: float,
+    flatness: float,
+    tags: str,
+) -> analyze.FeatureRow:
+    return analyze.FeatureRow(
+        path=Path(path),
+        source_kind="vendor-pack-audio",
+        source_name="Vendor",
+        role="KICKS",
+        sample_type="one-shot",
+        bpm="",
+        key="",
+        tempo_fit="unknown",
+        duration=0.5,
+        duration_s=0.5,
+        peak=0.9,
+        rms=0.3,
+        crest=3.0,
+        attack_ms=4.0,
+        tail_ms=tail_ms,
+        head_silence_ms=0.0,
+        tail_silence_ms=10.0,
+        centroid_hz=centroid_hz,
+        flatness=flatness,
+        sub_ratio=sub_ratio,
+        low_ratio=sub_ratio,
+        mid_ratio=max(0.0, 1.0 - sub_ratio),
+        high_ratio=0.05,
+        onset_density=1.0,
+        zcr=0.02,
+        audio_error="",
+        proposed_name=Path(path).stem,
+        review_reason="test",
+        processing_tag="",
+        processing_reason="",
+        character_tags=tags,
+        tag_reasons="test",
+    )
 
 
 def test_detect_ot_set_registers_project_audio_and_docs(tmp_path: Path):
@@ -198,6 +244,55 @@ def test_write_features_outputs_tsv(tmp_path: Path):
     assert "path:kick" in rows[0]["review_reason"]
 
 
+def test_build_feature_rows_adds_acoustic_features_and_reasons(tmp_path: Path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    kick = _make(root / "PACKS" / "Vendor" / "Kicks" / "Kick.wav")
+    registry = analyze.build_source_registry(root, analyze.detect_ot_sets(root))
+    calls = []
+
+    def fake_extract(path: Path, cache_path: Path | None = None) -> FeatureRecord:
+        calls.append((path, cache_path))
+        stat = path.stat()
+        return FeatureRecord(
+            path=cache_path or path,
+            size=stat.st_size,
+            mtime=stat.st_mtime,
+            duration_s=0.42,
+            peak=0.9,
+            rms=0.3,
+            crest=3.0,
+            attack_ms=3.0,
+            tail_ms=120.0,
+            head_silence_ms=0.0,
+            tail_silence_ms=12.0,
+            centroid_hz=90.0,
+            flatness=0.02,
+            sub_ratio=0.72,
+            low_ratio=0.82,
+            mid_ratio=0.15,
+            high_ratio=0.03,
+            onset_density=1.0,
+            zcr=0.01,
+        )
+
+    monkeypatch.setattr(analyze.audiofeatures, "extract", fake_extract)
+
+    rows = analyze.build_feature_rows(
+        root,
+        registry,
+        audio_features=True,
+        cache_path=tmp_path / "features.sqlite",
+    )
+
+    assert calls == [(kick, Path("PACKS/Vendor/Kicks/Kick.wav"))]
+    assert rows[0].duration == 0.42
+    assert rows[0].sub_ratio == 0.72
+    assert rows[0].tail_ms == 120.0
+    assert rows[0].character_tags == "subby;short;clicky"
+    assert "sub_ratio=0.72" in rows[0].tag_reasons
+    assert "tail_ms=120" in rows[0].tag_reasons
+
+
 def test_build_crates_keeps_digitakt_and_tr8s_one_shot_oriented(tmp_path: Path, monkeypatch):
     root = tmp_path / "SAMPLES"
     kick = _make(root / "PACKS" / "Vendor" / "Kicks" / "Kick 909.wav")
@@ -259,6 +354,75 @@ def test_device_crates_skip_demos_unfriendly_formats_and_mismatched_curated_role
     assert "CURATED/DRONE-ATMOS/Hat From Atmos.wav" not in digitakt_paths
 
 
+def test_cluster_within_role_separates_synthetic_audio_groups_deterministically():
+    subby = [
+        _feature_row(
+            f"PACKS/Vendor/Kicks/Sub {idx}.wav",
+            sub_ratio=0.85 + idx * 0.01,
+            tail_ms=120 + idx,
+            centroid_hz=80 + idx,
+            flatness=0.02,
+            tags="subby;short",
+        )
+        for idx in range(3)
+    ]
+    clicky = [
+        _feature_row(
+            f"PACKS/Vendor/Kicks/Click {idx}.wav",
+            sub_ratio=0.05,
+            tail_ms=40 + idx,
+            centroid_hz=4500 + idx * 10,
+            flatness=0.75,
+            tags="clicky",
+        )
+        for idx in range(3)
+    ]
+
+    first = analyze.cluster_within_role(subby + clicky)
+    second = analyze.cluster_within_role(list(reversed(subby + clicky)))
+
+    first_by_path = {row.path.as_posix(): row for row in first}
+    second_by_path = {row.path.as_posix(): row for row in second}
+    assert first_by_path == second_by_path
+    assert first_by_path["PACKS/Vendor/Kicks/Sub 0.wav"].cluster_label == "subby-short"
+    assert first_by_path["PACKS/Vendor/Kicks/Click 0.wav"].cluster_label == "clicky"
+    assert (
+        first_by_path["PACKS/Vendor/Kicks/Sub 0.wav"].cluster_label
+        != first_by_path["PACKS/Vendor/Kicks/Click 0.wav"].cluster_label
+    )
+    representatives = [row for row in first if row.is_representative]
+    assert len(representatives) == 2
+
+
+def test_cluster_labels_fall_back_to_acoustic_traits_when_tags_are_empty():
+    rows = analyze.cluster_within_role([
+        _feature_row("PACKS/Vendor/Kicks/Sub 0.wav", sub_ratio=0.85, tail_ms=120, centroid_hz=80, flatness=0.02, tags=""),
+        _feature_row("PACKS/Vendor/Kicks/Sub 1.wav", sub_ratio=0.86, tail_ms=121, centroid_hz=81, flatness=0.02, tags=""),
+        _feature_row("PACKS/Vendor/Kicks/Noise 0.wav", sub_ratio=0.05, tail_ms=40, centroid_hz=4500, flatness=0.75, tags=""),
+        _feature_row("PACKS/Vendor/Kicks/Noise 1.wav", sub_ratio=0.05, tail_ms=41, centroid_hz=4510, flatness=0.75, tags=""),
+    ])
+
+    labels = {row.cluster_label for row in rows}
+
+    assert labels == {"subby-tonal-short", "bright-noisy-short"}
+
+
+def test_write_clusters_outputs_representative_tsv(tmp_path: Path):
+    rows = analyze.cluster_within_role([
+        _feature_row("PACKS/Vendor/Kicks/Sub 0.wav", sub_ratio=0.85, tail_ms=120, centroid_hz=80, flatness=0.02, tags="subby;short"),
+        _feature_row("PACKS/Vendor/Kicks/Sub 1.wav", sub_ratio=0.86, tail_ms=121, centroid_hz=81, flatness=0.02, tags="subby;short"),
+        _feature_row("PACKS/Vendor/Kicks/Click 0.wav", sub_ratio=0.05, tail_ms=40, centroid_hz=4500, flatness=0.75, tags="clicky"),
+        _feature_row("PACKS/Vendor/Kicks/Click 1.wav", sub_ratio=0.05, tail_ms=41, centroid_hz=4510, flatness=0.75, tags="clicky"),
+    ])
+    out = tmp_path / "clusters.tsv"
+
+    analyze.write_clusters(out, rows)
+
+    written = list(csv.DictReader(out.open(), delimiter="\t"))
+    assert {row["cluster_label"] for row in written} == {"subby-short", "clicky"}
+    assert sum(row["is_representative"] == "yes" for row in written) == 2
+
+
 def test_build_crates_includes_octatrack_set_install_plan(tmp_path: Path):
     root = tmp_path / "SAMPLES"
     ot = root / "PACKS" / "Caught on Tape 808+909"
@@ -311,6 +475,7 @@ def test_main_writes_full_pilot_artifacts_without_moving_sources(tmp_path: Path)
     assert (out / "ot-sets-latest.tsv").exists()
     assert (out / "source-registry-latest.tsv").exists()
     assert (out / "sample-features-latest.tsv").exists()
+    assert (out / "clusters-latest.tsv").exists()
     assert (out / "crates" / "digitakt" / "punchy-techno-kit.txt").exists()
     assert (out / "crates" / "octatrack" / "caught-on-tape-808-909-set.txt").exists()
     report = (out / "reports" / "pilot.md").read_text()

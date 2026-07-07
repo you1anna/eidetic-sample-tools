@@ -79,7 +79,7 @@ derives first-pass character tags with reason strings, and writes small suggeste
 crate manifests for Digitakt, TR-8S, Octatrack, and Ableton.
 
 ```bash
-~/.venvs/library-tools/bin/sample-analyze --pilot --no-probe
+~/.venvs/library-tools/bin/sample-analyze --pilot
 ```
 
 Generated artifacts land under `manifests/sample-intelligence-pilot/`:
@@ -88,20 +88,25 @@ Generated artifacts land under `manifests/sample-intelligence-pilot/`:
 ot-sets-latest.tsv
 source-registry-latest.tsv
 sample-features-latest.tsv
+clusters-latest.tsv
 crates/<device>/*.txt
 reports/pilot.md
 ```
 
 The command is manifest-only: it does not move, delete, rewrite, convert, or copy
-sample files. Drop `--no-probe` when you want duration-based tags and have
-`ffprobe` available.
+sample files. By default it now decodes samples read-only, writes Tier-1 acoustic
+features to a SQLite cache at `manifests/sample-intelligence.sqlite`, and uses
+those features for inspectable character tags and within-role cluster/audition
+groups. Use `--no-probe` only when you want the old fast filename/path-only pass.
 
 What this is useful for:
 
 - Confirming Octatrack-native packs are seen as intact Sets, not flattened
   folders.
-- Producing small, device-shaped audition lists instead of broad alphabetical
-  dumps.
+- Producing small, device-shaped audition lists that spread across measured
+  sound clusters instead of broad alphabetical dumps.
+- Inspecting acoustic reasons such as `sub_ratio=0.72`, `tail_ms=120`, and
+  `centroid_hz=4500` before trusting a tag.
 - Surfacing obvious rule mistakes in the path/tag heuristics before any export
   or physical library move.
 
@@ -109,7 +114,9 @@ What it does **not** prove yet:
 
 - That the chosen sounds are musically good.
 - That a Digitakt/TR-8S bank is performance-ready.
-- That filename/path-derived tags are semantically correct.
+- That heuristic labels such as `subby-short` or `metallic-tight` are semantic
+  truth. They are grounded in simple acoustic features now, but still need ear
+  checks. Tier-2 embeddings / text search remain future work.
 
 Treat the crates as shortlist manifests for ear-checking. Promote only
 human-auditioned favourites into stable export manifests.

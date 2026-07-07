@@ -7,7 +7,10 @@ name = "librarytools"
 version = "0.1.0"
 description = "Sort the SSD sample library by sound type and de-dupe it (reversible)."
 requires-python = ">=3.12"
-dependencies = []  # stdlib + ffprobe via subprocess
+dependencies = [
+    "numpy>=2.0",
+    "soundfile>=0.13",
+]  # ffmpeg/ffprobe used via subprocess for format fallbacks and duration probes
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
