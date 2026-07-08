@@ -134,6 +134,28 @@ class CuratedRoleConflict:
     suggested_action: str
 
 
+@dataclass(frozen=True)
+class KickGateRow:
+    path: Path
+    current_role: str
+    sample_type: str
+    duration_s: float | None
+    attack_ms: float | None
+    tail_ms: float | None
+    sub_ratio: float | None
+    low_ratio: float | None
+    mid_ratio: float | None
+    high_ratio: float | None
+    centroid_hz: float | None
+    flatness: float | None
+    onset_density: float | None
+    zcr: float | None
+    kick_gate: str
+    confidence: str
+    reasons: str
+    review_action: str
+
+
 def _is_ignored(path: Path) -> bool:
     return any(part.startswith("._") or part in {".DS_Store", "__MACOSX"} for part in path.parts)
 
@@ -650,6 +672,189 @@ def _one_shot_role_cluster_issue(row: FeatureRow) -> bool:
     return row.tail_ms is not None and row.tail_ms > CURATED_LONG_TAIL_MS
 
 
+# High-precision KICKS gate. Optimises for precision: a KICKS row becomes
+# `likely_kick` only when cheap cached acoustic evidence strongly supports it.
+# Ambiguous-but-plausible kicks stay in `review`; clear non-kicks are rejected.
+KICK_MIN_LIKELY_SUB_RATIO = 0.55
+KICK_MIN_LIKELY_LOW_RATIO = 0.55
+KICK_MAX_LIKELY_HIGH_RATIO = 0.25
+KICK_MAX_LIKELY_DURATION_S = 0.90
+KICK_MAX_LIKELY_TAIL_MS = 450.0
+KICK_MAX_LIKELY_CENTROID_HZ = 2200.0
+KICK_MAX_LIKELY_FLATNESS = 0.45
+KICK_MAX_LIKELY_ONSET_DENSITY = 2.0
+# crest = peak/RMS. High crest is spiky/clicky; a kick with real body sits lower.
+# Measured median crest of strong low-end kicks in the library is ~3.3, so a 2.0
+# floor only excludes near-DC / no-transient sustained tones, not real kicks.
+KICK_MIN_LIKELY_CREST = 2.0
+KICK_MAX_LIKELY_ZCR = 0.12
+
+# Strong-reject thresholds (looser than the likely band; the gap routes to review).
+KICK_REJECT_DURATION_S = 3.0
+KICK_REJECT_ONSET_DENSITY = 4.0
+KICK_REJECT_HIGH_RATIO = 0.45
+KICK_REJECT_CENTROID_HZ = 3500.0
+KICK_REJECT_CENTROID_MIN_SUB = 0.45
+KICK_REJECT_ZCR = 0.18
+
+
+def _kick_gate_row(
+    row: FeatureRow,
+    gate: str,
+    confidence: str,
+    reasons: list[str],
+    review_action: str,
+) -> KickGateRow:
+    return KickGateRow(
+        path=row.path,
+        current_role=row.role,
+        sample_type=row.sample_type,
+        duration_s=row.duration_s if row.duration_s is not None else row.duration,
+        attack_ms=row.attack_ms,
+        tail_ms=row.tail_ms,
+        sub_ratio=row.sub_ratio,
+        low_ratio=row.low_ratio,
+        mid_ratio=row.mid_ratio,
+        high_ratio=row.high_ratio,
+        centroid_hz=row.centroid_hz,
+        flatness=row.flatness,
+        onset_density=row.onset_density,
+        zcr=row.zcr,
+        kick_gate=gate,
+        confidence=confidence,
+        reasons=";".join(reasons),
+        review_action=review_action,
+    )
+
+
+def kick_gate(row: FeatureRow) -> KickGateRow:
+    """Bucket a KICKS row as likely_kick / review / reject_as_kick.
+
+    Deterministic evidence ladder over existing cached acoustic features and the
+    curated-role conflict signals. Manifest-only: never moves or renames files.
+    """
+    # 1. Not a KICKS row: out of this gate's scope.
+    if row.role != "KICKS":
+        return _kick_gate_row(row, "review", "low", ["not-kicks-scope"], "not-kicks-scope")
+
+    # 2. Existing curated-role conflict signals (clap/snare/hat/cym/bass/synth/FX/
+    #    vocal/drum-loop names, loop sample_type, or long one-shot-role duration).
+    conflict = curated_role_conflict(row)
+    if conflict is not None:
+        return _kick_gate_row(
+            row, "reject_as_kick", "high", [f"role-conflict:{conflict.issues}"], "keep-out-of-kicks"
+        )
+
+    # 3. Missing decode / acoustic evidence: cannot confidently pass.
+    duration_s = row.duration_s if row.duration_s is not None else row.duration
+    required = (
+        duration_s, row.sub_ratio, row.low_ratio, row.high_ratio, row.centroid_hz,
+        row.tail_ms, row.onset_density, row.zcr, row.crest,
+    )
+    if row.audio_error or any(value is None for value in required):
+        reason = "decode-error" if row.audio_error else "missing-acoustic-features"
+        return _kick_gate_row(row, "review", "low", [reason], "decode-or-manual-review")
+
+    # 4. Loop / long / dense evidence: not a kick one-shot.
+    if (
+        row.sample_type == "loop"
+        or duration_s >= KICK_REJECT_DURATION_S
+        or row.onset_density >= KICK_REJECT_ONSET_DENSITY
+    ):
+        reasons: list[str] = []
+        if row.sample_type == "loop":
+            reasons.append("sample_type:loop")
+        if duration_s >= KICK_REJECT_DURATION_S:
+            reasons.append(_reason("duration_s", duration_s))
+        if row.onset_density >= KICK_REJECT_ONSET_DENSITY:
+            reasons.append(_reason("onset_density", row.onset_density))
+        return _kick_gate_row(row, "reject_as_kick", "high", reasons, "keep-out-of-kicks")
+
+    # 5. High-frequency / noisy spectral profile: hat/cymbal/noise, not kick.
+    if (
+        row.high_ratio >= KICK_REJECT_HIGH_RATIO
+        or (row.centroid_hz >= KICK_REJECT_CENTROID_HZ and row.sub_ratio < KICK_REJECT_CENTROID_MIN_SUB)
+        or row.zcr >= KICK_REJECT_ZCR
+    ):
+        reasons = []
+        if row.high_ratio >= KICK_REJECT_HIGH_RATIO:
+            reasons.append(_reason("high_ratio", row.high_ratio))
+        if row.centroid_hz >= KICK_REJECT_CENTROID_HZ and row.sub_ratio < KICK_REJECT_CENTROID_MIN_SUB:
+            reasons.append(f"{_reason('centroid_hz', row.centroid_hz)};{_reason('sub_ratio', row.sub_ratio)}")
+        if row.zcr >= KICK_REJECT_ZCR:
+            reasons.append(_reason("zcr", row.zcr))
+        return _kick_gate_row(row, "reject_as_kick", "high", reasons, "keep-out-of-kicks")
+
+    # 6. Strong likely-kick evidence: every precision gate passes.
+    likely = (
+        row.sub_ratio >= KICK_MIN_LIKELY_SUB_RATIO
+        and row.low_ratio >= KICK_MIN_LIKELY_LOW_RATIO
+        and row.high_ratio <= KICK_MAX_LIKELY_HIGH_RATIO
+        and duration_s <= KICK_MAX_LIKELY_DURATION_S
+        and row.tail_ms <= KICK_MAX_LIKELY_TAIL_MS
+        and row.centroid_hz <= KICK_MAX_LIKELY_CENTROID_HZ
+        and (row.flatness is None or row.flatness <= KICK_MAX_LIKELY_FLATNESS)
+        and row.onset_density <= KICK_MAX_LIKELY_ONSET_DENSITY
+        and row.crest >= KICK_MIN_LIKELY_CREST
+        and row.zcr <= KICK_MAX_LIKELY_ZCR
+    )
+    if likely:
+        reasons = [
+            _reason("sub_ratio", row.sub_ratio),
+            _reason("crest", row.crest),
+            _reason("centroid_hz", row.centroid_hz),
+        ]
+        return _kick_gate_row(row, "likely_kick", "high", reasons, "audition-as-kick")
+
+    # 7. Plausible but not high-precision: hold for a human ear-check.
+    return _kick_gate_row(row, "review", "medium", ["mixed-evidence"], "ear-check-before-kick")
+
+
+def kick_audit(rows: list[FeatureRow]) -> list[KickGateRow]:
+    return sorted(
+        [
+            kick_gate(row)
+            for row in rows
+            if row.role == "KICKS" or (_curated_folder_role(row.path) or row.role) == "KICKS"
+        ],
+        key=lambda item: item.path.as_posix(),
+    )
+
+
+def _passes_kick_gate(row: FeatureRow) -> bool:
+    # High-precision first pass: drop only clear non-kicks (reject_as_kick).
+    # likely_kick and review rows stay eligible for representatives/crate picks;
+    # a fresh ear-check still gates any physical reclassification.
+    return row.role != "KICKS" or kick_gate(row).kick_gate != "reject_as_kick"
+
+
+def _fmt_audit_value(value: float | None) -> str:
+    return _fmt_num(value) if value is not None else ""
+
+
+def write_kick_audit(path: Path, rows: list[KickGateRow]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh, delimiter="\t")
+        writer.writerow([
+            "path", "current_role", "sample_type", "duration_s", "attack_ms", "tail_ms",
+            "sub_ratio", "low_ratio", "mid_ratio", "high_ratio", "centroid_hz",
+            "flatness", "onset_density", "zcr", "kick_gate", "confidence",
+            "reasons", "review_action",
+        ])
+        for row in rows:
+            writer.writerow([
+                row.path.as_posix(), row.current_role, row.sample_type,
+                _fmt_audit_value(row.duration_s), _fmt_audit_value(row.attack_ms),
+                _fmt_audit_value(row.tail_ms), _fmt_audit_value(row.sub_ratio),
+                _fmt_audit_value(row.low_ratio), _fmt_audit_value(row.mid_ratio),
+                _fmt_audit_value(row.high_ratio), _fmt_audit_value(row.centroid_hz),
+                _fmt_audit_value(row.flatness), _fmt_audit_value(row.onset_density),
+                _fmt_audit_value(row.zcr), row.kick_gate, row.confidence,
+                row.reasons, row.review_action,
+            ])
+
+
 def write_curated_role_conflicts(path: Path, rows: list[CuratedRoleConflict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fh:
@@ -695,6 +900,8 @@ def _cluster_vector(row: FeatureRow) -> list[float] | None:
     if curated_role_conflict(row) is not None:
         return None
     if _one_shot_role_cluster_issue(row):
+        return None
+    if not _passes_kick_gate(row):
         return None
     if row.audio_error:
         return None
@@ -902,6 +1109,7 @@ def _device_one_shot_candidate(row: FeatureRow) -> bool:
         and not _has(text, *DEVICE_SKIP_TOKENS)
         and _curated_role_matches(row)
         and curated_role_conflict(row) is None
+        and _passes_kick_gate(row)
     )
 
 
@@ -911,6 +1119,7 @@ def _audition_candidate(row: FeatureRow) -> bool:
         not _has(text, *DEVICE_SKIP_TOKENS)
         and _curated_role_matches(row)
         and curated_role_conflict(row) is None
+        and _passes_kick_gate(row)
     )
 
 
@@ -1153,6 +1362,7 @@ def write_report(
     crates: dict[str, list[CrateEntry]],
     clusters: list[ClusterRow] | None = None,
     curated_conflicts: list[CuratedRoleConflict] | None = None,
+    kick_audit_rows: list[KickGateRow] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     source_counts: dict[str, int] = {}
@@ -1205,6 +1415,13 @@ def write_report(
                 issue_counts[issue] = issue_counts.get(issue, 0) + 1
         for issue, count in sorted(issue_counts.items()):
             lines.append(f"- {issue}: {count}")
+    if kick_audit_rows is not None:
+        lines.extend(["", "## KICKS Gate"])
+        gate_counts: dict[str, int] = {}
+        for row in kick_audit_rows:
+            gate_counts[row.kick_gate] = gate_counts.get(row.kick_gate, 0) + 1
+        for gate in ("likely_kick", "review", "reject_as_kick"):
+            lines.append(f"- {gate}: {gate_counts.get(gate, 0)}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -1277,6 +1494,7 @@ def main(argv: list[str] | None = None) -> int:
         cache_path=args.feature_cache,
     )
     curated_conflicts = curated_role_conflicts(features)
+    kick_audit_rows = kick_audit(features)
     clusters = cluster_within_role(features)
     crates = build_crates(features, ot_sets=sets, clusters=clusters)
 
@@ -1284,6 +1502,7 @@ def main(argv: list[str] | None = None) -> int:
     write_source_registry(args.output_dir / "source-registry-latest.tsv", sources)
     write_features(args.output_dir / "sample-features-latest.tsv", features)
     write_curated_role_conflicts(args.output_dir / "curated-role-conflicts-latest.tsv", curated_conflicts)
+    write_kick_audit(args.output_dir / "kick-audit-latest.tsv", kick_audit_rows)
     write_clusters(args.output_dir / "clusters-latest.tsv", clusters)
     write_crates(args.output_dir, crates)
     write_report(
@@ -1294,6 +1513,7 @@ def main(argv: list[str] | None = None) -> int:
         crates,
         clusters,
         curated_conflicts,
+        kick_audit_rows=kick_audit_rows,
     )
 
     print(f"[MANIFEST-ONLY] sample intelligence {args.root}")
@@ -1301,6 +1521,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  source rows: {len(sources)}")
     print(f"  feature rows: {len(features)}")
     print(f"  curated role conflicts: {len(curated_conflicts)}")
+    print(f"  KICKS audit rows: {len(kick_audit_rows)}")
     print(f"  clusters: {len(clusters)}")
     print(f"  crates: {len(crates)}")
     print(f"  output dir: {args.output_dir}")

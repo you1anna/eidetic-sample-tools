@@ -91,10 +91,30 @@ ot-sets-latest.tsv
 source-registry-latest.tsv
 sample-features-latest.tsv
 curated-role-conflicts-latest.tsv
+kick-audit-latest.tsv
 clusters-latest.tsv
 crates/<device>/*.txt
 reports/pilot.md
 ```
+
+#### High-precision KICKS gate
+
+`kick-audit-latest.tsv` buckets every `CURATED/KICKS` row as `likely_kick`,
+`review`, or `reject_as_kick` from the cached acoustic features (duration,
+attack/tail, sub/low/high ratios, centroid, flatness, onset density, zcr) and the
+existing role-conflict signals. It optimises for precision: a file is
+`likely_kick` only when the evidence strongly supports it; unusual-but-plausible
+kicks stay in `review`.
+
+- `reject_as_kick` rows (clap/snare, hat/cymbal, loops, long impacts, and
+  clean-named but noisy one-shots) are **excluded** from KICKS representatives and
+  device-crate picks — they stay visible in the manifests but never get presented
+  as kicks.
+- `likely_kick` and `review` rows remain eligible for the audition packet;
+  `review` rows still need a manual ear-check before you trust them as KICKS.
+
+This is manifest-only: it never moves or renames files, and a fresh ear-check is
+still required before any physical reclassification.
 
 The command is manifest-only: it does not move, delete, rewrite, convert, or copy
 sample files. By default it now decodes samples read-only, writes Tier-1 acoustic
