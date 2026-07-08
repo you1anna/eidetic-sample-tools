@@ -22,6 +22,7 @@ sample-intake = "librarytools.intake:main"
 sample-review = "librarytools.review:main"
 sample-sort = "librarytools.sort:main"
 sample-analyze = "librarytools.analyze:main"
+sample-near-dupes = "librarytools.neardupe:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

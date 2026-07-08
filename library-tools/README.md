@@ -25,6 +25,9 @@ library. Review is **manifest-only**; tidy tools default to **dry-run** and
   `sample-sort` for role-based organisation; kept for the loop/one-shot split.
 - `sample-dedupe` — finds byte-identical duplicates and moves the extras to
   `_TO-DELETE/dupes/` for a later human sign-off.
+- `sample-near-dupes` — writes a manifest-only near-dupe pilot from cached
+  `sample-analyze` acoustic features, with one-family/small-batch audition
+  outputs. It stages only reviewed TSV rows marked `decision=remove`.
 
 ## Install (per-machine venv)
 
@@ -39,6 +42,7 @@ library. Review is **manifest-only**; tidy tools default to **dry-run** and
 ls() { ~/.venvs/library-tools/bin/sample-sort "$@"; }
 lc() { ~/.venvs/library-tools/bin/sample-classify "$@"; }
 ld() { ~/.venvs/library-tools/bin/sample-dedupe "$@"; }
+ln() { ~/.venvs/library-tools/bin/sample-near-dupes "$@"; }
 lr() { ~/.venvs/library-tools/bin/sample-review "$@"; }
 
 lr --no-probe --summary
@@ -47,8 +51,10 @@ lr --no-probe --output manifests/review.tsv --index-dir manifests/index
 ls                        # dry-run: per-role counts + plan manifest, nothing moved
 ls --apply                # move classified files into <ROLE>/, write undo manifest
 ls --include-review --apply   # also gather low-confidence files into _REVIEW/
-ld                 # dry-run: how many dupes, ~GB reclaimable
-ld --apply         # move dupes to _TO-DELETE/dupes/, write undo manifest
+ld                 # dry-run: how many byte-identical dupes, ~GB reclaimable
+ld --apply         # move byte-identical dupes to _TO-DELETE/dupes/, write undo manifest
+ln --limit-groups 10      # near-dupe pilot batch, manifest-only
+ln --family kick-909      # near-dupe one-family pilot, manifest-only
 ~/.venvs/library-tools/bin/sample-analyze --pilot --no-probe
 ```
 
@@ -149,6 +155,42 @@ What it does **not** prove yet:
 
 Treat the crates as shortlist manifests for ear-checking. Promote only
 human-auditioned favourites into stable export manifests.
+
+
+### Near-dupe pilot before staging
+
+Use `sample-near-dupes` after a full `sample-analyze --pilot` run. It does not
+move files in detection mode; it writes a review TSV plus a tiny Markdown/M3U
+audition packet so Robin can test one family or a small batch before wider
+processing.
+
+```bash
+# One duplicate family/checklist
+~/.venvs/library-tools/bin/sample-near-dupes --family kick-909
+
+# Small batch before wider processing
+~/.venvs/library-tools/bin/sample-near-dupes --limit-groups 10
+```
+
+Outputs land under `manifests/near-dupes-pilot/`:
+
+```text
+near-dupes-latest.tsv          # edit decision column; only `remove` stages
+audition/near-dupes.md         # human checklist
+audition/near-dupes.m3u        # keep/candidate pairs for listening
+```
+
+To stage approved candidates, edit `near-dupes-latest.tsv` and set
+`decision=remove` only on rows you have auditioned. Then dry-run the reviewed
+manifest first, and only add `--apply` when the plan looks right:
+
+```bash
+~/.venvs/library-tools/bin/sample-near-dupes --apply-manifest manifests/near-dupes-pilot/near-dupes-latest.tsv
+~/.venvs/library-tools/bin/sample-near-dupes --apply-manifest manifests/near-dupes-pilot/near-dupes-latest.tsv --apply
+```
+
+Approved candidates are moved to `_TO-DELETE/near-dupes/`; nothing is deleted,
+nothing overwrites, and an undo manifest is written.
 
 ### 2. Inspect the useful slices yourself
 
