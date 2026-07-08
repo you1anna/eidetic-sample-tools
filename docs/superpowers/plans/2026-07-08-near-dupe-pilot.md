@@ -4,7 +4,7 @@
 
 **Goal:** Build manifest-first near-dupe detection with one-family/small-batch audition and approved-only staging.
 
-**Architecture:** Add a focused `librarytools.neardupe` module beside `dedupe.py`. It consumes existing `sample-analyze` feature TSVs, writes review/audition artifacts, and reuses `moves.apply_plan` for reviewed staging.
+**Architecture:** Add a focused `librarytools.neardupe` module beside `dedupe.py`. It consumes existing `sample-analyze` feature TSVs, writes review/audition artifacts, and reuses `moves.apply_plan` for reviewed staging. After Robin's short-sample audition failed, the detector is long-loop/high-certainty only by default.
 
 **Tech Stack:** Python 3.12 standard library, existing `librarytools.moves/config`, existing pytest suite.
 
@@ -12,6 +12,7 @@
 
 - Never delete sample files.
 - Never move from an unreviewed detection result.
+- Do not emit short one-shot near-dupe candidates by default; require long loops with `duration_s >= 3.0` and `score >= 0.99`.
 - Apply only rows explicitly marked `decision=remove`.
 - Move to `_TO-DELETE/near-dupes/` and write undo TSV.
 - No new dependencies.

@@ -26,8 +26,9 @@ library. Review is **manifest-only**; tidy tools default to **dry-run** and
 - `sample-dedupe` — finds byte-identical duplicates and moves the extras to
   `_TO-DELETE/dupes/` for a later human sign-off.
 - `sample-near-dupes` — writes a manifest-only near-dupe pilot from cached
-  `sample-analyze` acoustic features, with one-family/small-batch audition
-  outputs. It stages only reviewed TSV rows marked `decision=remove`.
+  `sample-analyze` acoustic features. After Robin's short-hit audition failed,
+  it deliberately only emits long high-certainty loop pairs by default. It
+  stages only reviewed TSV rows marked `decision=remove`.
 
 ## Install (per-machine venv)
 
@@ -162,7 +163,9 @@ human-auditioned favourites into stable export manifests.
 Use `sample-near-dupes` after a full `sample-analyze --pilot` run. It does not
 move files in detection mode; it writes a review TSV plus a tiny Markdown/M3U
 audition packet so Robin can test one family or a small batch before wider
-processing.
+processing. Short one-shots are intentionally ignored because the first audition
+proved they were not reliable duplicates; the default detector now requires long
+loops (`duration_s >= 3.0`) and high acoustic certainty (`score >= 0.99`).
 
 ```bash
 # One duplicate family/checklist

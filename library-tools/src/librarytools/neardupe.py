@@ -59,6 +59,8 @@ _STOP_TOKENS = {
 }
 
 _SUFFIX_RANK = {".wav": 0, ".aif": 1, ".aiff": 1, ".flac": 2, ".mp3": 3, ".ogg": 4}
+MIN_LONG_DUPE_DURATION_S = 3.0
+DEFAULT_MIN_SCORE = 0.99
 
 
 @dataclass(frozen=True)
@@ -188,13 +190,17 @@ def _score(left: FeatureRow, right: FeatureRow) -> float:
 
 
 def _candidate_reason(score: float) -> str:
-    return f"stem-family;acoustic-score={score:.3f}"
+    return f"long-loop;stem-family;acoustic-score={score:.3f}"
 
 
-def find_groups(rows: list[FeatureRow], *, min_score: float = 0.88) -> list[NearDupeGroup]:
+def _eligible_long_dupe(row: FeatureRow) -> bool:
+    return row.sample_type == "loop" and row.duration_s >= MIN_LONG_DUPE_DURATION_S
+
+
+def find_groups(rows: list[FeatureRow], *, min_score: float = DEFAULT_MIN_SCORE) -> list[NearDupeGroup]:
     buckets: dict[tuple[str, str, str], list[FeatureRow]] = {}
     for row in rows:
-        if not row.role or not row.sample_type:
+        if not row.role or not row.sample_type or not _eligible_long_dupe(row):
             continue
         buckets.setdefault((row.role, row.sample_type, row.family), []).append(row)
 
@@ -225,7 +231,7 @@ def select_groups(
     selected = sorted(groups, key=lambda group: (group.role, group.sample_type, group.family))
     if family:
         needle = normalise_family(family)
-        selected = [group for group in selected if needle in group.family]
+        selected = [group for group in selected if needle in normalise_family(group.family)]
     if limit_groups is not None:
         selected = selected[: max(0, limit_groups)]
     return selected

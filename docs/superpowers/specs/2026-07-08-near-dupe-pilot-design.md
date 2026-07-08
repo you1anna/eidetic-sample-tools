@@ -23,7 +23,7 @@ Add safety-first tooling for likely duplicate sample material that Robin can tes
 
 Create `librarytools.neardupe` and CLI `sample-near-dupes`.
 
-Detection reads `sample-features-latest.tsv` and groups rows by role, sample type, and normalized stem family. Within each group, rows are paired when cheap cached acoustic features are close enough to suggest the same musical material in a different format/folder. Each candidate writes both a `keep_path` and a `candidate_path`; canonical selection prefers `CURATED/`, then shorter audio-friendly formats, then shorter paths.
+Detection reads `sample-features-latest.tsv` and groups rows by role, sample type, and normalized stem family. After Robin's audition showed short one-shot candidates were not reliable, the default detector only emits long loop pairs (`duration_s >= 3.0`) with high acoustic certainty (`score >= 0.99`). Within each group, rows are paired when cached acoustic features are effectively identical enough to suggest the same long musical material in a different format/folder. Each candidate writes both a `keep_path` and a `candidate_path`; canonical selection prefers `CURATED/`, then shorter audio-friendly formats, then shorter paths.
 
 Pilot selection supports both `--family TEXT` for one family and `--limit-groups N` for a small batch. Pilot artifacts live under `manifests/near-dupes-pilot/` by default and include:
 
