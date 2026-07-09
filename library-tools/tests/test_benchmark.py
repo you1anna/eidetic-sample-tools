@@ -270,6 +270,20 @@ def test_read_labels_rejects_unknown_true_role(tmp_path: Path) -> None:
         benchmark.read_labels(tmp_path / "run")
 
 
+def test_read_labels_accepts_non_drum_categories(tmp_path: Path) -> None:
+    _write_labels(
+        tmp_path / "run" / "audition" / "hats-cym" / "labels.tsv",
+        [
+            ("id1", "CURATED/HATS-CYM/pad.wav", "HATS-CYM", "DRONE-ATMOS"),
+            ("id2", "CURATED/HATS-CYM/vox.wav", "HATS-CYM", "VOCALS"),
+        ],
+    )
+
+    labelled = benchmark.read_labels(tmp_path / "run")
+
+    assert {item.true_role for item in labelled} == {"DRONE-ATMOS", "VOCALS"}
+
+
 def test_read_labels_collects_across_roles(tmp_path: Path) -> None:
     _write_labels(
         tmp_path / "run" / "audition" / "kicks" / "labels.tsv",

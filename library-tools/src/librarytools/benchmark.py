@@ -31,7 +31,15 @@ from typing import NamedTuple
 # Reuse the audio extension set the classifier already agrees on.
 from .classifier import AUDIO_EXTS
 
+# Drum roles the model is authoritative for and that `prepare` samples one-shots from.
 ROLE_ORDER: tuple[str, ...] = ("KICKS", "CLAP-SNARE", "HATS-CYM", "PERC")
+
+# Non-drum destinations a human may tag by ear when a drum folder is contaminated. These match the
+# library's own CURATED folders. The drum CNN-LSTM cannot *predict* these (it only knows percussion
+# classes) — they exist so ambient/textures and vocals get their own home instead of a wrong drum
+# role or a catch-all OTHER, and so the scorecard shows where the model wrongly grabs non-drum
+# material. DRONE-ATMOS covers ambient / texture / drone / pad; VOCALS covers any vocal.
+NON_DRUM_ROLES: tuple[str, ...] = ("DRONE-ATMOS", "VOCALS")
 
 # This tool scores ONE-SHOTS only. Loops, textures, and long tails that leak into the CURATED
 # role folders are excluded up front so the benchmark (and any move it informs) never gets muddled
@@ -39,12 +47,12 @@ ROLE_ORDER: tuple[str, ...] = ("KICKS", "CLAP-SNARE", "HATS-CYM", "PERC")
 # the library (one-shots/decays cluster <=~2.1 s; loops start at ~3.9 s). Tunable via --max-duration.
 ONESHOT_MAX_SECONDS: float = 2.5
 
-# What a human may write in true_role. OTHER = none of the four drum roles / a contaminant.
-TRUE_ROLE_VALUES: frozenset[str] = frozenset({*ROLE_ORDER, "OTHER"})
+# What a human may write in true_role. OTHER = a one-shot that is none of the named categories.
+TRUE_ROLE_VALUES: frozenset[str] = frozenset({*ROLE_ORDER, *NON_DRUM_ROLES, "OTHER"})
 
-# Roles a model prediction is collapsed into for scoring. Anything a model suggests that is not one
-# of the four target drum roles (BASS, REVIEW, ...) becomes OTHER, matching the human vocabulary.
-SCORE_ROLES: tuple[str, ...] = (*ROLE_ORDER, "OTHER")
+# Rows/columns of the scorecard. Predictions are collapsed to the four drum roles or OTHER (the
+# model never emits DRONE-ATMOS/VOCALS), but those appear on the truth axis so misroutes show up.
+SCORE_ROLES: tuple[str, ...] = (*ROLE_ORDER, *NON_DRUM_ROLES, "OTHER")
 
 _LABEL_FIELDS: tuple[str, ...] = (
     "sample_id",
@@ -340,7 +348,9 @@ def _write_role_packet(
         f"Files: {len(picks)} (one-shots only — loops/long tails are excluded)",
         "",
         f"Listen to each file and set `true_role` in labels.tsv to one of: {', '.join(sorted(TRUE_ROLE_VALUES))}.",
-        "OTHER = a one-shot that is not one of the four drum roles (e.g. a bass hit, a stray perc).",
+        "Drum roles: KICKS, CLAP-SNARE, HATS-CYM, PERC.",
+        "DRONE-ATMOS = ambient / texture / drone / pad. VOCALS = any vocal.",
+        "OTHER = a one-shot that fits none of the above (e.g. a bass hit, an FX stab).",
         "Judge by EAR only — ignore the folder it currently sits in.",
         "",
     ]
