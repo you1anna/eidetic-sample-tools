@@ -1,67 +1,89 @@
-# Storage strategy & creative workflow
+# Storage and creative workflow
 
-Context for all future tooling in this repo. Robin (DJ **Eidetic**) runs a hardware
-techno studio: **Octatrack MKII** (clock master), **Digitakt MK1**, **TR-8S**, into
-**Ableton** on a Mac (mini + MacBook Air M4). Target sound: hypnotic / dub / raw /
-hard-groove techno (~130–150 BPM). Everything below is decided unless marked open.
+Context for all tooling in this repo. Robin (DJ **Eidetic**) runs a hardware
+techno studio: **Octatrack MKII** (clock master), **Digitakt MK1**, **TR-8S**,
+into **Ableton** on a Mac (mini and MacBook Air M4). Target sound: hypnotic,
+dub, raw, and hard-groove techno at roughly 130–150 BPM.
 
-## Storage / format
+Everything below is decided unless marked as open.
 
-The Extreme SSD is now **APFS**. Verified on 2026-07-07 with `diskutil info "/Volumes/Extreme SSD"`:
-`File System Personality: APFS`, mounted read/write, 2 TB total with about 696 GB free at the time
-of the check. Robin also confirmed the SSD is backed up.
+## Where files live
 
-**Current layout (decided):**
-- **Master library + production archive → APFS SSD.** The sample library is at
-  `/Volumes/Extreme SSD/Production/SAMPLES/`.
-- **Working repo mirror on the Mac mini → local APFS disk.** Current path:
-  `/Users/macmini/Projects/eidetic-music-tools`.
-- **Device cards (Octatrack CF, Digitakt +Drive, TR-8S SD) → exFAT/FAT** — required by the hardware.
-  These are built by `sample-tools` export, so they stay disposable/re-syncable.
+The Extreme SSD is **APFS**. Verified 2026-07-07 with
+`diskutil info "/Volumes/Extreme SSD"`: APFS, mounted read/write, 2 TB total,
+~696 GB free at the time. Robin confirmed the SSD is backed up.
 
-**Resolved gate:** the old "back up before APFS migration" blocker is closed as of 2026-07-07.
-Physical sample moves are still review-gated: generate a manifest first, inspect it, then apply only
-reversible moves with undo manifests.
+| Location | Format | Role |
+|---|---|---|
+| `/Volumes/Extreme SSD/Production/SAMPLES/` | APFS | Master sample library and production archive |
+| `/Users/macmini/Projects/eidetic-music-tools` | APFS (local disk) | This repo on the Mac mini |
+| Octatrack CF, Digitakt +Drive, TR-8S SD | exFAT / FAT | Device cards — built by `sample-tools`, disposable and re-syncable |
 
-Each machine still needs its own venv. On the Mac mini the current convention remains:
-`brew install ffmpeg python@3.12`, then `python3.12 -m venv ~/.venvs/<tool>` and editable-install
-against `/Users/macmini/Projects/eidetic-music-tools/<tool>`.
+**Resolved:** the old "back up before APFS migration" blocker closed 2026-07-07.
+Physical sample moves remain review-gated: generate a manifest, inspect it, then
+apply only reversible moves with undo manifests.
 
-## Creative workflow (what the tooling should serve)
+### Setup on each machine
 
-Primary capture/production paths (confirmed):
-- **Hardware jam → Ableton.** Record live jams (OT clock-master + DT + TR-8S) into Ableton,
-  multitrack or master.
-- **Resample in hardware.** Octatrack used as a live sampler/mangler — capture, mangle, reuse
-  in the box during performance.
-- **Arrange/finish in Ableton.** Recorded loops/stems arranged, mixed, finished in Ableton.
+Each machine needs its own Python venv. On the Mac mini:
 
-Vocals (vocal cuts + loops) enter mainly via Ableton and OT resampling rather than pre-chopped
-sample packs — so they need to be **easy to find, audition, and drop in live**, not just sorted.
+```bash
+brew install ffmpeg python@3.12
+python3.12 -m venv ~/.venvs/<tool>
+# editable install against /Users/macmini/Projects/eidetic-music-tools/<tool>
+```
 
-**The goal in one line:** make sampling, live recording, and techno production *dynamic and
-easy to play* — the right sound reachable instantly, low-friction, so the setup amplifies
-creativity instead of interrupting it.
+See each tool's README for the exact install command.
 
-What that implies for tooling:
-- **Fast, well-labelled content.** Consistent naming + BPM/key tags (techno range ~120–150)
-  so the Ableton browser and hardware banks are instantly filterable and auditionable.
-- **Two consumers, one library.** Optimise for both Ableton drag-and-drop *and* curated,
-  format-correct hardware card sets (already handled by `sample-tools`).
-- **Close the resample loop.** Good moments from jams/resampling should flow back into the
-  library as reusable, named loops/one-shots.
+## Creative workflow
 
-## Tooling roadmap (this repo)
+The tooling should support how the studio actually works.
+
+### Primary paths (confirmed)
+
+1. **Hardware jam → Ableton.** Record live jams (Octatrack as clock master,
+   Digitakt, TR-8S) into Ableton — multitrack or master.
+
+2. **Resample in hardware.** The Octatrack is a live sampler and mangler:
+   capture, process, and reuse in the box during performance.
+
+3. **Arrange and finish in Ableton.** Recorded loops and stems are arranged,
+   mixed, and finished in Ableton.
+
+Vocals (cuts and loops) enter mainly via Ableton and Octatrack resampling rather
+than pre-chopped packs. They need to be **easy to find, audition, and drop in
+live** — not just sorted into folders.
+
+### What we are optimising for
+
+Make sampling, live recording, and techno production **dynamic and easy to
+play**. The right sound should be reachable instantly, with low friction, so the
+setup amplifies creativity instead of interrupting it.
+
+That implies:
+
+- **Fast, well-labelled content.** Consistent naming plus BPM and key tags
+  (techno range ~120–150) so the Ableton browser and hardware banks are
+  instantly filterable.
+
+- **Two consumers, one library.** Optimise for both Ableton drag-and-drop and
+  curated, format-correct hardware card sets (`sample-tools` handles the latter).
+
+- **Close the resample loop.** Good moments from jams and resampling should flow
+  back into the library as reusable, named loops and one-shots.
+
+## Tooling in this repo
 
 | Tool | Status | Purpose |
 |---|---|---|
-| `sample-tools/` | ✅ built | Convert + sync curated samples to device specs (mono for DT). |
-| `library-tools/` | ✅ built | Manifest-only review/indexing (`main_category`, `sample_type`, explicit BPM/key, tempo fit, proposed names), plus reversible dry-run classify and de-dupe tools. |
-| `inventory/` | folded into `library-tools` for now | `sample-review` writes TSV indexes for curation without moving originals; future audio analysis can build on those manifests. |
-| `inbox-sort/` | planned | Fast intake of new downloads from `SAMPLES/00_INBOX/` into roles + naming. |
-| vocal/loop prep | idea | Trim silence, normalise, BPM/key-tag vocal cuts & loops → clean drops into Ableton + OT. |
-| jam/stem intake | idea | Organise + label recorded Ableton jam stems so good moments become reusable library assets. |
-| backup | resolved gate / maintain | SSD backed up per Robin on 2026-07-07; keep ongoing backup/restore checks as maintenance, not a blocker for reviewed sample-management manifests. |
+| `sample-tools/` | Built | Convert and sync curated samples to device specs (mono for Digitakt). |
+| `library-tools/` | Built | Manifest-only review and indexing, plus reversible dry-run classify, de-dupe, sort, and intake. |
+| `inventory/` | Folded into `library-tools` | `sample-review` writes TSV indexes; future audio analysis builds on those manifests. |
+| `inbox-sort/` | Folded into `library-tools` | `sample-intake` moves new downloads from `00_INBOX/` into `PACKS/`. |
+| Vocal / loop prep | Idea | Trim silence, normalise, BPM/key-tag vocal cuts and loops for Ableton and Octatrack. |
+| Jam / stem intake | Idea | Organise and label recorded Ableton jam stems so good moments become library assets. |
+| Backup | Resolved / maintain | SSD backed up 2026-07-07; keep ongoing backup checks as maintenance, not a blocker. |
 
-Open: whether to surface curated favourites into Ableton's User Library / Places for one-click
-access (worth exploring once `inventory` exists).
+**Open question:** whether to surface curated favourites into Ableton's User
+Library or Places for one-click access. Worth exploring once the inventory
+workflow is stable.
