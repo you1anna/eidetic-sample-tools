@@ -48,19 +48,31 @@ sx --all --dry-run                       # all three devices
 
 ## Device specs
 
-All outputs are **16-bit / 44.1 kHz WAV** (`pcm_s16le`).
+Outputs are **16-bit WAV** (`pcm_s16le`) at the selected device profile's native rate.
 
 | Device | Channels | Card sync | Notes |
 |---|---|---|---|
-| Octatrack | Preserve stereo/mono | Yes (CF card) | Reads WAVs from any folder. |
-| Digitakt | **Mono** (`-ac 1`) | No | +Drive is not a disk — use Elektron Transfer. |
-| TR-8S | Preserve stereo/mono | Yes (SD card) | May still need on-device Import. |
+| Octatrack | 44.1 kHz; preserve stereo/mono | Yes (CF card) | Profile crates stage under `EIDETIC-CURATED/AUDIO/`. |
+| Digitakt | 48 kHz; **mono** (`-ac 1`) | No | +Drive is not a disk — use Elektron Transfer. |
+| TR-8S | 48 kHz; mono default | Yes (SD card) | Stages under `ROLAND/TR-8S/SAMPLE/`; `stereo-essential` rows preserve stereo. |
 
 `--sync` copies into `<DEST>/EIDETIC-<DEVICE>/`.
 
-> **Open item:** community sources suggest the Digitakt's native format may be
-> 48 kHz, not 44.1 kHz. Verify on hardware before a large Digitakt export. See
-> [`OPERATING-BRIEF-ASSESSMENT.md`](../OPERATING-BRIEF-ASSESSMENT.md).
+Digitakt MK1's native format is 16-bit/48 kHz mono; Elektron Transfer can also
+perform this conversion automatically. The exporter now stages that native format.
+
+### Curated crate TSVs
+
+Use `--profile` with the human-approved TSVs written by `sample-curate views`:
+
+```bash
+sx digitakt --profile eidetic-studio --crate ../library-tools/manifests/foundation-v1/foundation-v1-one-shots.tsv --dry-run
+sx tr8s --profile eidetic-studio --crate ../library-tools/manifests/foundation-v1/foundation-v1-one-shots.tsv --dry-run
+sx octatrack --profile eidetic-studio --crate ../library-tools/manifests/foundation-v1/foundation-v1-all.tsv --dry-run
+```
+
+Each row contains `sample_id`, `source_path`, `role`, `descriptor`, and `reason`.
+Hash, capacity, role, path depth, and compact-name checks complete before conversion.
 
 ## Manifests
 

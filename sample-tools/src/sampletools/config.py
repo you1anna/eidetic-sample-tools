@@ -10,6 +10,7 @@ the SSD mounts at a different point or the library is relocated:
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,7 @@ SAMPLES_ROOT: Path = Path(
     os.environ.get("SAMPLES_ROOT", "/Volumes/Extreme SSD/Production/SAMPLES")
 )
 EXPORT_ROOT: Path = Path(os.environ.get("EXPORT_ROOT", str(SAMPLES_ROOT / "_EXPORT")))
+DEFAULT_PROFILE_CONFIG = Path.home() / ".config" / "eidetic-music-tools" / "config.toml"
 
 # Source extensions ffmpeg can decode into our 16-bit/44.1 WAV target.
 SOURCE_EXTS: tuple[str, ...] = (".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg")
@@ -55,7 +57,7 @@ DEVICE_SPECS: dict[str, DeviceSpec] = {
     "digitakt": DeviceSpec(
         name="digitakt",
         export_dir="DIGITAKT",
-        rate=44100,
+        rate=48000,
         bits=16,
         channels=1,  # Digitakt MK1 is mono-only
         name_warn=24,  # small screen; long names truncate
@@ -68,9 +70,9 @@ DEVICE_SPECS: dict[str, DeviceSpec] = {
     "tr8s": DeviceSpec(
         name="tr8s",
         export_dir="TR8S",
-        rate=44100,
+        rate=48000,
         bits=16,
-        channels=None,  # TR-8S handles mono + stereo
+        channels=1,  # efficient default for drum one-shots; crate rows may preserve stereo
         name_warn=120,
         can_sync=True,  # SD card is a plain filesystem
         sync_note=(
@@ -87,6 +89,35 @@ def get_spec(device: str) -> DeviceSpec:
         valid = ", ".join(sorted(DEVICE_SPECS))
         raise KeyError(f"unknown device {device!r}; valid devices: {valid}")
     return DEVICE_SPECS[key]
+
+
+def get_profile_spec(device: str, profile: str | None) -> DeviceSpec:
+    """Resolve sample conversion capability from a portable profile."""
+    base = get_spec(device)
+    if profile is None:
+        profile = os.environ.get("MUSIC_TOOLS_PROFILE")
+    if profile is None and DEFAULT_PROFILE_CONFIG.is_file():
+        with DEFAULT_PROFILE_CONFIG.open("rb") as fh:
+            profile = tomllib.load(fh).get("profile")
+    if not profile:
+        return base
+    profile_root = Path(__file__).resolve().parents[3] / "profiles"
+    studio_path = profile_root / "studios" / f"{profile}.toml"
+    if not studio_path.is_file():
+        raise KeyError(f"unknown studio profile {profile!r}")
+    with studio_path.open("rb") as fh:
+        studio = tomllib.load(fh)
+    device_id = {"digitakt": "digitakt-mki", "octatrack": "octatrack-mkii", "tr8s": "tr8s"}[base.name]
+    if device_id not in {item.get("id") for item in studio.get("devices", [])}:
+        raise KeyError(f"device {device_id!r} is not enabled by profile {profile!r}")
+    with (profile_root / "devices" / f"{device_id}.toml").open("rb") as fh:
+        raw = tomllib.load(fh)
+    channels = {"mono": 1, "mono-default": 1, "preserve": None}[str(raw["channels"])]
+    return DeviceSpec(
+        name=base.name, export_dir=base.export_dir, rate=int(raw["sample_rate"]),
+        bits=int(raw["bits"]), channels=channels, name_warn=base.name_warn,
+        can_sync=base.can_sync, sync_note=base.sync_note,
+    )
 
 
 def manifest_path(device: str) -> Path:

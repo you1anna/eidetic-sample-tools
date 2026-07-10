@@ -28,6 +28,8 @@ sample-analyze = "librarytools.analyze:main"
 sample-near-dupes = "librarytools.neardupe:main"
 sample-role-cleanup = "librarytools.rolecleanup_cli:main"
 sample-benchmark = "librarytools.benchmark_cli:main"
+sample-profile = "librarytools.profile_cli:main"
+sample-curate = "librarytools.curate_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

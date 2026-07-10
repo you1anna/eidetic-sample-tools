@@ -10,7 +10,7 @@ Target sound: hypnotic, dub, raw, and hard-groove techno at roughly 130–150 BP
 
 | Directory | Status | Purpose |
 |---|---|---|
-| [`sample-tools/`](sample-tools/) | Built | Convert and sync curated samples to each device's format (16-bit / 44.1 kHz WAV; mono for Digitakt). Manifest-driven CLI. |
+| [`sample-tools/`](sample-tools/) | Built | Profile-aware conversion and sync: Octatrack 44.1 kHz, Digitakt/TR-8S 48 kHz, with validated curated crate TSVs or legacy manifests. |
 | [`library-tools/`](library-tools/) | Built | Review, index, classify, de-dupe, and intake samples. Manifest-first: dry-run by default, reversible moves only. Two-zone layout: `CURATED/` (role folders) and `PACKS/` (whole vendor packs). |
 | `inbox-sort/` | Folded into `library-tools` | Use `sample-intake` to detect vendor packs dropped at the library root or in `00_INBOX/`, normalise names, and move them into `PACKS/`. Dry-run by default. |
 | `inventory/` | Folded into `library-tools` | `sample-review` writes TSV indexes for curation without moving originals. |
@@ -24,6 +24,8 @@ For current project status in plain language, see **[`STATUS.md`](STATUS.md)**.
 ## Storage and workflow
 
 See **[`docs/STORAGE-AND-WORKFLOW.md`](docs/STORAGE-AND-WORKFLOW.md)** for where files live and how the creative workflow fits together.
+The profile, catalogue, curation, and hardware-pilot sequence is documented in
+**[`docs/SAMPLE-FOUNDATION-WORKFLOW.md`](docs/SAMPLE-FOUNDATION-WORKFLOW.md)**.
 
 The Extreme SSD is **APFS** and backed up (confirmed 2026-07-07). Device cards stay
 exFAT or FAT as required by the hardware. The tooling supports: hardware jam →

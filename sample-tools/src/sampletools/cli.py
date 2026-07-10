@@ -6,13 +6,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from .config import DEVICE_SPECS, EXPORT_ROOT, SAMPLES_ROOT, get_spec
+from .config import DEVICE_SPECS, EXPORT_ROOT, SAMPLES_ROOT, get_profile_spec
 from . import export as export_mod
 
 
-def _print_plan(spec_name: str, *, resolve_only: bool) -> int:
-    spec = get_spec(spec_name)
-    plan = export_mod.build_plan(spec)
+def _print_plan(spec_name: str, *, profile: str | None, crate: Path | None) -> int:
+    spec = get_profile_spec(spec_name, profile)
+    plan = export_mod.build_crate_plan(spec, crate) if crate else export_mod.build_plan(spec)
     print(f"\n[{spec.name}]  ->  {EXPORT_ROOT / spec.export_dir}")
     print(f"  format: {spec.rate} Hz / {spec.bits}-bit / "
           f"{'mono' if spec.channels == 1 else 'preserve channels'}")
@@ -28,11 +28,13 @@ def _print_plan(spec_name: str, *, resolve_only: bool) -> int:
     return 0
 
 
-def _run_export(spec_name: str, *, dry_run: bool, force: bool, sync: str | None) -> int:
-    spec = get_spec(spec_name)
+def _run_export(spec_name: str, *, dry_run: bool, force: bool, sync: str | None,
+                profile: str | None, crate: Path | None) -> int:
+    spec = get_profile_spec(spec_name, profile)
+    plan = export_mod.build_crate_plan(spec, crate) if crate else None
     verb = "DRY-RUN" if dry_run else "EXPORT"
     print(f"[{verb}] {spec.name} -> {EXPORT_ROOT / spec.export_dir}")
-    converted, skipped = export_mod.export_device(spec, dry_run=dry_run, force=force)
+    converted, skipped = export_mod.export_device(spec, dry_run=dry_run, force=force, plan=plan)
     print(f"  {'would convert' if dry_run else 'converted'}: {converted}; skipped (exists): {skipped}")
 
     if sync:
@@ -69,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="re-convert even if the output already exists")
     parser.add_argument("--sync", metavar="DEST",
                         help="copy the built device folder to a mounted card (CF/SD)")
+    parser.add_argument("--profile", help="portable studio profile name")
+    parser.add_argument("--crate", type=Path, help="versioned curated crate TSV")
     args = parser.parse_args(argv)
 
     if not SAMPLES_ROOT.exists():
@@ -83,9 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     rc = 0
     for dev in devices:
         if args.list:
-            rc |= _print_plan(dev, resolve_only=True)
+            rc |= _print_plan(dev, profile=args.profile, crate=args.crate)
         else:
-            rc |= _run_export(dev, dry_run=args.dry_run, force=args.force, sync=args.sync)
+            rc |= _run_export(
+                dev, dry_run=args.dry_run, force=args.force, sync=args.sync,
+                profile=args.profile, crate=args.crate,
+            )
     return rc
 
 

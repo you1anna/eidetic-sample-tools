@@ -18,6 +18,8 @@ and never delete — they only move files, write a plan manifest, and (with
 | `sample-near-dupes` | Manifest-only near-duplicate pilot from cached `sample-analyze` acoustic features. After short-hit audition proved unreliable, it only emits long, high-certainty loop pairs by default. Stages only reviewed TSV rows marked `decision=remove`. |
 | `sample-intake` | Detects whole vendor packs at the library root or in `00_INBOX/`, normalises names, and moves them into `PACKS/`. Dry-run by default, reversible. |
 | `sample-role-cleanup` | Turns a classifier audit into per-route audition packets (`checklist.md`, M3U, labels). Human labels each calibration row before any move plan is generated. Read-only until apply. |
+| `sample-profile` | Shows/validates portable studio and device capability profiles against the Studio KB version header. |
+| `sample-curate` | Plans the reversible `CURATED` → `CATALOGUE` migration, prepares human audition packets, promotes favourites by verified copy, writes consumer crates, and quarantines promotion undo. |
 
 Run sort (or the older classify) **before** dedupe so dedupe sees the final layout.
 
@@ -220,6 +222,10 @@ for a fast filename/path-only pass when you do not need acoustic evidence.
 
 Treat crates as shortlist manifests for ear-checking. Promote only
 human-auditioned favourites into stable export manifests.
+
+For path-independent review history, run with `--library-db
+manifests/sample-library.sqlite`. This adds `scan_id` and SHA-256 `sample_id`
+columns to generated TSVs without modifying the older acoustic feature cache.
 
 ### Human-gated role cleanup
 

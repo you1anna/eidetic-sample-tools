@@ -3,6 +3,11 @@
 Last updated: 2026-07-09. A one-page summary of where things stand. Detailed
 records live in [`decisions/`](decisions/).
 
+> Tooling update (2026-07-10): portable studio/device profiles, stable SHA-256
+> inventory, reversible catalogue migration planning, human-gated favourite
+> promotion, and profile-aware crate exports are implemented in the repo. The
+> live SSD migration and foundation-v1 ear review have **not** been applied yet.
+
 ## The goal
 
 Turn the sample library on the Extreme SSD
