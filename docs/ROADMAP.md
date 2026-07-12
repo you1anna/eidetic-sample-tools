@@ -45,6 +45,11 @@ moving from an untidy archive to a performance-ready collection.
 4. Simplify installation without weakening the current workflow.
 5. Test the process against a second library before generalising it.
 
+The current IP focus is the [Foundation v1 decision corpus](FOUNDATION-V1-DECISION-CORPUS.md):
+preserve the path from content identity through listening, device preparation
+and real-session outcome. This is private workflow evidence, not a claim of
+rights to redistribute source packs or train a public model on them.
+
 The dated [project status](../STATUS.md) remains the authority for immediate
 operational actions.
 

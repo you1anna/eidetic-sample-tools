@@ -37,7 +37,8 @@ known test failure.
 - The Extreme SSD is APFS and backed up, confirmed 2026-07-07.
 - No profile-aware catalogue migration has been applied.
 - No classifier suggestion has been used to re-file samples.
-- The foundation-v1 ear review is not complete.
+- The foundation-v1 ear review is in progress; its 216-row label packet remains
+  under manual review and is not yet complete.
 - No final hardware export has been built from a fully approved foundation-v1
   pool.
 
@@ -80,6 +81,8 @@ requires a human removal label.
 4. Complete the foundation-v1 audition and labels.
 5. Promote hash-verified favourites and write consumer views.
 6. Preview, build and test the Octatrack export before the other devices.
+7. Record real-session outcomes for the exported crate before expanding the
+   intelligence layer; see the [Foundation v1 decision corpus](docs/FOUNDATION-V1-DECISION-CORPUS.md).
 
 Follow the canonical [workflow](docs/WORKFLOWS.md) and
 [safety model](docs/SAFETY.md) rather than reconstructing commands from research
