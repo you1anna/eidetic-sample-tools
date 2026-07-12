@@ -1,48 +1,111 @@
-# eidetic-music-tools
+# Eidetic Sample Tools
 
-Tools for Robin's hardware techno studio (DJ **Eidetic**). They manage the sample
-library on the Extreme SSD and prepare curated audio for the **Octatrack MKII**,
-**Digitakt MK1**, and **TR-8S**.
+Eidetic Sample Tools helps hardware-based electronic musicians organise large
+sample libraries, curate trusted collections by ear, and prepare samples for
+performance hardware.
 
-Target sound: hypnotic, dub, raw, and hard-groove techno at roughly 130–150 BPM.
+It is a personal-first command-line toolkit: built for one working studio today,
+but designed so the useful parts can become portable over time.
 
-## What lives here
+## What it does
 
-| Directory | Status | Purpose |
-|---|---|---|
-| [`sample-tools/`](sample-tools/) | Built | Profile-aware conversion and sync: Octatrack 44.1 kHz, Digitakt/TR-8S 48 kHz, with validated curated crate TSVs or legacy manifests. |
-| [`library-tools/`](library-tools/) | Built | Review, index, classify, de-dupe, and intake samples. Manifest-first: dry-run by default, reversible moves only. Two-zone layout: `CURATED/` (role folders) and `PACKS/` (whole vendor packs). |
-| `inbox-sort/` | Folded into `library-tools` | Use `sample-intake` to detect vendor packs dropped at the library root or in `00_INBOX/`, normalise names, and move them into `PACKS/`. Dry-run by default. |
-| `inventory/` | Folded into `library-tools` | `sample-review` writes TSV indexes for curation without moving originals. |
-| `midi-tools/` | Spec only | Generate techno MIDI (Euclidean patterns, basslines, hats) as `.mid` for Ableton and hardware. Spec: [`docs/superpowers/`](docs/superpowers/) `2026-06-26-midi-generator*`. **Build first.** |
-| `ableton-tools/` | Spec only | Read-only Ableton `.als` introspection: tempo, key, samples, missing media, reusable loops. Spec: `2026-06-26-ableton-als-introspection*`. |
-| `analysis-tools/` | Spec only | Bounce analysis (LUFS, true peak, spectral, mono compatibility, BPM, key). Feeds `sample-tools` export. Spec: `2026-06-26-bounce-analysis-a1*`. |
-| `stem-tools/` | Spec only | `demucs` stem separation (drums, bass, vocals, other) for resampling and vocal sourcing. Spec: `2026-06-26-stem-separation*`. **Build last — heavy.** |
+The repository contains two working Python packages:
 
-For current project status in plain language, see **[`STATUS.md`](STATUS.md)**.
+- **Library tools** index, review, organise, de-duplicate, analyse and curate a
+  sample library.
+- **Sample export** validates and converts approved samples for Octatrack MKII,
+  Digitakt MKI and TR-8S.
 
-## Storage and workflow
+The tools support a simple operating model: keep source packs intact, organise a
+broad catalogue, promote a small collection by ear, then build device-specific
+copies from that trusted collection.
 
-See **[`docs/STORAGE-AND-WORKFLOW.md`](docs/STORAGE-AND-WORKFLOW.md)** for where files live and how the creative workflow fits together.
-The profile, catalogue, curation, and hardware-pilot sequence is documented in
-**[`docs/SAMPLE-FOUNDATION-WORKFLOW.md`](docs/SAMPLE-FOUNDATION-WORKFLOW.md)**.
+## Why it is safe
 
-The Extreme SSD is **APFS** and backed up (confirmed 2026-07-07). Device cards stay
-exFAT or FAT as required by the hardware. The tooling supports: hardware jam →
-Ableton, resample in the Octatrack, finish in Ableton.
+The library is more valuable than the software. The tools therefore favour
+preview, evidence and recovery:
 
-## Paths on this machine
+- Review and analysis commands do not change source audio.
+- Commands that can move files default to a preview and require `--apply`.
+- Move operations write manifests and undo records.
+- Content hashes keep review history attached to the audio when paths change.
+- Automated labels remain suggestions. Listening is the final approval step.
+- Export writes converted copies; it does not convert source files in place.
 
-| What | Where |
+Read the full [safety model](docs/SAFETY.md) before applying a move or syncing a
+card.
+
+## What works today
+
+| Maturity | Capability |
 |---|---|
-| This repo | `/Users/macmini/Projects/eidetic-music-tools` |
-| Sample library (not in git) | `/Volumes/Extreme SSD/Production/SAMPLES/` |
+| **Stable** | Review and index a library; plan reversible sorting, intake and exact de-duplication; convert approved samples for supported hardware. |
+| **Beta** | Portable studio and device profiles; content-hash inventory; catalogue migration; human-gated curation; profile-aware crate export. These are implemented but the current live migration and foundation ear review are not complete. |
+| **Experimental** | Acoustic features, drum-role suggestions, benchmark tooling and conservative near-duplicate research. These produce evidence for review, not autonomous decisions. |
+| **Planned** | MIDI generation, Ableton project inspection, bounce analysis and stem separation. Specifications are kept in Git beside the working code. |
 
-Each tool uses its own Python venv under `~/.venvs/`. See each tool's README for
-setup.
+The maturity labels describe this project, not a public support guarantee. See
+the [roadmap](docs/ROADMAP.md) for their exact meaning.
 
-## Where to start
+## Supported hardware
 
-- **Export samples to hardware:** [`sample-tools/README.md`](sample-tools/README.md)
-- **Review and tidy the library:** [`library-tools/README.md`](library-tools/README.md)
-- **Curation without AI:** [`library-tools/README.md#manual-curation-workflow`](library-tools/README.md#manual-curation-workflow) — refresh indexes locally, inspect TSV slices, then bring back small examples when rules need improving
+| Device | Export format | Transfer route |
+|---|---|---|
+| Octatrack MKII | 16-bit WAV, 44.1 kHz, source channel layout preserved | CompactFlash card |
+| Digitakt MKI | 16-bit WAV, 48 kHz, mono | Elektron Transfer |
+| TR-8S | 16-bit WAV, 48 kHz, mono by default | SD card |
+
+Profiles live in [`profiles/devices/`](profiles/devices/). The current studio
+profile is [`profiles/studios/eidetic-studio.toml`](profiles/studios/eidetic-studio.toml).
+
+## Try a safe first run
+
+After installing the library tools, point the review command at a sample
+directory:
+
+```bash
+sample-review --root /path/to/SAMPLES --no-probe --summary
+```
+
+Replace `/path/to/SAMPLES` with your library. This reads filenames and prints a
+summary. It does not move, rename, convert or delete audio.
+
+Follow the [getting started guide](docs/GETTING-STARTED.md) for prerequisites,
+installation and a first TSV index.
+
+## Documentation
+
+- [Getting started](docs/GETTING-STARTED.md) — install and run a safe review.
+- [Workflows](docs/WORKFLOWS.md) — inspect, organise, curate and export.
+- [Safety model](docs/SAFETY.md) — understand previews, apply steps and recovery.
+- [Library command reference](library-tools/README.md) — every library command.
+- [Sample export reference](sample-tools/README.md) — conversion and device transfer.
+- [Roadmap](docs/ROADMAP.md) — personal priorities and the path towards a product.
+
+## Research and beta work
+
+Research stays in plain sight:
+
+- [`STATUS.md`](STATUS.md) records the current operational position.
+- [`decisions/`](decisions/) records approaches that were adopted, rejected or
+  downgraded.
+- [`docs/superpowers/specs/`](docs/superpowers/specs/) contains design and audit
+  documents.
+- [`docs/superpowers/plans/`](docs/superpowers/plans/) contains implementation
+  plans.
+
+Failed experiments remain useful evidence. In particular, the current drum-role
+classifier is review-only after its first ear calibration failed.
+
+## Project status
+
+The working CLIs and portable profile foundation are implemented. The live SSD
+catalogue migration and the first complete ear-approved hardware collection have
+not yet been applied. See the dated [project status](STATUS.md) for the next safe
+actions.
+
+## Licence
+
+No software licence has been selected. The source is visible for personal
+development and review; visibility alone does not grant permission to copy,
+modify or redistribute it.
