@@ -5,10 +5,15 @@ venv/
 # Throwaway spike area (cloned third-party repos, experiment scripts) — not for commit.
 .spikes/
 
+# Vendored third-party tools (Ableton Remote Scripts, MCP bridges) — each is its own clone
+# with its own git history; symlinked into Live's Remote Scripts, not copied. Not for commit.
+external/
+
 # Python build/cache
 __pycache__/
 *.pyc
 *.egg-info/
+.pytest_cache/
 build/
 dist/
 

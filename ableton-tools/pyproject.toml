@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abletontools"
+version = "0.1.0"
+description = "Read-only .als (Ableton Live Set) introspection: tempo/track/device/sample indexing."
+requires-python = ">=3.12"
+dependencies = []  # stdlib only: gzip, xml.etree.ElementTree, pathlib
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+als-index = "abletontools.cli:index_main"
+als-samples = "abletontools.cli:samples_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
