@@ -19,6 +19,37 @@ The intended sequence is:
 The tools are useful independently, but this sequence keeps broad library
 organisation separate from musical selection.
 
+## Current recovery position
+
+Three working packages support this sequence: library management, device export
+and read-only Ableton `.als` inspection. The Ableton tools can index Sets and
+report sample references, but never edit a Set.
+
+A local post-run audit dated 2026-07-18 verified 18 authorised catalogue moves.
+The 2026-07-23 read-only reconciliation scanned 22,952 audio files and verified
+that all 18 audited destination paths match their recorded SHA-256 identities;
+all 18 former source paths are absent. The associated confidence-organisation
+code is not merged. Treat this as historical organisation evidence only: it does
+not establish a complete catalogue, curated audio, verified PACKS preservation
+or an exportable crate, and confidence does not permit any additional move.
+
+The reconciliation found 130 absent entries from a 7,689-entry protected
+`PACKS/` snapshot; none were found relocated or changed in place. It also found
+one canonical Foundation v1 sample identity absent from inventory. These are
+blocking integrity discrepancies. Preserve the read-only evidence and conduct a
+human recovery review before promotion, export or a new organisation plan; do
+not infer their cause or mutate audio while resolving them.
+
+Foundation v1 is still human-gated. Its canonical `labels.tsv` has 216 rows;
+215 current rows resolve to decisions in the 214-row `labels-categorised.tsv`
+reference because one sample identity is duplicated, and one canonical identity
+is absent from inventory. The reference has 169 `keep` and 45 `reject` decisions
+but no favourites, so it cannot drive promotion. The 2026-07-18 audit found no
+curated audio. Recover the sequence by resolving the integrity discrepancies
+through human review, reviewing any future move plan in preview, completing and
+validating the canonical listening sheet, and only then promoting hash-verified
+favourites and previewing an export.
+
 ## Library zones
 
 | Zone | Purpose |
@@ -78,6 +109,11 @@ sample-dedupe --root /path/to/SAMPLES
 Read the plan, check destination collisions and confirm the library backup before
 running the same command with `--apply`. Applied moves do not overwrite existing
 files and write undo records for files that actually moved.
+
+Confidence is a way to prioritise a reviewed plan, not permission to move audio.
+The unmerged confidence-organisation work and its 18-move audit do not change
+this gate. The reconciliation's PACKS and canonical-label discrepancies block a
+fresh plan until human recovery review resolves them.
 
 The profile-aware foundation can plan a legacy-role migration into the
 [library zones](#library-zones):

@@ -9,12 +9,14 @@ but designed so the useful parts can become portable over time.
 
 ## What it does
 
-The repository contains two working Python packages:
+The repository contains three working Python packages:
 
 - **Library tools** index, review, organise, de-duplicate, analyse and curate a
   sample library.
 - **Sample export** validates and converts approved samples for Octatrack MKII,
   Digitakt MKI and TR-8S.
+- **Ableton tools** provide read-only `.als` Set indexing and sample-reference
+  reporting. They never edit a Live Set.
 
 The tools support a simple operating model: keep source packs intact, organise a
 broad catalogue, promote a small collection by ear, then build device-specific
@@ -39,10 +41,10 @@ card.
 
 | Maturity | Capability |
 |---|---|
-| **Stable** | Review and index a library; plan reversible sorting, intake and exact de-duplication; convert approved samples for supported hardware. |
-| **Beta** | Portable studio and device profiles; content-hash inventory; catalogue migration; human-gated curation; profile-aware crate export. These are implemented but the current live migration and foundation ear review are not complete. |
+| **Stable** | Review and index a library; plan reversible sorting, intake and exact de-duplication; convert approved samples for supported hardware; read-only Ableton Set indexing and sample-reference reporting. |
+| **Beta** | Portable studio and device profiles; content-hash inventory; catalogue migration; human-gated curation; profile-aware crate export. These are implemented, but the confidence-organisation work remains unmerged and Foundation v1 is not complete. |
 | **Experimental** | Acoustic features, drum-role suggestions, benchmark tooling and conservative near-duplicate research. These produce evidence for review, not autonomous decisions. |
-| **Planned** | MIDI generation, Ableton project inspection, bounce analysis and stem separation. Specifications are kept in Git beside the working code. |
+| **Planned** | MIDI generation, bounce analysis and stem separation. Specifications are kept in Git beside the working code. |
 
 The maturity labels describe this project, not a public support guarantee. See
 the [roadmap](docs/ROADMAP.md) for their exact meaning.
@@ -80,6 +82,7 @@ installation and a first TSV index.
 - [Safety model](docs/SAFETY.md) — understand previews, apply steps and recovery.
 - [Library command reference](library-tools/README.md) — every library command.
 - [Sample export reference](sample-tools/README.md) — conversion and device transfer.
+- [Ableton tools reference](ableton-tools/README.md) — read-only Set and sample-reference inspection.
 - [Roadmap](docs/ROADMAP.md) — personal priorities and the path towards a product.
 
 ## Research and beta work
@@ -99,10 +102,14 @@ classifier is review-only after its first ear calibration failed.
 
 ## Project status
 
-The working CLIs and portable profile foundation are implemented. The live SSD
-catalogue migration and the first complete ear-approved hardware collection have
-not yet been applied. See the dated [project status](STATUS.md) for the next safe
-actions.
+The working CLIs and portable profile foundation are implemented, including
+read-only Ableton inspection. A 2026-07-18 post-run audit and 2026-07-23
+reconciliation verified 18 authorised catalogue moves, but its
+confidence-organisation code is not merged and that evidence is not complete
+curation or hardware export. The reconciliation also found protected PACKS and
+Foundation-label integrity discrepancies that require human recovery review
+before promotion or export. See the dated [project status](STATUS.md) for the
+recovery sequence and next safe actions.
 
 ## Licence
 
