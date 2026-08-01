@@ -1,0 +1,210 @@
+# Sample search vocabulary.
+#
+# A tag is a named saved predicate over evidence, not a sticker applied to a file. Edit a
+# rule here and every tag regenerates — you never re-label individual samples.
+#
+# Each rule may carry:
+#   selectors  (at least one must match, if any are given)
+#     origins        exact origin match, as recovered by origin.py
+#     origin_matches substring match against the origin
+#     name_matches   substring match against the full path text
+#   constraints (all must hold, if given)
+#     roles          restrict to these review roles
+#     features       acoustic thresholds, e.g. { sub_ratio = ">=0.60" }
+#
+# Seeded from the real library: token counts come from the 23,088 indexed locations, so
+# every rule below has something to match. Delete what you don't think in; add what you do.
+
+schema_version = 1
+
+# ---------------------------------------------------------------- gear
+# Drum machines and synths are named all over this library, both in pack names and in the
+# vendors' own filenames.
+
+[[tag]]
+name = "909"
+group = "gear"
+origin_matches = ["909"]
+name_matches = ["909", "sa909"]
+
+[[tag]]
+name = "808"
+group = "gear"
+origin_matches = ["808"]
+name_matches = ["808"]
+
+[[tag]]
+name = "sp1200"
+group = "gear"
+origin_matches = ["sp1200"]
+name_matches = ["sp1200"]
+
+[[tag]]
+name = "sh101"
+group = "gear"
+origin_matches = ["sh101"]
+name_matches = ["sh101", "tapesh101"]
+
+[[tag]]
+name = "303"
+group = "gear"
+origin_matches = ["303"]
+name_matches = ["303", "handson303"]
+
+[[tag]]
+name = "cr78"
+group = "gear"
+name_matches = ["cr78", "cr-78"]
+
+[[tag]]
+name = "tr8"
+group = "gear"
+origin_matches = ["tr-8", "tr8"]
+name_matches = ["tr-8", "tr8"]
+
+[[tag]]
+name = "tape"
+group = "gear"
+name_matches = ["tape", "cass", "fatso"]
+
+[[tag]]
+name = "analog"
+group = "gear"
+origin_matches = ["analog", "analogue", "super-analog"]
+name_matches = ["analog", "analogue"]
+
+# ---------------------------------------------------------------- style
+# Genre and feel. Mostly carried by the pack a sample came from, which is why origin is the
+# strongest evidence here.
+
+[[tag]]
+name = "techno"
+group = "style"
+origin_matches = ["techno"]
+name_matches = ["techno"]
+
+[[tag]]
+name = "tribal"
+group = "style"
+origin_matches = ["tribal"]
+name_matches = ["tribal", "conga", "bongo", "djembe", "cowbell", "timbale"]
+
+[[tag]]
+name = "dub"
+group = "style"
+origin_matches = ["echospace", "deepchord", "modulation-space"]
+name_matches = ["dub", "echoes-in-space"]
+
+[[tag]]
+name = "detroit"
+group = "style"
+origin_matches = ["detroit"]
+name_matches = ["detroit"]
+
+[[tag]]
+name = "hardgroove"
+group = "style"
+origin_matches = ["hardgroove"]
+name_matches = ["hardgroove"]
+
+[[tag]]
+name = "acid"
+group = "style"
+origin_matches = ["acid", "303"]
+name_matches = ["acid"]
+
+[[tag]]
+name = "ambient"
+group = "style"
+origin_matches = ["ambient", "soundware", "cartel-hall"]
+name_matches = ["ambient", "atmos", "drone", "texture"]
+
+[[tag]]
+name = "dark"
+group = "style"
+origin_matches = ["dark", "underground"]
+name_matches = ["dark"]
+
+[[tag]]
+name = "house"
+group = "style"
+origin_matches = ["house"]
+name_matches = ["house"]
+
+# ---------------------------------------------------------------- character
+# Measured, not guessed. Thresholds are ported unchanged from
+# analyze_features.derive_character_tags, which tuned them against this library — that code
+# computed these into a TSV column and then discarded them.
+
+[[tag]]
+name = "subby"
+group = "character"
+roles = ["KICKS"]
+features = { sub_ratio = ">=0.60" }
+
+[[tag]]
+name = "clicky"
+group = "character"
+roles = ["KICKS"]
+features = { attack_ms = "<=5" }
+
+[[tag]]
+name = "rumble-long"
+group = "character"
+roles = ["KICKS"]
+features = { tail_ms = ">=700", low_ratio = ">=0.55" }
+
+[[tag]]
+name = "short"
+group = "character"
+roles = ["KICKS"]
+features = { tail_ms = "<=250" }
+
+[[tag]]
+name = "metallic"
+group = "character"
+roles = ["HATS-CYM"]
+features = { flatness = ">=0.35", centroid_hz = ">=3500" }
+
+[[tag]]
+name = "tight"
+group = "character"
+roles = ["HATS-CYM"]
+features = { tail_ms = "<=250" }
+
+[[tag]]
+name = "sparse"
+group = "character"
+roles = ["DRUM-LOOPS"]
+features = { duration_s = ">=1.0", onset_density = "<=2.0" }
+
+[[tag]]
+name = "busy"
+group = "character"
+roles = ["DRUM-LOOPS"]
+features = { duration_s = ">=1.0", onset_density = ">=8.0" }
+
+[[tag]]
+name = "dub-wash"
+group = "character"
+roles = ["DRONE-ATMOS"]
+features = { duration_s = ">=5.0", onset_density = "<=1.5", centroid_hz = "<=1200" }
+
+[[tag]]
+name = "wood"
+group = "character"
+roles = ["PERC"]
+name_matches = ["wood", "clave", "block", "rim"]
+
+# ---------------------------------------------------------------- processing
+# Caught-on-Tape style suffixes, already parsed by analyze_sources.parse_processing_suffix.
+
+[[tag]]
+name = "processed"
+group = "character"
+name_matches = ["_x.", "_x2.", "-x.", "processed"]
+
+[[tag]]
+name = "original"
+group = "character"
+name_matches = ["_orig", "-orig", "aorig"]

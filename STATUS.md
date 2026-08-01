@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-07-23
+**Updated:** 2026-08-01
 
 ## Current position
 
@@ -44,7 +44,11 @@ known test failure.
 
 ## Live-library state
 
-- The Extreme SSD is APFS and backed up, confirmed 2026-07-07.
+- **The Extreme SSD has no current backup.** The earlier "backed up, confirmed 2026-07-07"
+  claim was checked on 2026-07-31 and does not hold: `tmutil destinationinfo` reports no
+  destinations configured on the Mac mini. 28 GB across 22,952 audio files is single-copy,
+  including material that cannot be re-downloaded. No `--apply`, promotion, export or card
+  sync should run until this is resolved.
 - A 2026-07-18 local audit verified 18 authorised catalogue moves. Reconcile
   those recorded moves with the 2026-07-23 read-only inventory before planning
   further organisation. All 18 audited destinations match their recorded
@@ -67,6 +71,37 @@ known test failure.
 
 The generated database, manifests and research reports are evidence. They are
 not proof that a move or musical selection has been approved.
+
+## Retrieval layer (added 2026-07-31)
+
+`sample-tag` and `sample-find` make the library searchable by style, type and origin without
+moving a file. Verified against the live library, which was byte-identical before and after
+(22,952 audio files, 27,672 files total, 28 GB):
+
+- Pack origin recovered for 20,300 of 21,306 distinct samples (95.3%) across 44 packs.
+  10,067 came from a surviving folder, 10,231 from the filename token the sorter left behind.
+- 21,304 acoustic measurements moved from the stale path-keyed cache onto `sample_id`, with
+  no re-decoding required; 2 failed and are recorded.
+- 83,606 tags written from `vocabulary.toml` — the `tags` table had been empty since it was
+  created.
+- `sample-find --crate` output was accepted by `sample-export octatrack --list`, which
+  re-verified every SHA-256 against the bytes on disk.
+
+**Gap closed 2026-08-01:** that verification ran against a `CURATED/`-located sample, but
+`build_crate_plan` had no check that a crate row's source lived there at all — a matching
+hash from anywhere in the library, including unreviewed `CATALOGUE/` or `PACKS/` material,
+would pass. That let `sample-find --crate` build a crate `sample-export` would convert
+without the ear-review `sample-curate promote` step in between, contradicting this repo's own
+promote-then-export invariant (`docs/WORKFLOWS.md` §3–4) and `eidetic-studio`'s WIP export-set
+contract. `build_crate_plan` now rejects any row outside `CURATED/`; `sample-find --curated-only`
+lets a search be scoped to what will actually pass before a crate is written.
+
+This also bears on the 130 absent protected `PACKS/` entries. The evidence points to earlier
+flattening rather than loss: 935 orphaned `.wav.asd` sidecars sit in `PACKS/` where audio was
+moved out, and the pack that `unresolved.tsv` records as missing
+(`gr8-tech-house-top-loops`) still has 50 samples present in the index under recovered
+origin. That is not a completed recovery review and does not by itself unblock promotion or
+export, but it narrows what remains to be explained.
 
 ## Beta and research
 

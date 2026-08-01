@@ -126,6 +126,28 @@ review-needed.tsv
 Open these files in a spreadsheet or text editor. Treat every proposal as review
 material, not permission to move audio.
 
+## Make the library searchable
+
+Review tells you what is there. To find things by style, type and origin, build the
+search index once:
+
+```bash
+sample-tag --root /path/to/SAMPLES --rescan --apply
+```
+
+This recovers each sample's pack origin, measures its acoustics against the content
+hash, and generates tags from [`vocabulary.toml`](../library-tools/vocabulary.toml).
+It reads audio but never moves, renames or converts it.
+
+Then search, and audition what comes back:
+
+```bash
+sample-find perc tribal analog --limit 20 --m3u8 manifests/hunt.m3u8
+```
+
+Run without `--apply` first if you want to see what the vocabulary would match before
+writing anything.
+
 ## Choose your next workflow
 
 - Read [Workflows](WORKFLOWS.md) to move from inspection to curation and export.

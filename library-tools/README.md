@@ -40,6 +40,8 @@ repository. Locally supplied weights belong at
 | `sample-near-dupes` | Experimental | Produce conservative near-duplicate audition groups. | Derived files; reviewed apply is a dry run by default |
 | `sample-role-cleanup` | Experimental | Turn classifier routes into human calibration packets. | Derived files only |
 | `sample-benchmark` | Experimental | Prepare ear-labelled model benchmarks and score them. | Derived files only |
+| `sample-tag` | Beta | Recover pack origin, measure acoustics and regenerate search tags. | Derived files only |
+| `sample-find` | Beta | Find samples by style, type and origin; write playlists and crates. | None |
 | `sample-profile` | Beta | Show or validate portable studio profiles. | None |
 | `sample-curate` | Beta | Plan catalogue migration, curate by ear and write consumer views. | Depends on subcommand |
 | `sample-classify` | Retired | Legacy coarse loop/one-shot sorter. | Dry run |
@@ -138,6 +140,75 @@ sample-classify [--root PATH] [--no-probe] [--apply]
 This older command sorts `_PACKS/`, `DRUM-KITS/` and `00_INBOX/` into coarse
 sound-type buckets. Use `sample-review` and `sample-sort` for new role-based
 work. The command remains available when the older loop/one-shot split is useful.
+
+## Find samples and load hardware
+
+### `sample-tag`
+
+```text
+sample-tag [--root PATH] [--library-db FILE] [--vocabulary FILE]
+           [--rescan] [--skip-features] [--apply]
+```
+
+Builds the search index in three read-only steps: recovers each sample's pack origin,
+moves acoustic measurements onto the content hash, then regenerates tags from
+[`vocabulary.toml`](vocabulary.toml).
+
+Origin survives the earlier flattening because `sample-sort` renamed files to
+`{role}-{description}_{source}`, leaving the pack token in the filename. Where a folder still
+names the pack it is used directly, and a sample that also exists somewhere with intact
+provenance inherits it by content hash. On the current library that resolves 20,300 of 21,306
+samples (95.3%) across 44 packs.
+
+A tag is a saved predicate over evidence, not a label applied per file:
+
+```toml
+[[tag]]
+name = "tribal"
+group = "style"
+origin_matches = ["tribal"]
+name_matches = ["conga", "bongo", "djembe", "cowbell"]
+```
+
+Run without `--apply` to write a coverage proposal listing what each rule would match and
+why. Edit the vocabulary, re-run, and tags regenerate — you never re-label samples.
+
+### `sample-find`
+
+```text
+sample-find [TERMS...] [--role R] [--style S] [--gear G] [--character C] [--origin O]
+            [--any] [--curated-only] [--like PATH|ID] [--preferred] [--no-spread]
+            [--limit N] [--m3u8 FILE] [--crate FILE] [--kit-id ID]
+```
+
+Terms match across every tag group and are ANDed unless `--any` is given.
+
+`--like` ranks by measured acoustic distance instead of keywords. This is what narrows
+*within* a pack: 7,826 Goldbaby SA909 samples share every keyword tag they will ever have, so
+only sound can separate them. It is plain min-max normalised euclidean distance over the
+measured features — no clustering and no model.
+
+Results spread across sound families by default, so "find me a bongo" returns different
+bongos rather than eight round-robin takes of one. Use `--no-spread` for a flat alphabetical
+list.
+
+`--crate` writes the schema `sample-export` already reads, which makes search-to-hardware two
+commands — but `sample-export` rejects any row whose source isn't already promoted into
+`CURATED/`, so add `--curated-only` to search only what will actually pass:
+
+```bash
+sample-find kick --gear 909 --character subby --curated-only --limit 16 \
+  --crate manifests/ot-kit-01.tsv --kit-id ot-kit-01
+sample-export octatrack --profile eidetic-studio --crate manifests/ot-kit-01.tsv --list
+```
+
+Without `--curated-only`, a written crate may still contain `CATALOGUE/`- or `PACKS/`-sourced
+rows; `sample-find` warns at write time, and `sample-export` refuses the whole crate until
+those samples are promoted with `sample-curate`.
+
+`--kit-id` records what went into a kit. Those picks accumulate into a preference signal that
+`--preferred` sorts by, so the trusted set builds itself out of real use instead of requiring
+a labelling session up front.
 
 ## Curate trusted samples
 

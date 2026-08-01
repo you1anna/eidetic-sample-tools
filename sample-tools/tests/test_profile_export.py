@@ -94,6 +94,18 @@ def test_crate_plan_rejects_changed_hash_before_conversion(tmp_path):
         build_crate_plan(config.get_spec("digitakt"), crate, root)
 
 
+def test_crate_plan_rejects_source_outside_curated(tmp_path):
+    root = tmp_path / "SAMPLES"
+    _, sample_id = _source(root, "CATALOGUE/KICK/a.wav", b"kick")
+    crate = _crate(tmp_path / "crate.tsv", [{
+        "sample_id": sample_id, "source_path": "CATALOGUE/KICK/a.wav",
+        "role": "KICK", "descriptor": "short", "reason": "",
+    }])
+
+    with pytest.raises(ExportError, match="not under CURATED/"):
+        build_crate_plan(config.get_spec("digitakt"), crate, root)
+
+
 def test_digitakt_capacity_is_checked_before_conversion(tmp_path):
     root = tmp_path / "SAMPLES"
     rows = []

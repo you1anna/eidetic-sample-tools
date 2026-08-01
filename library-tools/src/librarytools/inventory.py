@@ -16,7 +16,7 @@ from pathlib import Path
 from . import config
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SKIP_TOP = frozenset({"_EXPORT", "_TO-DELETE", "_QUARANTINE"})
 
 
@@ -123,6 +123,21 @@ class LibraryDatabase:
                     promoted_at text not null,
                     run_id text not null default '',
                     primary key(sample_id, curated_path)
+                );
+                create table if not exists origins (
+                    sample_id text primary key references assets(sample_id),
+                    origin text not null,
+                    confidence text not null,
+                    method text not null,
+                    token text not null default ''
+                );
+                create table if not exists picks (
+                    sample_id text not null references assets(sample_id),
+                    kit_id text not null,
+                    query text not null default '',
+                    kept integer not null default 1,
+                    recorded_at text not null,
+                    primary key(sample_id, kit_id)
                 );
                 """
             )
@@ -242,6 +257,73 @@ class LibraryDatabase:
         with self._connect() as conn:
             rows = conn.execute("select * from promotions order by promoted_at,curated_path").fetchall()
         return [dict(row) for row in rows]
+
+    def record_origin(
+        self, sample_id: str, origin: str, confidence: str, method: str, token: str = "",
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                insert or replace into origins
+                (sample_id,origin,confidence,method,token) values(?,?,?,?,?)
+                """,
+                (sample_id, origin, confidence, method, token),
+            )
+
+    def origins(self) -> dict[str, tuple[str, str, str]]:
+        """Return ``sample_id -> (origin, confidence, method)`` for every resolved asset."""
+        with self._connect() as conn:
+            rows = conn.execute("select sample_id,origin,confidence,method from origins").fetchall()
+        return {
+            str(row["sample_id"]): (str(row["origin"]), str(row["confidence"]), str(row["method"]))
+            for row in rows
+        }
+
+    def record_features(self, sample_id: str, payload_json: str, audio_error: str = "") -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                insert or replace into asset_features
+                (sample_id,payload_json,audio_error) values(?,?,?)
+                """,
+                (sample_id, payload_json, audio_error),
+            )
+
+    def features(self) -> dict[str, str]:
+        """Return ``sample_id -> payload_json`` for assets whose extraction succeeded."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "select sample_id,payload_json from asset_features where audio_error=''"
+            ).fetchall()
+        return {str(row["sample_id"]): str(row["payload_json"]) for row in rows}
+
+    def feature_ids(self) -> set[str]:
+        with self._connect() as conn:
+            rows = conn.execute("select sample_id from asset_features").fetchall()
+        return {str(row["sample_id"]) for row in rows}
+
+    def record_pick(self, sample_id: str, kit_id: str, query: str, kept: bool = True) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                insert or replace into picks
+                (sample_id,kit_id,query,kept,recorded_at) values(?,?,?,?,?)
+                """,
+                (sample_id, kit_id, query, 1 if kept else 0, _now()),
+            )
+
+    def pick_counts(self) -> dict[str, int]:
+        """Return ``sample_id -> times kept in a kit`` — the accreted preference signal."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "select sample_id,count(*) c from picks where kept=1 group by sample_id"
+            ).fetchall()
+        return {str(row["sample_id"]): int(row["c"]) for row in rows}
+
+    def clear_tags(self) -> None:
+        """Drop every materialised tag so the vocabulary can be regenerated from rules."""
+        with self._connect() as conn:
+            conn.execute("delete from tags")
 
     def record_tags(self, sample_id: str, tags: list[tuple[str, str]]) -> None:
         with self._connect() as conn:

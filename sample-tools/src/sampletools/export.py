@@ -112,6 +112,7 @@ def build_crate_plan(
     if spec.name == "tr8s" and len(rows) > 256:
         raise ExportError(f"TR-8S import folder capacity is 256 files, crate has {len(rows)}")
     crate_name = naming.normalise_base(crate_path.stem)
+    curated_root = (samples_root / "CURATED").resolve()
     per_role: dict[str, int] = {}
     names: set[str] = set()
     items: list[Item] = []
@@ -120,6 +121,11 @@ def build_crate_plan(
         source = samples_root / row.source_path
         if not source.is_file():
             raise ExportError(f"missing crate source: {row.source_path}")
+        if not source.resolve().is_relative_to(curated_root):
+            raise ExportError(
+                f"crate source is not under CURATED/: {row.source_path} "
+                "(promote it with sample-curate first)"
+            )
         if _sha256(source) != row.sample_id:
             raise ExportError(f"hash changed for crate source: {row.source_path}")
         if spec.name == "tr8s":

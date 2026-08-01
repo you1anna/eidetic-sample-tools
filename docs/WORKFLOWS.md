@@ -61,6 +61,67 @@ favourites and previewing an export.
 Generated indexes, review packets and export folders sit outside these source
 zones. They can be rebuilt from the library and its decision records.
 
+## Find a sound now
+
+**Action level:** Writes derived files.
+
+Most sessions do not need the full sequence below. If the index is built, searching
+is the fast path from "I need an analog bongo" to a loaded card.
+
+Build the index once. This recovers each sample's pack origin, moves acoustic
+measurements onto the content hash, and regenerates tags from `vocabulary.toml`.
+It never moves, renames or converts audio:
+
+```bash
+sample-tag --root /path/to/SAMPLES --rescan --apply
+```
+
+Then search. Terms match across every tag group and are combined with AND:
+
+```bash
+sample-find perc tribal analog --limit 30
+sample-find --role KICKS --style techno --character subby --limit 20
+```
+
+Keywords cannot separate samples that share a pack — 7,826 Goldbaby SA909 samples
+carry the same tags. `--like` ranks by measured sound instead, which is the only
+thing that narrows inside a pack:
+
+```bash
+sample-find --like perc-cr78-bongolo-aorig-r1 --role PERC --limit 10
+```
+
+Results spread across sound families by default, so a search for a bongo returns
+different bongos rather than eight round-robin takes of one.
+
+Write a playlist to audition, and a crate the exporter can read. `sample-export`
+only accepts crate rows whose source has already been promoted into `CURATED/`
+(§3 below) — add `--curated-only` so the crate it writes only contains samples
+that will actually pass:
+
+```bash
+sample-find --role PERC --style tribal --gear analog --curated-only --limit 8 \
+  --m3u8 manifests/tribal-perc.m3u8 \
+  --crate manifests/ot-tribal-perc.tsv \
+  --kit-id ot-tribal-perc
+
+sample-export octatrack --profile eidetic-studio \
+  --crate manifests/ot-tribal-perc.tsv --list
+```
+
+Without `--curated-only`, search still helps you *find* the sound — but a row whose
+source is still in `CATALOGUE/` or `PACKS/` will make `sample-export` refuse the
+whole crate until that sample is promoted (`sample-curate promote`, §3). `sample-find`
+prints a warning at write time if a written crate contains any such rows.
+
+`--kit-id` records what went into the kit. Those picks accumulate, and
+`sample-find --preferred` sorts by them, so a trusted set builds itself out of real
+use rather than a separate labelling exercise.
+
+When a search disappoints, edit one rule in `vocabulary.toml` and re-run
+`sample-tag --apply`. Tags regenerate from the rules; individual samples are never
+labelled by hand and never move.
+
 ## 1. Inspect without changing audio
 
 **Action level:** Writes derived files.

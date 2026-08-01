@@ -24,6 +24,8 @@ Representative commands:
 |---|---|---|
 | `sample-review` | Prints a summary or writes requested TSV files | Never moves audio |
 | `sample-analyze` | Writes analysis manifests, reports and caches | Never moves audio |
+| `sample-tag` | Writes origin, measurements and tags to the index | Never moves audio |
+| `sample-find` | Prints matches; writes playlists and crates | Never moves audio; has no apply path |
 | `sample-sort` | Writes a move plan | `--apply` moves audio and writes an undo manifest |
 | `sample-dedupe` | Writes a duplicate plan | `--apply` moves extras to `_TO-DELETE/dupes/` |
 | `sample-intake` | Writes an intake plan | `--apply` moves detected packs |

@@ -12,7 +12,7 @@ but designed so the useful parts can become portable over time.
 The repository contains three working Python packages:
 
 - **Library tools** index, review, organise, de-duplicate, analyse and curate a
-  sample library.
+  sample library, and search it by style, type and origin.
 - **Sample export** validates and converts approved samples for Octatrack MKII,
   Digitakt MKI and TR-8S.
 - **Ableton tools** provide read-only `.als` Set indexing and sample-reference
@@ -42,7 +42,7 @@ card.
 | Maturity | Capability |
 |---|---|
 | **Stable** | Review and index a library; plan reversible sorting, intake and exact de-duplication; convert approved samples for supported hardware; read-only Ableton Set indexing and sample-reference reporting. |
-| **Beta** | Portable studio and device profiles; content-hash inventory; catalogue migration; human-gated curation; profile-aware crate export. These are implemented, but the confidence-organisation work remains unmerged and Foundation v1 is not complete. |
+| **Beta** | Portable studio and device profiles; content-hash inventory; pack-origin recovery and tag search; catalogue migration; human-gated curation; profile-aware crate export. These are implemented, but the confidence-organisation work remains unmerged and Foundation v1 is not complete. |
 | **Experimental** | Acoustic features, drum-role suggestions, benchmark tooling and conservative near-duplicate research. These produce evidence for review, not autonomous decisions. |
 | **Planned** | MIDI generation, bounce analysis and stem separation. Specifications are kept in Git beside the working code. |
 
