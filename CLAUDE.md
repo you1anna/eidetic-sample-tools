@@ -177,10 +177,20 @@ user-supplied and unlicensed upstream), `external/`, `.spikes/`. Ableton archive
 - Maturity labels (Stable / Beta / Experimental / Planned / Retired) are defined in
   `docs/ROADMAP.md` and used consistently across the READMEs.
 
-## Current operational state (STATUS.md, 2026-07-23)
+## Current operational state (STATUS.md, 2026-08-04)
 
-Promotion and hardware export are **blocked** pending human recovery review: 130 of 7,689
-protected `PACKS/` snapshot entries are absent from the 22,952-file inventory, and one
-canonical Foundation v1 sample identity is missing. The confidence-organisation code behind
-the 2026-07-18 18-move audit is unmerged. Do not run `--apply`, `promote` or a real export
-against the live library, and do not infer causes for the discrepancies.
+**`promote` is permitted.** The 130 absent protected `PACKS/` entries and the one missing
+Foundation v1 identity were demoted from blocker to open integrity risk on 2026-08-04
+(`eidetic-studio/decisions/2026-08-04-demote-packs-recovery-gate.md`): promotion re-hashes
+every labelled source and refuses a stale or missing file, which is the per-file guarantee the
+blanket block stood in for. Still do not infer causes for the discrepancies, and treat no
+`PACKS/` preservation claim as verified.
+
+**Still blocked:** `--apply` organisation, intake, dedupe and catalogue-migration against the
+live library — the SSD remains single-copy (28 GB, no `tmutil` destination), and promotion's
+second copy lands on the same disk, so it is not a backup. The confidence-organisation code
+behind the 2026-07-18 18-move audit is unmerged. Hardware export and card sync are untested
+against the live library; run `--list` then `--dry-run` first.
+
+Active run: `tribal-140-01` — a 63-row audition packet awaiting Robin's listening decisions.
+`CURATED/` is still empty (`promotions` table: 0 rows).

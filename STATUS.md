@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-08-01
+**Updated:** 2026-08-04
 
 ## Current position
 
@@ -15,8 +15,9 @@ branch. That audit is limited organisation evidence: it is neither proof of a
 complete catalogue migration nor permission for further moves. The 2026-07-23
 read-only reconciliation scanned 22,952 audio files: all 18 audited destination
 paths match their recorded SHA-256 identities and all 18 former source paths are
-absent. It also found integrity discrepancies that require human recovery review
-before curation promotion or hardware export.
+absent. It also found integrity discrepancies that remain unexplained; as of
+2026-08-04 they are an open risk rather than a promotion block (see "Live-library
+state" below).
 
 The immediate objective remains a small, trusted collection for Octatrack first,
 then Digitakt and TR-8S.
@@ -47,8 +48,17 @@ known test failure.
 - **The Extreme SSD has no current backup.** The earlier "backed up, confirmed 2026-07-07"
   claim was checked on 2026-07-31 and does not hold: `tmutil destinationinfo` reports no
   destinations configured on the Mac mini. 28 GB across 22,952 audio files is single-copy,
-  including material that cannot be re-downloaded. No `--apply`, promotion, export or card
-  sync should run until this is resolved.
+  including material that cannot be re-downloaded. **No `--apply` organisation, intake,
+  dedupe or catalogue-migration command may run until this is resolved.**
+- **Promotion is permitted again as of 2026-08-04** (Robin's decision; recorded in
+  `eidetic-studio/decisions/2026-08-04-demote-packs-recovery-gate.md`). `sample-curate
+  promote` is a hash-verified **copy** — it re-resolves every labelled row against the
+  inventory, re-computes its SHA-256 and refuses a stale or missing source before copying,
+  so it carries the per-file guarantee the blanket block was standing in for.
+  `undo-promotion --run-id <id>` moves copies to `_QUARANTINE/promotion-undo/`.
+  **This is not a backup:** promotion writes a second copy on the same physical disk, and a
+  drive failure still loses both. Robin declined a backup on 2026-08-04 with this stated.
+  Hardware export and card sync remain untested against the live library.
 - A 2026-07-18 local audit verified 18 authorised catalogue moves. Reconcile
   those recorded moves with the 2026-07-23 read-only inventory before planning
   further organisation. All 18 audited destinations match their recorded
@@ -56,7 +66,13 @@ known test failure.
 - The inventory contains 22,952 audio files. Of 7,689 protected `PACKS/`
   snapshot entries, 130 are absent from the current inventory and were not
   found relocated or changed in place. PACKS preservation is therefore not
-  fully verified; do not infer why those entries are absent.
+  fully verified; do not infer why those entries are absent. **As of 2026-08-04 this is an
+  open integrity risk rather than a block** — it stays unexplained and may never be
+  explained, and no preservation claim about `PACKS/` should be treated as verified.
+  Demonstrated in practice on 2026-08-04: the `tribal-140-01` packet contained one such row
+  (`04b454c5…`, the known Foundation recovery blocker in
+  `foundation-v1-recovery-20260723/unresolved.tsv`); it was caught by the per-file check and
+  removed, leaving the other 63 rows unaffected.
 - The confidence-organisation implementation used for that audit is unmerged.
   Its confidence output remains review evidence, never permission to move,
   exclude, promote or export audio.
@@ -100,8 +116,13 @@ This also bears on the 130 absent protected `PACKS/` entries. The evidence point
 flattening rather than loss: 935 orphaned `.wav.asd` sidecars sit in `PACKS/` where audio was
 moved out, and the pack that `unresolved.tsv` records as missing
 (`gr8-tech-house-top-loops`) still has 50 samples present in the index under recovered
-origin. That is not a completed recovery review and does not by itself unblock promotion or
-export, but it narrows what remains to be explained.
+origin. That is not a completed recovery review, but it narrows what remains to be explained.
+**Corroborated 2026-08-04:** the `tribal-140-01` packet drew one row from exactly that pack
+(`PACKS/gr8-tech-house-top-loops/125bpm_Wav_Loops/Top Loop 2.wav`) — the whole
+`125bpm_Wav_Loops/` sub-folder is gone while the rest of the pack is indexed, which fits the
+flattening explanation rather than wholesale loss. It is still not proof, and no cause should
+be inferred. Promotion was unblocked separately on the strength of the per-file hash check,
+not on this evidence.
 
 ## Beta and research
 
