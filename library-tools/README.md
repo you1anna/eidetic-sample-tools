@@ -245,8 +245,8 @@ role and a short descriptor.
 `classify-packet` always predicts both form and content. Its nine audition groups are rim,
 tom and general percussion one-shots; percussion and full-drum loops; vocal stabs, phrases
 and long sources; and out-of-brief. Fill all truth columns in `benchmark-labels.tsv`, then rerun
-the same command. Category playlists are published only after at least 22/24 form and 20/24
-content/group decisions agree with the ear labels. Low-confidence files appear last within their
+the same command. Category playlists are published only after at least 22/24 form decisions and
+20/24 joint content-and-group decisions agree with the ear labels. Low-confidence files appear last within their
 best-guess group. On the first pass, the rejected name-derived playlist directory and combined
 playlist are preserved below the packet's `archive/` directory before replacement.
 

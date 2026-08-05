@@ -12,6 +12,7 @@ import csv
 import json
 import re
 import shutil
+from collections import Counter
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
@@ -20,6 +21,7 @@ import numpy as np
 
 from . import audiofeatures
 from .featurecache import FEATURE_COLUMNS
+from .inventory import sha256_file
 
 
 CLASSIFIER_VERSION = "hybrid-v1"
@@ -158,6 +160,7 @@ class BenchmarkScore:
     form_correct: int
     content_correct: int
     group_correct: int
+    content_group_correct: int
     total: int
     ready: bool
     passed: bool
@@ -172,7 +175,7 @@ def calibrate_config(
         raise PacketClassifierError("calibration requires at least one candidate configuration")
     ranked: list[tuple[tuple[float, ...], ClassifierConfig]] = []
     for config in configs:
-        form_correct = content_correct = group_correct = 0
+        form_correct = content_correct = group_correct = content_group_correct = 0
         margins: list[float] = []
         for item in items:
             expected = truth.get(item.sample_id)
@@ -184,10 +187,14 @@ def calibrate_config(
             form_correct += predicted.form == expected.get("true_form")
             content_correct += predicted.content == expected.get("true_content")
             group_correct += predicted.audition_group == expected.get("true_audition_group")
+            content_group_correct += (
+                predicted.content == expected.get("true_content")
+                and predicted.audition_group == expected.get("true_audition_group")
+            )
             margins.append(min(predicted.form_confidence, predicted.content_confidence))
         mean_margin = sum(margins) / len(margins) if margins else 0.0
         objective = (
-            float(form_correct), float(content_correct), float(group_correct), mean_margin,
+            float(form_correct), float(content_group_correct), float(content_correct), mean_margin,
             -config.lexical_weight,
         )
         ranked.append((objective, config))
@@ -199,6 +206,24 @@ class SemanticScorer(Protocol):
     def revision(self) -> str: ...
 
     def score(self, path: Path) -> dict[str, float]: ...
+
+
+def verify_packet_source(root: Path, database, sample_id: str, path: Path) -> Path:
+    root = root.resolve()
+    source = (root / path).resolve()
+    if not source.is_relative_to(root):
+        raise PacketClassifierError(f"sample path escapes root: {path}")
+    try:
+        location = database.location(path)
+    except KeyError as exc:
+        raise PacketClassifierError(f"sample is absent from inventory: {path}") from exc
+    if not location.exists or location.sample_id != sample_id:
+        raise PacketClassifierError(f"stale sample identity for: {path}")
+    if not source.is_file():
+        raise PacketClassifierError(f"sample is missing: {path}")
+    if sha256_file(source) != sample_id:
+        raise PacketClassifierError(f"hash changed since inventory scan: {path}")
+    return source
 
 
 def feature_array(output):
@@ -220,6 +245,14 @@ def clap_audio_inputs(processor, excerpts):
         return_tensors="pt",
         padding=True,
     )
+
+
+def clap_excerpt_offsets(duration_s: float, window_s: float = 10.0) -> list[float]:
+    """Return bounded start offsets without decoding an entire long source."""
+    if duration_s <= window_s:
+        return [0.0]
+    remainder = duration_s - window_s
+    return [0.0, remainder / 2.0, remainder]
 
 
 def rhythm_periodicity(onset, sample_rate: int) -> float:
@@ -276,7 +309,6 @@ def _content(
 def _form(
     path: Path,
     evidence: AcousticEvidence,
-    content: str,
     config: ClassifierConfig,
 ) -> tuple[str, float]:
     duration = evidence.duration_s
@@ -291,8 +323,6 @@ def _form(
         return "LONG_FORM", min(1.0, 0.90 + min(duration - 90.0, 100.0) / 1000.0)
     if duration <= 2.0:
         return "ONE_SHOT", min(1.0, 0.76 + (2.0 - duration) * 0.10)
-    if content == "VOCAL":
-        return "PHRASE", min(0.95, 0.68 + min(duration, 30.0) / 120.0)
     if rhythmic or (loop_hint and evidence.onset_density >= 1.0):
         strength = max(evidence.periodicity, evidence.beat_confidence)
         return "LOOP", min(0.98, 0.62 + strength * 0.35)
@@ -323,7 +353,7 @@ def classify_evidence(
     config: ClassifierConfig = DEFAULT_CONFIG,
 ) -> Classification:
     content, content_confidence, adjusted = _content(path, semantic_scores, config)
-    form, form_confidence = _form(path, evidence, content, config)
+    form, form_confidence = _form(path, evidence, config)
     group = _audition_group(form, content)
     top_scores = sorted(adjusted.items(), key=lambda item: (-item[1], item[0]))[:2]
     detail = (
@@ -431,13 +461,17 @@ class ClapSemanticScorer:
     def score(self, path: Path) -> dict[str, float]:
         import librosa
 
-        audio, _ = librosa.load(path, sr=48_000, mono=True)
-        window = 10 * 48_000
-        if len(audio) <= window:
-            excerpts = [audio]
-        else:
-            starts = [0, max(0, (len(audio) - window) // 2), max(0, len(audio) - window)]
-            excerpts = [audio[start:start + window] for start in starts]
+        duration_s = float(librosa.get_duration(path=path))
+        excerpts = [
+            librosa.load(
+                path,
+                sr=48_000,
+                mono=True,
+                offset=offset,
+                duration=10.0,
+            )[0]
+            for offset in clap_excerpt_offsets(duration_s)
+        ]
         inputs = clap_audio_inputs(self._processor, excerpts)
         with self._torch.inference_mode():
             embeddings = feature_array(self._model.get_audio_features(**inputs))
@@ -464,19 +498,38 @@ def score_benchmark(rows: Sequence[Mapping[str, str]]) -> BenchmarkScore:
         row for row in rows
         if row.get("true_form") and row.get("true_content") and row.get("true_audition_group")
     ]
-    ready = len(rows) == 24 and len(ready_rows) == 24
+    expected_strata = Counter({stratum: 4 for stratum in BENCHMARK_STRATA})
+    structurally_valid = (
+        len(rows) == 24
+        and len({row.get("sample_id", "") for row in rows}) == 24
+        and all(row.get("sample_id") and row.get("current_path") for row in rows)
+        and Counter(row.get("stratum", "") for row in rows) == expected_strata
+    )
+    truths_valid = all(
+        row.get("true_form") in FORMS
+        and row.get("true_content") in CONTENTS
+        and row.get("true_audition_group") in AUDITION_GROUPS
+        for row in ready_rows
+    )
+    ready = structurally_valid and len(ready_rows) == 24 and truths_valid
     form_correct = sum(row.get("form") == row.get("true_form") for row in ready_rows)
     content_correct = sum(row.get("content") == row.get("true_content") for row in ready_rows)
     group_correct = sum(
         row.get("audition_group") == row.get("true_audition_group") for row in ready_rows
     )
+    content_group_correct = sum(
+        row.get("content") == row.get("true_content")
+        and row.get("audition_group") == row.get("true_audition_group")
+        for row in ready_rows
+    )
     return BenchmarkScore(
         form_correct=form_correct,
         content_correct=content_correct,
         group_correct=group_correct,
+        content_group_correct=content_group_correct,
         total=len(ready_rows),
         ready=ready,
-        passed=ready and form_correct >= 22 and content_correct >= 20 and group_correct >= 20,
+        passed=ready and form_correct >= 22 and content_group_correct >= 20,
     )
 
 
@@ -593,10 +646,53 @@ def write_benchmark_sheet(
             })
 
 
+def refresh_benchmark_predictions(
+    path: Path,
+    classifications: Mapping[str, Classification],
+) -> list[dict[str, str]]:
+    """Refresh machine columns while preserving all human-entered benchmark fields."""
+    with path.open(encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        if tuple(reader.fieldnames or ()) != BENCHMARK_FIELDS:
+            raise PacketClassifierError("benchmark-labels.tsv has an unexpected schema")
+        raw_rows = list(reader)
+
+    saved_rows: list[dict[str, str]] = []
+    merged: list[dict[str, str]] = []
+    for raw in raw_rows:
+        predicted = classifications.get(raw["sample_id"])
+        if predicted is None:
+            raise PacketClassifierError(f"benchmark sample is not classified: {raw['sample_id']}")
+        if Path(raw["current_path"]) != predicted.current_path:
+            raise PacketClassifierError(f"benchmark sample path is stale: {raw['sample_id']}")
+        refreshed = {
+            **raw,
+            "predicted_form": predicted.form,
+            "predicted_content": predicted.content,
+            "predicted_audition_group": predicted.audition_group,
+        }
+        saved_rows.append(refreshed)
+        merged.append({
+            **refreshed,
+            "form": predicted.form,
+            "content": predicted.content,
+            "audition_group": predicted.audition_group,
+        })
+
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=BENCHMARK_FIELDS, delimiter="\t")
+        writer.writeheader()
+        writer.writerows(saved_rows)
+    temporary.replace(path)
+    return merged
+
+
 def read_benchmark_with_predictions(
     path: Path,
     classifications: Mapping[str, Classification],
 ) -> list[dict[str, str]]:
+    """Read benchmark truth and merge current predictions without changing the sheet."""
     with path.open(encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh, delimiter="\t")
         if tuple(reader.fieldnames or ()) != BENCHMARK_FIELDS:
@@ -695,9 +791,7 @@ def classify_packet(
     raw_candidates: list[RawCandidate] = []
     for raw in label_rows:
         rel = Path(raw["current_path"])
-        source = (root / rel).resolve()
-        if not source.is_relative_to(root.resolve()):
-            raise PacketClassifierError(f"sample path escapes root: {rel}")
+        source = verify_packet_source(root, database, raw["sample_id"], rel)
         payload = json.loads(cached.get(raw["sample_id"], "{}"))
         if not payload:
             record = audiofeatures.extract(source, cache_path=rel)
@@ -733,7 +827,7 @@ def classify_packet(
     write_classifications(classification_path, classifications)
     by_id = {row.sample_id: row for row in classifications}
     if benchmark_path.is_file():
-        benchmark_rows = read_benchmark_with_predictions(benchmark_path, by_id)
+        benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
     else:
         strata = benchmark_strata(classifications)
         write_benchmark_sheet(benchmark_path, classifications, strata)
@@ -758,6 +852,7 @@ def classify_packet(
             "form_correct": score.form_correct,
             "content_correct": score.content_correct,
             "group_correct": score.group_correct,
+            "content_group_correct": score.content_group_correct,
             "total": score.total,
         },
     })

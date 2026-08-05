@@ -65,7 +65,8 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"benchmark: form {score.form_correct}/{score.total}; "
                 f"content {score.content_correct}/{score.total}; "
-                f"group {score.group_correct}/{score.total}"
+                f"group {score.group_correct}/{score.total}; "
+                f"content+group {score.content_group_correct}/{score.total}"
             )
             if not score.passed:
                 print("benchmark gate failed; playlists were not regenerated", file=sys.stderr)

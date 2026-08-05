@@ -11,17 +11,21 @@ from librarytools.packet_classifier import (
     AcousticEvidence,
     ClassifierConfig,
     Classification,
+    PacketClassifierError,
     RawCandidate,
     calibrate_config,
     clap_audio_inputs,
+    clap_excerpt_offsets,
     classify_packet,
     feature_array,
     classify_evidence,
     rank_prompt_embeddings,
+    refresh_benchmark_predictions,
     rhythm_periodicity,
     score_benchmark,
     select_benchmark_rows,
     tokenise_path,
+    verify_packet_source,
     write_benchmark_sheet,
     write_classifications,
 )
@@ -102,6 +106,17 @@ def test_long_acapella_is_a_long_vocal_source():
     assert result.audition_group == "long-vocal-sources"
 
 
+def test_periodic_vocal_content_does_not_override_loop_form():
+    result = classify_evidence(
+        Path("vocal_loop_140.wav"),
+        _evidence(6.857, onset_density=4.0, periodicity=0.8, beat_confidence=0.8),
+        {"VOCAL": 0.95, "PERCUSSION": 0.05},
+    )
+    assert result.form == "LOOP"
+    assert result.content == "VOCAL"
+    assert result.audition_group == "vocal-phrases"
+
+
 def test_parent_folder_named_loops_cannot_turn_short_hit_into_loop():
     result = classify_evidence(
         Path("PACKS/Loops/rim_07.wav"),
@@ -136,15 +151,26 @@ def test_clap_audio_inputs_uses_transformers_five_audio_keyword():
     assert result["sampling_rate"] == 48_000
 
 
+def test_clap_excerpt_offsets_bound_long_source_decoding():
+    assert clap_excerpt_offsets(6.0) == [0.0]
+    assert clap_excerpt_offsets(300.0) == [0.0, 145.0, 290.0]
+
+
 def test_rhythm_periodicity_returns_zero_when_short_audio_has_no_valid_tempo_lag():
     assert rhythm_periodicity(np.array([1.0, 0.5]), sample_rate=22_050) == 0.0
 
 
 def test_benchmark_gate_requires_22_forms_and_20_groups():
+    strata = (
+        "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+        "out-of-brief", "control",
+    )
     rows = []
     for index in range(24):
         rows.append({
             "sample_id": f"{index:064x}",
+            "current_path": f"PACKS/{index}.wav",
+            "stratum": strata[index // 4],
             "true_form": "ONE_SHOT",
             "true_content": "PERCUSSION",
             "true_audition_group": "percussion-one-shots",
@@ -154,9 +180,60 @@ def test_benchmark_gate_requires_22_forms_and_20_groups():
         })
     score = score_benchmark(rows)
     assert score.passed is True
-    assert (score.form_correct, score.group_correct, score.total) == (22, 20, 24)
+    assert (score.form_correct, score.content_group_correct, score.total) == (22, 20, 24)
     rows[21]["form"] = "LOOP"
     assert score_benchmark(rows).passed is False
+
+
+def test_benchmark_requires_20_rows_with_both_content_and_group_correct():
+    strata = (
+        "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+        "out-of-brief", "control",
+    )
+    rows = []
+    for index in range(24):
+        rows.append({
+            "sample_id": f"{index:064x}",
+            "current_path": f"PACKS/{index}.wav",
+            "stratum": strata[index // 4],
+            "true_form": "ONE_SHOT",
+            "true_content": "PERCUSSION",
+            "true_audition_group": "percussion-one-shots",
+            "form": "ONE_SHOT",
+            "content": "TOM" if index < 4 else "PERCUSSION",
+            "audition_group": "tom-one-shots" if 4 <= index < 8 else "percussion-one-shots",
+        })
+    score = score_benchmark(rows)
+    assert score.content_correct == 20
+    assert score.group_correct == 20
+    assert score.content_group_correct == 16
+    assert score.passed is False
+
+
+def test_benchmark_rejects_duplicate_ids_bad_strata_and_invalid_truth_values():
+    strata = (
+        "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+        "out-of-brief", "control",
+    )
+    rows = [{
+        "sample_id": f"{index:064x}",
+        "current_path": f"PACKS/{index}.wav",
+        "stratum": strata[index // 4],
+        "true_form": "ONE_SHOT",
+        "true_content": "PERCUSSION",
+        "true_audition_group": "percussion-one-shots",
+        "form": "ONE_SHOT",
+        "content": "PERCUSSION",
+        "audition_group": "percussion-one-shots",
+    } for index in range(24)]
+    rows[1]["sample_id"] = rows[0]["sample_id"]
+    assert score_benchmark(rows).ready is False
+    rows[1]["sample_id"] = f"{1:064x}"
+    rows[0]["stratum"] = "control"
+    assert score_benchmark(rows).ready is False
+    rows[0]["stratum"] = "form-boundary"
+    rows[0]["true_form"] = "MAYBE"
+    assert score_benchmark(rows).ready is False
 
 
 def test_benchmark_selection_is_24_unique_rows_across_six_strata():
@@ -201,6 +278,48 @@ def test_writers_emit_stable_classification_and_benchmark_schemas(tmp_path):
         "predicted_audition_group", "true_form", "true_content",
         "true_audition_group", "notes",
     ]
+
+
+def test_refresh_benchmark_predictions_preserves_human_truth(tmp_path):
+    sample_id = "a" * 64
+    benchmark_path = tmp_path / "benchmark-labels.tsv"
+    with benchmark_path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=(
+            "sample_id", "current_path", "stratum", "predicted_form", "predicted_content",
+            "predicted_audition_group", "true_form", "true_content",
+            "true_audition_group", "notes",
+        ), delimiter="\t")
+        writer.writeheader()
+        writer.writerow({
+            "sample_id": sample_id,
+            "current_path": "PACKS/voice.wav",
+            "stratum": "vocal-form",
+            "predicted_form": "PHRASE",
+            "predicted_content": "VOCAL",
+            "predicted_audition_group": "vocal-phrases",
+            "true_form": "LOOP",
+            "true_content": "VOCAL",
+            "true_audition_group": "vocal-phrases",
+            "notes": "heard as a timed loop",
+        })
+    current = Classification(
+        sample_id=sample_id,
+        current_path=Path("PACKS/voice.wav"),
+        form="LOOP",
+        content="VOCAL",
+        audition_group="vocal-phrases",
+        form_confidence=0.9,
+        content_confidence=0.9,
+        evidence="",
+    )
+
+    merged = refresh_benchmark_predictions(benchmark_path, {sample_id: current})
+
+    saved = next(csv.DictReader(benchmark_path.open(), delimiter="\t"))
+    assert saved["predicted_form"] == "LOOP"
+    assert saved["true_form"] == "LOOP"
+    assert saved["notes"] == "heard as a timed loop"
+    assert merged[0]["form"] == "LOOP"
 
 
 def test_calibration_prefers_semantics_over_a_misleading_filename_token():
@@ -297,6 +416,20 @@ def test_classify_packet_writes_candidate_benchmark_and_absolute_playlist(tmp_pa
     )
     metadata = json.loads((packet / "packet-meta.json").read_text())
     assert metadata["classifier"]["model_revision"] == "fake-model-sha"
+
+
+def test_packet_source_verification_rejects_bytes_changed_after_inventory(tmp_path):
+    root = tmp_path / "SAMPLES"
+    source = root / "PACKS" / "pack" / "rim.wav"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"original")
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    location = db.current_locations()[0]
+    source.write_bytes(b"changed")
+
+    with pytest.raises(PacketClassifierError, match="hash changed"):
+        verify_packet_source(root, db, location.sample_id, location.path)
 
 
 @pytest.mark.skipif(os.environ.get("RUN_CLAP_INTEGRATION") != "1", reason="downloads/runs CLAP")

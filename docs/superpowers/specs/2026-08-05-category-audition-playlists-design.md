@@ -1,7 +1,12 @@
 # Category-scoped audition playlists
 
 **Date:** 2026-08-05
-**Status:** Approved design; implementation pending
+**Status:** Superseded by the audio-derived classifier
+
+> Historical record only. The name-derived `suggested_role` design below was rejected after
+> auditioning exposed one-shot/loop and percussion/full-drum errors. Operational packets now use
+> `classification.tsv` plus the mandatory 24-sample ear benchmark described in `docs/WORKFLOWS.md`.
+> Do not use the old playlists as audition evidence.
 
 ## Problem
 

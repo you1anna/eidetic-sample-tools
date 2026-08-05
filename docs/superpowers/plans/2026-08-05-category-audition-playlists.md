@@ -1,5 +1,9 @@
 # Category Audition Playlists Implementation Plan
 
+> **Superseded 2026-08-05.** This is retained as historical evidence of the rejected
+> `suggested_role` implementation. The operational workflow is the local audio-derived classifier
+> and strict ear benchmark in `docs/WORKFLOWS.md`; do not implement or publish this plan as written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make every curation packet directly auditionable by category while retaining one combined playlist and repairing the existing 63-row `tribal-140-01` packet without changing its selection.

@@ -223,7 +223,7 @@ four-file benchmark-stratum playlists. Listen through `benchmark-playlists/READM
 `true_form`, `true_content`, `true_audition_group` and optional notes in
 `benchmark-labels.tsv`. Rerun the same command. It calibrates deterministic signal/text weights
 against those labels and publishes the nine category playlists only when the strict 22/24 form
-and 20/24 content/group gate passes. Before that first replacement, the rejected name-derived
+and 20/24 joint content-and-group gate passes. Before that first replacement, the rejected name-derived
 playlist set is retained once under the packet's `archive/` directory.
 
 Open `playlists/README.md` only after that pass and listen through one audio-derived group at a

@@ -1,5 +1,6 @@
 import csv
 import gzip
+import json
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,12 @@ def _audio(path: Path, payload: bytes = b"audio") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
     return path
+
+
+def _mark_benchmark_passed(packet: Path) -> None:
+    metadata = json.loads((packet / "packet-meta.json").read_text())
+    metadata["benchmark"] = {"ready": True, "passed": True}
+    (packet / "packet-meta.json").write_text(json.dumps(metadata) + "\n", encoding="utf-8")
 
 
 def _als(path: Path, text: str) -> None:
@@ -151,6 +158,7 @@ def test_regenerate_packet_playlists_requires_audio_classification_and_follows_t
         f"{rows[0]['sample_id']}\t{rows[0]['current_path']}\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\thybrid-v1\n",
         encoding="utf-8",
     )
+    _mark_benchmark_passed(packet)
 
     paths = curate.regenerate_packet_playlists(labels)
 
@@ -182,7 +190,7 @@ def test_regenerate_packet_playlists_requires_classification_sheet(tmp_path):
     labels = packet / "labels.tsv"
     labels.write_text("\t".join(curate.LABEL_FIELDS) + "\n", encoding="utf-8")
     (packet / "packet-meta.json").write_text(
-        '{"schema_version": 2, "root": "' + str(root) + '"}\n', encoding="utf-8",
+        '{"schema_version": 2, "root": "' + str(root) + '", "benchmark": {"ready": true, "passed": true}}\n', encoding="utf-8",
     )
 
     with pytest.raises(CurationError, match="classification.tsv"):
@@ -216,11 +224,35 @@ def test_playlists_cli_regenerates_packet_without_library_database(tmp_path, cap
         f"{label_row['sample_id']}\t{label_row['current_path']}\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\thybrid-v1\n",
         encoding="utf-8",
     )
+    _mark_benchmark_passed(packet)
 
     rc = curate_cli.main(["playlists", "--labels", str(packet / "labels.tsv")])
 
     assert rc == 0
     assert capsys.readouterr().out == f"category playlists: 1 -> {packet / 'playlists'}\n"
+
+
+def test_playlists_refuses_to_bypass_unpassed_benchmark_and_preserves_old_output(tmp_path):
+    root = tmp_path / "SAMPLES"
+    _audio(root / "CATALOGUE" / "RIM" / "rim.wav")
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    packet = tmp_path / "packet"
+    prepare_packet(root, db, packet, quotas={"RIM": 1}, multiplier=1)
+    row = next(csv.DictReader((packet / "labels.tsv").open(), delimiter="\t"))
+    (packet / "classification.tsv").write_text(
+        "sample_id\tcurrent_path\tform\tcontent\taudition_group\tform_confidence\tcontent_confidence\tevidence\tclassifier_version\n"
+        f"{row['sample_id']}\t{row['current_path']}\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\thybrid-v1\n",
+        encoding="utf-8",
+    )
+    old = packet / "playlists"
+    old.mkdir()
+    (old / "rejected.m3u8").write_text("#EXTM3U\n/old.wav\n", encoding="utf-8")
+
+    rc = curate_cli.main(["playlists", "--labels", str(packet / "labels.tsv")])
+
+    assert rc == 2
+    assert (old / "rejected.m3u8").read_text() == "#EXTM3U\n/old.wav\n"
 
 
 def test_archive_rejected_name_derived_playlists_is_one_time_and_non_destructive(tmp_path):

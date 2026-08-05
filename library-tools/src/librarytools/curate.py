@@ -277,6 +277,9 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
     root_path = Path(root)
     if not root_path.is_dir():
         raise CurationError(f"invalid packet metadata: sample root is not a directory: {root}")
+    benchmark = metadata.get("benchmark")
+    if not isinstance(benchmark, dict) or not benchmark.get("ready") or not benchmark.get("passed"):
+        raise CurationError("benchmark quality gate has not passed")
     classification_path = labels_path.parent / "classification.tsv"
     if not classification_path.is_file():
         raise CurationError(f"classification.tsv is missing beside {labels_path.name}")
