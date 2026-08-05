@@ -234,6 +234,23 @@ def write_audition_playlists(root: Path, labels_path: Path) -> dict[str, Path]:
     return generated
 
 
+def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
+    metadata_path = labels_path.parent / "packet-meta.json"
+    if not metadata_path.is_file():
+        raise CurationError(f"packet-meta.json is missing beside {labels_path.name}")
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CurationError(f"invalid packet metadata: {exc}") from exc
+    root = metadata.get("root")
+    if not isinstance(root, str) or not root.strip():
+        raise CurationError("invalid packet metadata: root must be a non-empty path")
+    root_path = Path(root)
+    if not root_path.is_dir():
+        raise CurationError(f"invalid packet metadata: sample root is not a directory: {root}")
+    return write_audition_playlists(root_path, labels_path)
+
+
 def prepare_packet(
     root: Path,
     database: LibraryDatabase,

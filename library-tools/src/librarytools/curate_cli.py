@@ -9,7 +9,7 @@ from pathlib import Path
 from . import config, moves
 from .curate import (
     CurationError, apply_migration, plan_catalogue_migration, prepare_packet,
-    promote_favourites, read_labels, validate_labels,
+    promote_favourites, read_labels, regenerate_packet_playlists, validate_labels,
     undo_promotions, write_consumer_views,
 )
 from .inventory import LibraryDatabase
@@ -30,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     migrate.add_argument("--apply", action="store_true")
     prepare = sub.add_parser("prepare")
     prepare.add_argument("--output-dir", type=Path, required=True)
+    playlists = sub.add_parser("playlists")
+    playlists.add_argument("--labels", type=Path, required=True)
     validate = sub.add_parser("validate")
     validate.add_argument("--labels", type=Path, required=True)
     promote = sub.add_parser("promote")
@@ -42,6 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     undo_promotion.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
     try:
+        if args.command == "playlists":
+            paths = regenerate_packet_playlists(args.labels)
+            categories = len(paths) - 2  # combined playlist and index are not categories
+            print(f"category playlists: {categories} -> {args.labels.parent / 'playlists'}")
+            return 0
         db = LibraryDatabase(args.library_db)
         if args.command == "migrate-catalogue":
             plan = plan_catalogue_migration(args.root, args.ableton_root, db)

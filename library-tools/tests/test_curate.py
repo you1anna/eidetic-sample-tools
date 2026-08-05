@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from librarytools import curate, curate_cli
 from librarytools.curate import (
     CurationError,
     apply_migration,
@@ -142,6 +143,71 @@ def test_prepare_packet_explains_when_no_categories_are_present(tmp_path):
     assert "No categories are present in this label sheet." in (
         out / "playlists" / "README.md"
     ).read_text()
+
+
+def test_regenerate_packet_playlists_follows_trimmed_labels(tmp_path):
+    root = tmp_path / "SAMPLES"
+    kick = _audio(root / "CATALOGUE" / "KICKS" / "big-kick.wav")
+    _audio(root / "CATALOGUE" / "PERC" / "metal-perc.wav", b"perc")
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    packet = tmp_path / "packet"
+    prepare_packet(root, db, packet, quotas={"KICK": 1, "PERC": 1}, multiplier=1)
+    labels = packet / "labels.tsv"
+    rows = list(csv.DictReader(labels.open(), delimiter="\t"))
+    with labels.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=rows[0].keys(), delimiter="\t")
+        writer.writeheader()
+        writer.writerow(rows[0])
+
+    paths = curate.regenerate_packet_playlists(labels)
+
+    assert set(paths) == {"combined", "index", "KICK"}
+    assert not (packet / "playlists" / "perc.m3u8").exists()
+    assert (packet / "playlists" / "kick.m3u8").read_text().splitlines() == [
+        "#EXTM3U", str(kick),
+    ]
+    assert (packet / "audition.m3u8").read_text().splitlines() == [
+        "#EXTM3U", str(kick),
+    ]
+
+
+def test_regenerate_packet_playlists_requires_packet_metadata(tmp_path):
+    packet = tmp_path / "packet"
+    packet.mkdir()
+    labels = packet / "labels.tsv"
+    labels.write_text("\t".join(curate.LABEL_FIELDS) + "\n", encoding="utf-8")
+
+    with pytest.raises(CurationError, match="packet-meta.json"):
+        curate.regenerate_packet_playlists(labels)
+
+
+@pytest.mark.parametrize("metadata", ["{broken", "{}"])
+def test_regenerate_packet_playlists_rejects_invalid_packet_metadata(
+    tmp_path, metadata,
+):
+    packet = tmp_path / "packet"
+    packet.mkdir()
+    labels = packet / "labels.tsv"
+    labels.write_text("\t".join(curate.LABEL_FIELDS) + "\n", encoding="utf-8")
+    (packet / "packet-meta.json").write_text(metadata, encoding="utf-8")
+
+    with pytest.raises(CurationError, match="invalid packet metadata"):
+        curate.regenerate_packet_playlists(labels)
+
+
+def test_playlists_cli_regenerates_packet_without_library_database(tmp_path, capsys):
+    root = tmp_path / "SAMPLES"
+    _audio(root / "CATALOGUE" / "KICKS" / "big-kick.wav")
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    packet = tmp_path / "packet"
+    prepare_packet(root, db, packet, quotas={"KICK": 1}, multiplier=1)
+
+    rc = curate_cli.main(["playlists", "--labels", str(packet / "labels.tsv")])
+
+    assert rc == 0
+    assert capsys.readouterr().out == f"category playlists: 1 -> {packet / 'playlists'}\n"
 
 
 def test_validate_requires_role_and_descriptor_for_favourite(tmp_path):
