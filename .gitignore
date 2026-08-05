@@ -9,6 +9,9 @@ venv/
 # with its own git history; symlinked into Live's Remote Scripts, not copied. Not for commit.
 external/
 
+# Isolated feature worktrees created by agentic development workflows.
+.worktrees/
+
 # Python build/cache
 __pycache__/
 *.pyc
