@@ -174,6 +174,66 @@ def _diverse(candidates: list[InventoryLocation], limit: int) -> list[InventoryL
     return selected
 
 
+def _write_m3u8(path: Path, sources: list[Path]) -> None:
+    lines = ["#EXTM3U", *(str(source) for source in sources)]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_audition_playlists(root: Path, labels_path: Path) -> dict[str, Path]:
+    rows = read_labels(labels_path)
+    root = root.resolve()
+    combined: list[Path] = []
+    grouped: dict[str, list[Path]] = {}
+    for row in rows:
+        if row.suggested_role not in TRUSTED_ROLES:
+            role = row.suggested_role or "<empty>"
+            raise CurationError(f"unsupported suggested_role: {role}")
+        source = (root / row.current_path).resolve()
+        if not source.is_relative_to(root):
+            raise CurationError(f"sample path escapes root: {row.current_path}")
+        combined.append(source)
+        grouped.setdefault(row.suggested_role, []).append(source)
+
+    output_dir = labels_path.parent
+    combined_path = output_dir / "audition.m3u8"
+    _write_m3u8(combined_path, combined)
+
+    playlists_dir = output_dir / "playlists"
+    if playlists_dir.is_symlink() or playlists_dir.is_file():
+        playlists_dir.unlink()
+    elif playlists_dir.exists():
+        shutil.rmtree(playlists_dir)
+    playlists_dir.mkdir(parents=True)
+
+    generated = {"combined": combined_path}
+    index_lines = [
+        "# Audition playlists",
+        "",
+        "Listen category by category, then record every decision in `../labels.tsv`.",
+        "",
+        "| Category | Files | Playlist |",
+        "|---|---:|---|",
+    ]
+    if not grouped:
+        index_lines.extend(["", "No categories are present in this label sheet."])
+    for role in sorted(grouped):
+        filename = f"{role.lower()}.m3u8"
+        playlist_path = playlists_dir / filename
+        _write_m3u8(playlist_path, grouped[role])
+        generated[role] = playlist_path
+        index_lines.append(
+            f"| `{role}` | {len(grouped[role])} | [{filename}]({filename}) |"
+        )
+    index_lines.extend([
+        "",
+        "[Complete packet](../audition.m3u8) contains all categories in label-sheet order.",
+    ])
+    index_path = playlists_dir / "README.md"
+    index_path.write_text("\n".join(index_lines) + "\n", encoding="utf-8")
+    generated["index"] = index_path
+    return generated
+
+
 def prepare_packet(
     root: Path,
     database: LibraryDatabase,
@@ -206,14 +266,11 @@ def prepare_packet(
                 "suggested_role": role, "decision": "", "true_role": "",
                 "descriptor": "", "tags": "", "notes": "",
             })
-    (output_dir / "audition.m3u8").write_text(
-        "\n".join(str(root / item.path) for _, item in selected) + ("\n" if selected else ""),
-        encoding="utf-8",
-    )
     (output_dir / "packet-meta.json").write_text(
         json.dumps({"schema_version": 1, "scan_id": scan_id, "root": str(root)}, indent=2) + "\n",
         encoding="utf-8",
     )
+    write_audition_playlists(root, output_dir / "labels.tsv")
     return len(selected)
 
 

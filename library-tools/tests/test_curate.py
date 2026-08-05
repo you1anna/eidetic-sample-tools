@@ -96,6 +96,54 @@ def test_prepare_packet_writes_identity_labels_and_playlist(tmp_path):
     assert scan.scan_id in (out / "packet-meta.json").read_text()
 
 
+def test_prepare_packet_writes_category_playlists(tmp_path):
+    root = tmp_path / "SAMPLES"
+    kick = _audio(root / "CATALOGUE" / "KICKS" / "big-kick.wav")
+    perc = _audio(root / "CATALOGUE" / "PERC" / "metal-perc.wav", b"perc")
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    out = tmp_path / "packet"
+
+    count = prepare_packet(
+        root, db, out, quotas={"KICK": 1, "PERC": 1}, multiplier=1
+    )
+
+    assert count == 2
+    combined = (out / "audition.m3u8").read_text().splitlines()
+    kick_playlist = (out / "playlists" / "kick.m3u8").read_text().splitlines()
+    perc_playlist = (out / "playlists" / "perc.m3u8").read_text().splitlines()
+    assert combined == ["#EXTM3U", str(kick), str(perc)]
+    assert kick_playlist == ["#EXTM3U", str(kick)]
+    assert perc_playlist == ["#EXTM3U", str(perc)]
+    assert sorted(kick_playlist[1:] + perc_playlist[1:]) == sorted(combined[1:])
+    assert len(set(kick_playlist[1:] + perc_playlist[1:])) == 2
+    assert (out / "playlists" / "README.md").read_text() == (
+        "# Audition playlists\n\n"
+        "Listen category by category, then record every decision in `../labels.tsv`.\n\n"
+        "| Category | Files | Playlist |\n"
+        "|---|---:|---|\n"
+        "| `KICK` | 1 | [kick.m3u8](kick.m3u8) |\n"
+        "| `PERC` | 1 | [perc.m3u8](perc.m3u8) |\n\n"
+        "[Complete packet](../audition.m3u8) contains all categories in label-sheet order.\n"
+    )
+
+
+def test_prepare_packet_explains_when_no_categories_are_present(tmp_path):
+    root = tmp_path / "SAMPLES"
+    root.mkdir()
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    out = tmp_path / "packet"
+
+    count = prepare_packet(root, db, out, quotas={"KICK": 1}, multiplier=1)
+
+    assert count == 0
+    assert (out / "audition.m3u8").read_text() == "#EXTM3U\n"
+    assert "No categories are present in this label sheet." in (
+        out / "playlists" / "README.md"
+    ).read_text()
+
+
 def test_validate_requires_role_and_descriptor_for_favourite(tmp_path):
     labels = tmp_path / "labels.tsv"
     labels.write_text(
