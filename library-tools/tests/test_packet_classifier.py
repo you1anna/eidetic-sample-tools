@@ -375,12 +375,29 @@ def test_classify_packet_writes_candidate_benchmark_and_absolute_playlist(tmp_pa
                 "suggested_role": "RIM",
             })
     (packet / "packet-meta.json").write_text(
-        json.dumps({"schema_version": 2, "root": str(root)}) + "\n", encoding="utf-8",
+        json.dumps({
+            "schema_version": 2,
+            "root": str(root),
+            "benchmark": {"ready": True, "passed": True},
+        }) + "\n",
+        encoding="utf-8",
     )
 
     monkeypatch.setattr(
         "librarytools.packet_classifier.measure_acoustic",
         lambda path, payload: _evidence(0.2),
+    )
+    original_writer = write_classifications
+
+    def assert_gate_is_invalidated_before_output(path, rows):
+        metadata = json.loads((packet / "packet-meta.json").read_text())
+        assert metadata["benchmark"]["ready"] is False
+        assert metadata["benchmark"]["passed"] is False
+        original_writer(path, rows)
+
+    monkeypatch.setattr(
+        "librarytools.packet_classifier.write_classifications",
+        assert_gate_is_invalidated_before_output,
     )
 
     class FakeScorer:

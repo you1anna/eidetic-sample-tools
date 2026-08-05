@@ -255,7 +255,8 @@ def write_audition_playlists(
         )
     index_lines.extend([
         "",
-        "[Complete packet](../audition.m3u8) contains all categories in label-sheet order.",
+        "[Complete packet](../audition.m3u8) follows the category table above; within each "
+        "category, confidence runs from highest to lowest.",
     ])
     index_path = playlists_dir / "README.md"
     index_path.write_text("\n".join(index_lines) + "\n", encoding="utf-8")
@@ -283,7 +284,12 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
     classification_path = labels_path.parent / "classification.tsv"
     if not classification_path.is_file():
         raise CurationError(f"classification.tsv is missing beside {labels_path.name}")
-    return write_audition_playlists(root_path, labels_path, classification_path)
+    if not metadata.get("audio_playlists_published"):
+        archive_rejected_playlists(labels_path.parent)
+    generated = write_audition_playlists(root_path, labels_path, classification_path)
+    metadata["audio_playlists_published"] = True
+    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    return generated
 
 
 def prepare_packet(

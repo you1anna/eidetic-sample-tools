@@ -823,6 +823,17 @@ def classify_packet(
             current_path=item.current_path,
         ))
 
+    # Revoke any previous pass before changing classifier-derived output.  If this
+    # run fails afterwards, `playlists` must not trust a gate scored against older
+    # predictions.
+    meta_path = labels_path.parent / "packet-meta.json"
+    metadata = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.is_file() else {}
+    previous_benchmark = metadata.get("benchmark")
+    benchmark_metadata = dict(previous_benchmark) if isinstance(previous_benchmark, dict) else {}
+    benchmark_metadata.update({"ready": False, "passed": False})
+    metadata["benchmark"] = benchmark_metadata
+    meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
     classification_path = labels_path.parent / "classification.tsv"
     write_classifications(classification_path, classifications)
     by_id = {row.sample_id: row for row in classifications}
@@ -835,8 +846,6 @@ def classify_packet(
     _write_benchmark_audition(root, benchmark_path)
     score = score_benchmark(benchmark_rows)
 
-    meta_path = labels_path.parent / "packet-meta.json"
-    metadata = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.is_file() else {}
     metadata.update({
         "schema_version": 2,
         "classifier": {

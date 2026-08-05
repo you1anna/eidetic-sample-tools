@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import config, moves
 from .curate import (
-    CurationError, apply_migration, archive_rejected_playlists, plan_catalogue_migration, prepare_packet,
+    CurationError, apply_migration, plan_catalogue_migration, prepare_packet,
     promote_favourites, read_labels, regenerate_packet_playlists, validate_labels,
     undo_promotions, write_consumer_views,
 )
@@ -71,7 +71,6 @@ def main(argv: list[str] | None = None) -> int:
             if not score.passed:
                 print("benchmark gate failed; playlists were not regenerated", file=sys.stderr)
                 return 3
-            archive_rejected_playlists(args.labels.parent)
             paths = regenerate_packet_playlists(args.labels)
             print(f"quality gate passed; category playlists: {len(paths) - 2}")
         elif args.command == "migrate-catalogue":

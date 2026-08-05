@@ -159,6 +159,9 @@ def test_regenerate_packet_playlists_requires_audio_classification_and_follows_t
         encoding="utf-8",
     )
     _mark_benchmark_passed(packet)
+    rejected = packet / "playlists"
+    rejected.mkdir()
+    (rejected / "name-derived.m3u8").write_text("#EXTM3U\n/old.wav\n", encoding="utf-8")
 
     paths = curate.regenerate_packet_playlists(labels)
 
@@ -170,6 +173,14 @@ def test_regenerate_packet_playlists_requires_audio_classification_and_follows_t
     assert (packet / "audition.m3u8").read_text().splitlines() == [
         "#EXTM3U", str(kick),
     ]
+    assert (
+        packet / "archive" / "name-derived-playlists" / "name-derived.m3u8"
+    ).read_text() == "#EXTM3U\n/old.wav\n"
+    metadata = json.loads((packet / "packet-meta.json").read_text())
+    assert metadata["audio_playlists_published"] is True
+
+    curate.regenerate_packet_playlists(labels)
+    assert (packet / "playlists" / "rim-one-shots.m3u8").is_file()
 
 
 def test_regenerate_packet_playlists_requires_packet_metadata(tmp_path):
