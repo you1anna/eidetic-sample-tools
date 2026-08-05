@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import moves, review
 from .inventory import LibraryDatabase, InventoryLocation, sha256_file
+from .packet_classifier import AUDITION_GROUPS, PacketClassifierError, read_classifications
 
 
 ONE_SHOT_ROLES = (
@@ -179,20 +180,48 @@ def _write_m3u8(path: Path, sources: list[Path]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_audition_playlists(root: Path, labels_path: Path) -> dict[str, Path]:
+def archive_rejected_playlists(packet_dir: Path) -> bool:
+    """Archive the first name-derived playlist set exactly once before replacement."""
+    playlists = packet_dir / "playlists"
+    target = packet_dir / "archive" / "name-derived-playlists"
+    if not playlists.is_dir() or target.exists():
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(playlists), str(target))
+    combined = packet_dir / "audition.m3u8"
+    if combined.is_file():
+        shutil.copy2(combined, target.parent / "name-derived-audition.m3u8")
+    return True
+
+
+def write_audition_playlists(
+    root: Path,
+    labels_path: Path,
+    classification_path: Path,
+) -> dict[str, Path]:
     rows = read_labels(labels_path)
+    try:
+        classifications = read_classifications(classification_path)
+    except PacketClassifierError as exc:
+        raise CurationError(str(exc)) from exc
+    by_id = {row.sample_id: row for row in classifications}
     root = root.resolve()
-    combined: list[Path] = []
-    grouped: dict[str, list[Path]] = {}
+    grouped: dict[str, list[tuple[float, Path]]] = {}
     for row in rows:
-        if row.suggested_role not in TRUSTED_ROLES:
-            role = row.suggested_role or "<empty>"
-            raise CurationError(f"unsupported suggested_role: {role}")
+        classification = by_id.get(row.sample_id)
+        if classification is None or classification.current_path != row.current_path:
+            raise CurationError(f"classification missing or stale for: {row.current_path}")
         source = (root / row.current_path).resolve()
         if not source.is_relative_to(root):
             raise CurationError(f"sample path escapes root: {row.current_path}")
-        combined.append(source)
-        grouped.setdefault(row.suggested_role, []).append(source)
+        confidence = min(classification.form_confidence, classification.content_confidence)
+        grouped.setdefault(classification.audition_group, []).append((confidence, source))
+
+    ordered_groups = [group for group in AUDITION_GROUPS if group in grouped]
+    combined: list[Path] = []
+    for group in ordered_groups:
+        grouped[group].sort(key=lambda item: (-item[0], str(item[1])))
+        combined.extend(source for _, source in grouped[group])
 
     output_dir = labels_path.parent
     combined_path = output_dir / "audition.m3u8"
@@ -216,10 +245,10 @@ def write_audition_playlists(root: Path, labels_path: Path) -> dict[str, Path]:
     ]
     if not grouped:
         index_lines.extend(["", "No categories are present in this label sheet."])
-    for role in sorted(grouped):
-        filename = f"{role.lower()}.m3u8"
+    for role in ordered_groups:
+        filename = f"{role}.m3u8"
         playlist_path = playlists_dir / filename
-        _write_m3u8(playlist_path, grouped[role])
+        _write_m3u8(playlist_path, [source for _, source in grouped[role]])
         generated[role] = playlist_path
         index_lines.append(
             f"| `{role}` | {len(grouped[role])} | [{filename}]({filename}) |"
@@ -248,7 +277,10 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
     root_path = Path(root)
     if not root_path.is_dir():
         raise CurationError(f"invalid packet metadata: sample root is not a directory: {root}")
-    return write_audition_playlists(root_path, labels_path)
+    classification_path = labels_path.parent / "classification.tsv"
+    if not classification_path.is_file():
+        raise CurationError(f"classification.tsv is missing beside {labels_path.name}")
+    return write_audition_playlists(root_path, labels_path, classification_path)
 
 
 def prepare_packet(
@@ -284,10 +316,10 @@ def prepare_packet(
                 "descriptor": "", "tags": "", "notes": "",
             })
     (output_dir / "packet-meta.json").write_text(
-        json.dumps({"schema_version": 1, "scan_id": scan_id, "root": str(root)}, indent=2) + "\n",
+        json.dumps({"schema_version": 2, "scan_id": scan_id, "root": str(root)}, indent=2) + "\n",
         encoding="utf-8",
     )
-    write_audition_playlists(root, output_dir / "labels.tsv")
+    _write_m3u8(output_dir / "audition.m3u8", [root / item.path for _, item in selected])
     return len(selected)
 
 

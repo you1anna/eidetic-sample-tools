@@ -28,6 +28,13 @@ Its upstream weights have no software licence and are not shipped in this
 repository. Locally supplied weights belong at
 `library-tools/models/drum-cnn-lstm.model` and must remain uncommitted.
 
+Audio-derived packet classification uses a separate local extra and caches the
+Apache-2.0 `laion/clap-htsat-unfused` checkpoint on first use:
+
+```bash
+~/.venvs/library-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-sample-tools/library-tools[audio-classifier,dev]"
+```
+
 ## Commands at a glance
 
 | Command | Maturity | Purpose | Audio effect by default |
@@ -223,8 +230,9 @@ sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 | Subcommand | Required options | Effect |
 |---|---|---|
 | `migrate-catalogue` | `--ableton-root`, `--manifest`, `--undo` | Writes a migration plan; `--apply` moves after preflight. |
-| `prepare` | `--output-dir` | Writes category-scoped audition playlists, a combined playlist and labels. |
-| `playlists` | `--labels` | Regenerates combined and category playlists from a packet's current labels. |
+| `prepare` | `--output-dir` | Writes labels and a combined candidate playlist; it never publishes name-derived categories. |
+| `classify-packet` | `--labels`, `--benchmark` | Uses cached acoustics, librosa rhythm evidence and local CLAP prompts; writes `classification.tsv` plus a 24-file ear benchmark. |
+| `playlists` | `--labels` | Regenerates combined and category playlists from the sibling, quality-gated `classification.tsv`; fails when it is absent. |
 | `validate` | `--labels` | Checks that required human decisions are complete. |
 | `promote` | `--labels`, `--run-id` | Hash-checks and copies approved favourites to `CURATED/`. |
 | `views` | `--labels`, `--output-dir` | Writes device and Ableton consumer TSVs. |
@@ -233,6 +241,14 @@ sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 Use the complete [curation workflow](../docs/WORKFLOWS.md#3-curate-by-ear).
 Promotion accepts only a complete label set. Every favourite needs a canonical
 role and a short descriptor.
+
+`classify-packet` always predicts both form and content. Its nine audition groups are rim,
+tom and general percussion one-shots; percussion and full-drum loops; vocal stabs, phrases
+and long sources; and out-of-brief. Fill all truth columns in `benchmark-labels.tsv`, then rerun
+the same command. Category playlists are published only after at least 22/24 form and 20/24
+content/group decisions agree with the ear labels. Low-confidence files appear last within their
+best-guess group. On the first pass, the rejected name-derived playlist directory and combined
+playlist are preserved below the packet's `archive/` directory before replacement.
 
 ## Analyse and run experiments
 

@@ -206,10 +206,30 @@ sample-curate \
   --output-dir manifests/foundation-v1-review
 ```
 
-`prepare` writes one feedback sheet plus category-scoped playlists. Open
-`playlists/README.md` and listen through one role at a time; `audition.m3u8` remains available as
-an optional combined pass. Mark every `labels.tsv` row as `reject`, `keep` or `favourite`. A
-favourite also needs its true role and a short descriptor.
+`prepare` writes one feedback sheet plus a combined candidate playlist. It deliberately does not
+publish filename-derived categories. Run the local audio classifier next:
+
+```bash
+sample-curate \
+  --root /path/to/SAMPLES \
+  --library-db manifests/sample-library.sqlite \
+  classify-packet \
+  --labels manifests/foundation-v1-review/labels.tsv \
+  --benchmark manifests/foundation-v1-review/benchmark-labels.tsv
+```
+
+The first run writes `classification.tsv`, a combined 24-file benchmark playlist and six
+four-file benchmark-stratum playlists. Listen through `benchmark-playlists/README.md`, then fill
+`true_form`, `true_content`, `true_audition_group` and optional notes in
+`benchmark-labels.tsv`. Rerun the same command. It calibrates deterministic signal/text weights
+against those labels and publishes the nine category playlists only when the strict 22/24 form
+and 20/24 content/group gate passes. Before that first replacement, the rejected name-derived
+playlist set is retained once under the packet's `archive/` directory.
+
+Open `playlists/README.md` only after that pass and listen through one audio-derived group at a
+time. Mark every `labels.tsv` row as `reject`, `keep` or `favourite`. A favourite also needs its
+true canonical role and a short descriptor. `labels.tsv` remains the single promotion record;
+classifier output never becomes an approval by itself.
 
 If you trim rows from `labels.tsv`, regenerate the derived playlists immediately so they cannot
 retain removed candidates:
@@ -220,7 +240,8 @@ sample-curate playlists \
 ```
 
 This rewrites the combined playlist, category playlists and their index from the current label
-rows. It does not change decisions or audio.
+rows joined to sibling `classification.tsv`. It fails if classification is absent or stale and
+does not change decisions or audio.
 
 Validate the complete label file before promotion:
 

@@ -97,7 +97,7 @@ def test_prepare_packet_writes_identity_labels_and_playlist(tmp_path):
     assert scan.scan_id in (out / "packet-meta.json").read_text()
 
 
-def test_prepare_packet_writes_category_playlists(tmp_path):
+def test_prepare_packet_does_not_publish_name_derived_category_playlists(tmp_path):
     root = tmp_path / "SAMPLES"
     kick = _audio(root / "CATALOGUE" / "KICKS" / "big-kick.wav")
     perc = _audio(root / "CATALOGUE" / "PERC" / "metal-perc.wav", b"perc")
@@ -110,26 +110,13 @@ def test_prepare_packet_writes_category_playlists(tmp_path):
     )
 
     assert count == 2
-    combined = (out / "audition.m3u8").read_text().splitlines()
-    kick_playlist = (out / "playlists" / "kick.m3u8").read_text().splitlines()
-    perc_playlist = (out / "playlists" / "perc.m3u8").read_text().splitlines()
-    assert combined == ["#EXTM3U", str(kick), str(perc)]
-    assert kick_playlist == ["#EXTM3U", str(kick)]
-    assert perc_playlist == ["#EXTM3U", str(perc)]
-    assert sorted(kick_playlist[1:] + perc_playlist[1:]) == sorted(combined[1:])
-    assert len(set(kick_playlist[1:] + perc_playlist[1:])) == 2
-    assert (out / "playlists" / "README.md").read_text() == (
-        "# Audition playlists\n\n"
-        "Listen category by category, then record every decision in `../labels.tsv`.\n\n"
-        "| Category | Files | Playlist |\n"
-        "|---|---:|---|\n"
-        "| `KICK` | 1 | [kick.m3u8](kick.m3u8) |\n"
-        "| `PERC` | 1 | [perc.m3u8](perc.m3u8) |\n\n"
-        "[Complete packet](../audition.m3u8) contains all categories in label-sheet order.\n"
-    )
+    assert (out / "audition.m3u8").read_text().splitlines() == [
+        "#EXTM3U", str(kick), str(perc),
+    ]
+    assert not (out / "playlists").exists()
 
 
-def test_prepare_packet_explains_when_no_categories_are_present(tmp_path):
+def test_prepare_packet_writes_empty_combined_playlist(tmp_path):
     root = tmp_path / "SAMPLES"
     root.mkdir()
     db = LibraryDatabase(tmp_path / "library.sqlite")
@@ -140,12 +127,10 @@ def test_prepare_packet_explains_when_no_categories_are_present(tmp_path):
 
     assert count == 0
     assert (out / "audition.m3u8").read_text() == "#EXTM3U\n"
-    assert "No categories are present in this label sheet." in (
-        out / "playlists" / "README.md"
-    ).read_text()
+    assert not (out / "playlists").exists()
 
 
-def test_regenerate_packet_playlists_follows_trimmed_labels(tmp_path):
+def test_regenerate_packet_playlists_requires_audio_classification_and_follows_trimmed_labels(tmp_path):
     root = tmp_path / "SAMPLES"
     kick = _audio(root / "CATALOGUE" / "KICKS" / "big-kick.wav")
     _audio(root / "CATALOGUE" / "PERC" / "metal-perc.wav", b"perc")
@@ -160,11 +145,18 @@ def test_regenerate_packet_playlists_follows_trimmed_labels(tmp_path):
         writer.writeheader()
         writer.writerow(rows[0])
 
+    classification = packet / "classification.tsv"
+    classification.write_text(
+        "sample_id\tcurrent_path\tform\tcontent\taudition_group\tform_confidence\tcontent_confidence\tevidence\tclassifier_version\n"
+        f"{rows[0]['sample_id']}\t{rows[0]['current_path']}\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\thybrid-v1\n",
+        encoding="utf-8",
+    )
+
     paths = curate.regenerate_packet_playlists(labels)
 
-    assert set(paths) == {"combined", "index", "KICK"}
+    assert set(paths) == {"combined", "index", "rim-one-shots"}
     assert not (packet / "playlists" / "perc.m3u8").exists()
-    assert (packet / "playlists" / "kick.m3u8").read_text().splitlines() == [
+    assert (packet / "playlists" / "rim-one-shots.m3u8").read_text().splitlines() == [
         "#EXTM3U", str(kick),
     ]
     assert (packet / "audition.m3u8").read_text().splitlines() == [
@@ -179,6 +171,21 @@ def test_regenerate_packet_playlists_requires_packet_metadata(tmp_path):
     labels.write_text("\t".join(curate.LABEL_FIELDS) + "\n", encoding="utf-8")
 
     with pytest.raises(CurationError, match="packet-meta.json"):
+        curate.regenerate_packet_playlists(labels)
+
+
+def test_regenerate_packet_playlists_requires_classification_sheet(tmp_path):
+    root = tmp_path / "SAMPLES"
+    root.mkdir()
+    packet = tmp_path / "packet"
+    packet.mkdir()
+    labels = packet / "labels.tsv"
+    labels.write_text("\t".join(curate.LABEL_FIELDS) + "\n", encoding="utf-8")
+    (packet / "packet-meta.json").write_text(
+        '{"schema_version": 2, "root": "' + str(root) + '"}\n', encoding="utf-8",
+    )
+
+    with pytest.raises(CurationError, match="classification.tsv"):
         curate.regenerate_packet_playlists(labels)
 
 
@@ -203,11 +210,37 @@ def test_playlists_cli_regenerates_packet_without_library_database(tmp_path, cap
     scan_library(root, db)
     packet = tmp_path / "packet"
     prepare_packet(root, db, packet, quotas={"KICK": 1}, multiplier=1)
+    label_row = next(csv.DictReader((packet / "labels.tsv").open(), delimiter="\t"))
+    (packet / "classification.tsv").write_text(
+        "sample_id\tcurrent_path\tform\tcontent\taudition_group\tform_confidence\tcontent_confidence\tevidence\tclassifier_version\n"
+        f"{label_row['sample_id']}\t{label_row['current_path']}\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\thybrid-v1\n",
+        encoding="utf-8",
+    )
 
     rc = curate_cli.main(["playlists", "--labels", str(packet / "labels.tsv")])
 
     assert rc == 0
     assert capsys.readouterr().out == f"category playlists: 1 -> {packet / 'playlists'}\n"
+
+
+def test_archive_rejected_name_derived_playlists_is_one_time_and_non_destructive(tmp_path):
+    packet = tmp_path / "packet"
+    old = packet / "playlists"
+    old.mkdir(parents=True)
+    (old / "tom.m3u8").write_text("#EXTM3U\n/old/tom.wav\n", encoding="utf-8")
+    (packet / "audition.m3u8").write_text("#EXTM3U\n/old/tom.wav\n", encoding="utf-8")
+
+    assert curate.archive_rejected_playlists(packet) is True
+    assert not old.exists()
+    assert (packet / "archive" / "name-derived-playlists" / "tom.m3u8").read_text() == (
+        "#EXTM3U\n/old/tom.wav\n"
+    )
+    assert (packet / "archive" / "name-derived-audition.m3u8").is_file()
+
+    old.mkdir()
+    (old / "new.m3u8").write_text("#EXTM3U\n/new.wav\n", encoding="utf-8")
+    assert curate.archive_rejected_playlists(packet) is False
+    assert (old / "new.m3u8").is_file()
 
 
 def test_validate_requires_role_and_descriptor_for_favourite(tmp_path):

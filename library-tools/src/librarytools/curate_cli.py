@@ -8,11 +8,12 @@ from pathlib import Path
 
 from . import config, moves
 from .curate import (
-    CurationError, apply_migration, plan_catalogue_migration, prepare_packet,
+    CurationError, apply_migration, archive_rejected_playlists, plan_catalogue_migration, prepare_packet,
     promote_favourites, read_labels, regenerate_packet_playlists, validate_labels,
     undo_promotions, write_consumer_views,
 )
 from .inventory import LibraryDatabase
+from .packet_classifier import PacketClassifierError, classify_packet
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     prepare.add_argument("--output-dir", type=Path, required=True)
     playlists = sub.add_parser("playlists")
     playlists.add_argument("--labels", type=Path, required=True)
+    classify = sub.add_parser("classify-packet")
+    classify.add_argument("--labels", type=Path, required=True)
+    classify.add_argument("--benchmark", type=Path, required=True)
     validate = sub.add_parser("validate")
     validate.add_argument("--labels", type=Path, required=True)
     promote = sub.add_parser("promote")
@@ -50,7 +54,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"category playlists: {categories} -> {args.labels.parent / 'playlists'}")
             return 0
         db = LibraryDatabase(args.library_db)
-        if args.command == "migrate-catalogue":
+        if args.command == "classify-packet":
+            classifications, score = classify_packet(
+                args.root, db, args.labels, args.benchmark,
+            )
+            print(f"classified: {len(classifications)} -> {args.labels.parent / 'classification.tsv'}")
+            if not score.ready:
+                print(f"benchmark awaiting ear labels: {args.benchmark}")
+                return 3
+            print(
+                f"benchmark: form {score.form_correct}/{score.total}; "
+                f"content {score.content_correct}/{score.total}; "
+                f"group {score.group_correct}/{score.total}"
+            )
+            if not score.passed:
+                print("benchmark gate failed; playlists were not regenerated", file=sys.stderr)
+                return 3
+            archive_rejected_playlists(args.labels.parent)
+            paths = regenerate_packet_playlists(args.labels)
+            print(f"quality gate passed; category playlists: {len(paths) - 2}")
+        elif args.command == "migrate-catalogue":
             plan = plan_catalogue_migration(args.root, args.ableton_root, db)
             moves.write_plan(args.manifest, plan)
             print(f"[{'APPLY' if args.apply else 'DRY-RUN'}] migration: {len(plan)} moves")
@@ -73,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             count = undo_promotions(args.root, db, args.run_id)
             print(f"quarantined promoted copies: {count}")
         return 0
-    except (CurationError, OSError) as exc:
+    except (CurationError, PacketClassifierError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 
