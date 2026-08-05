@@ -206,8 +206,21 @@ sample-curate \
   --output-dir manifests/foundation-v1-review
 ```
 
-Listen through `audition.m3u8`. Mark every `labels.tsv` row as `reject`, `keep`
-or `favourite`. A favourite also needs its true role and a short descriptor.
+`prepare` writes one feedback sheet plus category-scoped playlists. Open
+`playlists/README.md` and listen through one role at a time; `audition.m3u8` remains available as
+an optional combined pass. Mark every `labels.tsv` row as `reject`, `keep` or `favourite`. A
+favourite also needs its true role and a short descriptor.
+
+If you trim rows from `labels.tsv`, regenerate the derived playlists immediately so they cannot
+retain removed candidates:
+
+```bash
+sample-curate playlists \
+  --labels manifests/foundation-v1-review/labels.tsv
+```
+
+This rewrites the combined playlist, category playlists and their index from the current label
+rows. It does not change decisions or audio.
 
 Validate the complete label file before promotion:
 

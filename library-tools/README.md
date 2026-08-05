@@ -223,7 +223,8 @@ sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 | Subcommand | Required options | Effect |
 |---|---|---|
 | `migrate-catalogue` | `--ableton-root`, `--manifest`, `--undo` | Writes a migration plan; `--apply` moves after preflight. |
-| `prepare` | `--output-dir` | Writes an audition playlist and labels. |
+| `prepare` | `--output-dir` | Writes category-scoped audition playlists, a combined playlist and labels. |
+| `playlists` | `--labels` | Regenerates combined and category playlists from a packet's current labels. |
 | `validate` | `--labels` | Checks that required human decisions are complete. |
 | `promote` | `--labels`, `--run-id` | Hash-checks and copies approved favourites to `CURATED/`. |
 | `views` | `--labels`, `--output-dir` | Writes device and Ableton consumer TSVs. |
