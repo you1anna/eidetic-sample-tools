@@ -115,6 +115,13 @@ def clap_excerpt_offsets(duration_s: float, window_s: float = 10.0) -> list[floa
     return [0.0, remainder / 2.0, remainder]
 
 
+def batches_of(values: list, size: int):
+    if size <= 0:
+        raise ClassificationError("batch size must be positive")
+    for offset in range(0, len(values), size):
+        yield values[offset:offset + size]
+
+
 def rank_prompt_embeddings(
     audio_embedding: np.ndarray,
     text_embeddings: Mapping[str, np.ndarray],
@@ -185,17 +192,27 @@ class ClapEmbeddingRuntime:
     def embed(self, paths: list[Path]) -> list[np.ndarray]:
         import librosa
 
-        results: list[np.ndarray] = []
-        for path in paths:
+        excerpts: list[np.ndarray] = []
+        owners: list[int] = []
+        for owner, path in enumerate(paths):
             duration_s = float(librosa.get_duration(path=path))
-            excerpts = [
-                librosa.load(path, sr=48_000, mono=True, offset=offset, duration=10.0)[0]
-                for offset in clap_excerpt_offsets(duration_s)
-            ]
-            inputs = clap_audio_inputs(self._processor, excerpts)
+            for offset in clap_excerpt_offsets(duration_s):
+                excerpts.append(
+                    librosa.load(path, sr=48_000, mono=True, offset=offset, duration=10.0)[0]
+                )
+                owners.append(owner)
+        features: list[np.ndarray] = []
+        for excerpt_batch in batches_of(excerpts, 8):
+            inputs = clap_audio_inputs(self._processor, excerpt_batch)
             with self._torch.inference_mode():
-                embeddings = feature_array(self._model.get_audio_features(**inputs))
-            vector = np.mean(embeddings, axis=0).astype(np.float32).reshape(-1)
+                features.extend(feature_array(self._model.get_audio_features(**inputs)))
+
+        results: list[np.ndarray] = []
+        for owner in range(len(paths)):
+            vector = np.mean(
+                [feature for index, feature in enumerate(features) if owners[index] == owner],
+                axis=0,
+            ).astype(np.float32).reshape(-1)
             if vector.size != self.spec.embedding_dimensions:
                 raise ClassificationError(
                     f"{self.spec.model_id} returned {vector.size} dimensions; "

@@ -103,6 +103,8 @@ def classify_packet(
     labels_path: Path,
     benchmark_path: Path,
     scorer: SemanticScorer | None = None,
+    *,
+    restart_review: bool = False,
 ) -> tuple[list[Classification], BenchmarkScore]:
     """Classify a packet and create/score its 24-row ear benchmark."""
     with labels_path.open(encoding="utf-8", newline="") as fh:
@@ -195,6 +197,8 @@ def classify_packet(
                     "batch_sizes": list(report.batch_sizes),
                     "excerpt_policy": report.excerpt_policy,
                     "prompt_cache_hit": report.prompt_cache_hit,
+                    "wall_time_s": round(report.wall_time_s, 3),
+                    "peak_rss_mb": round(report.peak_rss_mb, 1),
                 }
                 for report in reports
             ],
@@ -231,10 +235,11 @@ def classify_packet(
             labels_path.parent / "classification-audit.jsonl",
             candidates,
         )
-        session = ReviewSession.open(
+        session = ReviewSession.begin(
             labels_path.parent / "review-state.json",
             candidates,
             candidate_digest,
+            restart=restart_review,
         )
         strata = benchmark_strata(classifications)
         write_benchmark_sheet(benchmark_path, classifications, strata)

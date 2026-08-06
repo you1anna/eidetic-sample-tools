@@ -7,7 +7,9 @@ import os
 import subprocess
 import sys
 import tempfile
-from dataclasses import asdict, dataclass
+import time
+import resource
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
@@ -43,6 +45,8 @@ class WorkerReport:
     batch_sizes: tuple[int, ...]
     excerpt_policy: str = EXCERPT_POLICY
     prompt_cache_hit: bool = True
+    wall_time_s: float = 0.0
+    peak_rss_mb: float = 0.0
 
 
 class EmbeddingWorker:
@@ -187,6 +191,7 @@ class EmbeddingWorker:
             job_path.write_text(json.dumps(job), encoding="utf-8")
             environment = os.environ.copy()
             environment.update({"OMP_NUM_THREADS": str(threads), "MKL_NUM_THREADS": str(threads)})
+            started = time.perf_counter()
             completed = subprocess.run(
                 [
                     sys.executable,
@@ -200,6 +205,7 @@ class EmbeddingWorker:
                 text=True,
                 env=environment,
             )
+            wall_time_s = time.perf_counter() - started
             if completed.returncode:
                 detail = completed.stderr.strip().splitlines()[-1] if completed.stderr.strip() else ""
                 raise ClassificationError(
@@ -219,6 +225,8 @@ class EmbeddingWorker:
             batch_sizes=tuple(int(value) for value in raw["batch_sizes"]),
             excerpt_policy=str(raw["excerpt_policy"]),
             prompt_cache_hit=bool(raw.get("prompt_cache_hit", True)),
+            wall_time_s=wall_time_s,
+            peak_rss_mb=float(raw.get("peak_rss_mb", 0.0)),
         )
 
 
@@ -302,4 +310,7 @@ def run_real_worker_job(job_path: Path, report_path: Path) -> None:
             for label, values in (raw.get("prompts") or {}).items()
         } or None,
     )
+    raw_rss = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    peak_rss_mb = raw_rss / (1024.0 * 1024.0) if sys.platform == "darwin" else raw_rss / 1024.0
+    report = replace(report, peak_rss_mb=peak_rss_mb)
     report_path.write_text(json.dumps(asdict(report), sort_keys=True), encoding="utf-8")

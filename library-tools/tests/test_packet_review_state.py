@@ -113,6 +113,23 @@ def test_review_session_persists_resumes_undoes_and_rejects_stale_digest(tmp_pat
         ReviewSession.open(state_path, candidates, "digest-two")
 
 
+def test_beginning_new_run_replaces_empty_state_but_preserves_human_decisions(tmp_path) -> None:
+    state_path = tmp_path / "review-state.json"
+    candidates = [_candidate(1, ambiguous=True), _candidate(2)]
+    ReviewSession.open(state_path, candidates, "digest-one")
+    restarted = ReviewSession.begin(state_path, candidates, "digest-two")
+    assert restarted.queue.classification_digest == "digest-two"
+
+    item = restarted.queue.pending()[0]
+    restarted.apply_decision(item.sample_id, item.predicted_form, item.predicted_content, "heard")
+    with pytest.raises(ClassificationError, match="--restart-review"):
+        ReviewSession.begin(state_path, candidates, "digest-three")
+
+    forced = ReviewSession.begin(state_path, candidates, "digest-three", restart=True)
+    assert forced.queue.decisions == ()
+    assert list((tmp_path / "archive" / "review-state").glob("digest-two*.json"))
+
+
 def test_completed_review_regenerates_benchmark_without_manual_tsv_edits(tmp_path) -> None:
     candidates = [_candidate(index) for index in range(24)]
     queue = ReviewQueue.build(candidates, "digest")

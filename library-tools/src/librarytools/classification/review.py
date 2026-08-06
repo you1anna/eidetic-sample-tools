@@ -189,6 +189,41 @@ class ReviewSession:
         self.queue = queue
 
     @classmethod
+    def begin(
+        cls,
+        path: Path,
+        candidates: Sequence[CandidateClassification],
+        classification_digest: str,
+        *,
+        restart: bool = False,
+    ) -> ReviewSession:
+        """Start a classifier run without silently discarding human review work."""
+        if path.is_file():
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ClassificationError(f"invalid review state: {exc}") from exc
+            previous_digest = str(raw.get("classification_digest", ""))
+            if previous_digest and previous_digest != classification_digest:
+                decisions = raw.get("decisions", [])
+                if decisions and not restart:
+                    raise ClassificationError(
+                        "review state contains human decisions; rerun with --restart-review to archive them"
+                    )
+                if decisions:
+                    archive_dir = path.parent / "archive" / "review-state"
+                    archive_dir.mkdir(parents=True, exist_ok=True)
+                    target = archive_dir / f"{previous_digest}.json"
+                    suffix = 1
+                    while target.exists():
+                        target = archive_dir / f"{previous_digest}-{suffix}.json"
+                        suffix += 1
+                    path.replace(target)
+                else:
+                    path.unlink()
+        return cls.open(path, candidates, classification_digest)
+
+    @classmethod
     def open(
         cls,
         path: Path,

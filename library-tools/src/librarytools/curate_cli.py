@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     classify = sub.add_parser("classify-packet")
     classify.add_argument("--labels", type=Path, required=True)
     classify.add_argument("--benchmark", type=Path, required=True)
+    classify.add_argument("--restart-review", action="store_true")
     packet_review = sub.add_parser("review-packet")
     packet_review.add_argument("--labels", type=Path, required=True)
     packet_review.add_argument("--port", type=int, default=0)
@@ -72,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "classify-packet":
             classifications, score = classify_packet(
                 args.root, db, args.labels, args.benchmark,
+                restart_review=args.restart_review,
             )
             print(f"classified: {len(classifications)} -> {args.labels.parent / 'classification.tsv'}")
             if not score.ready:

@@ -32,10 +32,13 @@ def infer_bar_fit_error(duration_s: float, tempo_bpm: float) -> float:
     """Return relative error from the nearest whole number of four-beat bars."""
     if duration_s <= 0.0 or tempo_bpm <= 0.0:
         return 1.0
-    bar_duration = 240.0 / tempo_bpm
-    bar_count = max(1, round(duration_s / bar_duration))
-    fitted_duration = bar_count * bar_duration
-    return min(1.0, abs(duration_s - fitted_duration) / fitted_duration)
+    errors: list[float] = []
+    for factor in (0.5, 0.75, 1.0, 1.25, 1.5, 2.0):
+        bar_duration = 240.0 / (tempo_bpm * factor)
+        bar_count = max(1, round(duration_s / bar_duration))
+        fitted_duration = bar_count * bar_duration
+        errors.append(abs(duration_s - fitted_duration) / fitted_duration)
+    return min(1.0, min(errors))
 
 
 def measure_acoustic(path: Path, payload: Mapping[str, float | None]) -> AcousticEvidence:
@@ -49,8 +52,16 @@ def measure_acoustic(path: Path, payload: Mapping[str, float | None]) -> Acousti
 
     audio, sample_rate = librosa.load(path, sr=22_050, mono=True, duration=120.0)
     onset = librosa.onset.onset_strength(y=audio, sr=sample_rate)
-    if len(onset) >= 4 and float(np.max(onset)) > 0.0:
-        onset_count = len(librosa.onset.onset_detect(onset_envelope=onset, sr=sample_rate))
+    onset_count = (
+        len(librosa.onset.onset_detect(
+            onset_envelope=onset,
+            sr=sample_rate,
+            delta=0.24,
+        ))
+        if len(onset) >= 4 and float(np.max(onset)) > 0.0
+        else 0
+    )
+    if onset_count >= 4:
         tempo_raw, beats = librosa.beat.beat_track(
             onset_envelope=onset, sr=sample_rate, units="frames",
         )
@@ -59,7 +70,6 @@ def measure_acoustic(path: Path, payload: Mapping[str, float | None]) -> Acousti
         beat_confidence = min(1.0, max(0.0, periodicity) * min(1.0, len(beats) / 8.0))
     else:
         tempo = periodicity = beat_confidence = 0.0
-        onset_count = 0
 
     duration = float(payload.get("duration_s") or (len(audio) / sample_rate if sample_rate else 0.0))
     head = float(payload.get("head_silence_ms") or 0.0)

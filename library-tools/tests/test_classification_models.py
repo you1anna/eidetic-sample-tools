@@ -1,7 +1,12 @@
 import numpy as np
 import pytest
 
-from librarytools.classification.models import ClapScorer, ModelSpec, rank_prompt_embeddings
+from librarytools.classification.models import (
+    ClapScorer,
+    ModelSpec,
+    batches_of,
+    rank_prompt_embeddings,
+)
 
 
 def test_prompt_ranking_returns_cosine_similarity_by_label():
@@ -24,3 +29,11 @@ def test_clap_scorer_builds_a_typed_vote_from_fixed_embeddings():
     assert vote.top_label == "RIM"
     assert vote.top_score > 0.99
     assert vote.margin > 0.99
+
+
+def test_model_inputs_are_batched_without_exceeding_eight() -> None:
+    assert list(batches_of(list(range(19)), 8)) == [
+        list(range(8)),
+        list(range(8, 16)),
+        list(range(16, 19)),
+    ]
