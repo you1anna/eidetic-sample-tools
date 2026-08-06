@@ -339,6 +339,44 @@ def test_resolution_digest_changes_with_human_form_or_content() -> None:
     assert first != second
 
 
+def test_undo_restores_decision_when_stale_publication_withdrawal_fails(
+    tmp_path, monkeypatch,
+) -> None:
+    candidate = _candidate(0)
+    digest = classification_digest([candidate], {"prompt_policy": "v1"})
+    session = ReviewSession.open(tmp_path / "review-state.json", [candidate], digest)
+    item = session.queue.pending()[0]
+    session.apply_decision(item.sample_id, item.predicted_form, item.predicted_content, "heard")
+    before = (tmp_path / "review-state.json").read_text(encoding="utf-8")
+    (tmp_path / "packet-meta.json").write_text(json.dumps({
+        "classification_digest": digest,
+        "audio_playlists_published": True,
+        "published_digest": "a" * 64,
+        "review": {"ready": True, "passed": True},
+        "benchmark": {"ready": True, "passed": True},
+    }), encoding="utf-8")
+    playlists = tmp_path / "playlists"
+    playlists.mkdir()
+    (playlists / "README.md").write_text("published\n", encoding="utf-8")
+
+    def fail_withdrawal(*_args, **_kwargs):
+        raise ClassificationError("injected archive failure")
+
+    monkeypatch.setattr(
+        "librarytools.classification.review.withdraw_published_playlists",
+        fail_withdrawal,
+    )
+    with pytest.raises(ClassificationError, match="injected archive failure"):
+        session.undo()
+
+    assert (tmp_path / "review-state.json").read_text(encoding="utf-8") == before
+    assert len(session.queue.decisions) == 1
+    assert playlists.is_dir()
+    metadata = json.loads((tmp_path / "packet-meta.json").read_text(encoding="utf-8"))
+    assert metadata["audio_playlists_published"] is True
+    assert metadata["review"]["passed"] is True
+
+
 def _write_blank_benchmark(path: Path, candidates) -> None:
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=(

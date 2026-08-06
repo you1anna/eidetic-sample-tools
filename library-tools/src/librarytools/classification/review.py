@@ -402,8 +402,12 @@ class ReviewSession:
 
     def undo(self) -> ReviewDecision:
         decision = self.queue.undo()
-        self._save()
-        self._invalidate_completion()
+        try:
+            self._invalidate_completion()
+            self._save()
+        except Exception:
+            self.queue.restore_decision(decision)
+            raise
         return decision
 
     def _invalidate_completion(self) -> None:
