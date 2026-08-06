@@ -235,10 +235,13 @@ sample-curate review-packet \
 
 The page provides audio playback, one-click form/content choices, notes, undo and resume. It writes
 `review-state.json` atomically and regenerates the 24-row benchmark when the queue completes; never
-edit TSV rows manually. A failed sentinel reopens the rest of that group. Publication remains
-blocked until review is complete and the strict 22/24 form and 20/24 joint content-and-group gate
-passes. Before the first replacement, the rejected name-derived playlists are retained once under
-the packet's `archive/` directory.
+edit benchmark TSV rows manually. A failed sentinel reopens the rest of that group. Publication
+remains blocked until review is complete and the 22/24 form plus 19/24 joint content-and-group gate
+passes. Nineteen is the nearest whole-sample boundary to the approximately 20% group-error policy
+adopted for the 24-row benchmark. Before the first replacement, the rejected name-derived playlists
+are retained once under the packet's `archive/` directory. Undoing or changing a completed review
+withdraws the official playlist links into `archive/stale-publications/`; republishing requires the
+new resolution digest to pass both gates.
 
 Open `playlists/README.md` only after that pass and listen through one audio-derived group at a
 time. Mark every `labels.tsv` row as `reject`, `keep` or `favourite`. A favourite also needs its
@@ -315,6 +318,32 @@ root. Octatrack and TR-8S folders can then be copied to mounted media with
 The exporter checks hashes, device capacity, role compatibility, path depth and
 compact names before conversion. See the [export reference](../sample-tools/README.md)
 for exact formats.
+
+### First-device smoke test
+
+Do not make the first hardware trial a batch export. Select and promote one representative sample
+for Digitakt and one for Octatrack; add one TR-8S percussion sample only when its native engine has
+already failed the musical role. Keep a minimal, versioned crate beside the audition packet using
+the normal `sample_id`, `source_path`, `role`, `descriptor`, `reason` schema. Every `source_path`
+must be the promoted copy below `CURATED/`; a matching source hash elsewhere is deliberately rejected.
+
+For each device, run the same crate through three separate gates:
+
+```bash
+sample-export DEVICE --profile eidetic-studio --crate /path/to/device-smoke.tsv --list
+sample-export DEVICE --profile eidetic-studio --crate /path/to/device-smoke.tsv --dry-run
+sample-export DEVICE --profile eidetic-studio --crate /path/to/device-smoke.tsv
+```
+
+The first command must resolve exactly the selected files with no missing rows. The second must
+report the same conversion count without writing audio. The third stages derived WAV copies below
+`_EXPORT/<DEVICE>/`; inspect that folder before transferring anything. Load one machine at a time,
+make one audible pattern, save it, reload it and record whether the sample, assignment and device
+state survived. Expand a crate only after that device-specific round trip passes.
+
+`sample-curate views` remains the quota-enforced Foundation view generator; do not pad a smoke test
+with unapproved favourites merely to satisfy those quotas. A deliberately small smoke crate is a
+separate retained selection artefact, not a relaxation of promotion or hash checks.
 
 ## 5. Recover or revise a decision
 

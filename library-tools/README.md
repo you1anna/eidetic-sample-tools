@@ -250,9 +250,12 @@ exceptions plus one blind sentinel per accepted group in `review-packet`; the UI
 the audit state and regenerates `benchmark-labels.tsv`, so no spreadsheet editing is required.
 If prompt tuning changes the classification digest, rerun with `--carry-review`; only newly affected
 automatic samples are reopened. The two review-state flags are mutually exclusive.
-Category playlists remain unavailable until review is complete and the 22/24 form and 20/24
-joint content-and-group benchmark gate passes. Low-confidence files appear last. On the first pass,
-the rejected name-derived playlists are preserved below the packet's `archive/` directory.
+Category playlists remain unavailable until review is complete and the 22/24 form and 19/24
+joint content-and-group benchmark gate passes. The joint threshold is the nearest whole-sample
+boundary to the accepted approximately 20% error policy for this 24-row cohort. Low-confidence
+files appear last. On the first pass, the rejected name-derived playlists are preserved below the
+packet's `archive/` directory. Undo or reclassification withdraws superseded public playlists into
+`archive/stale-publications/`; only a newly passed resolution digest can publish replacements.
 
 ## Analyse and run experiments
 

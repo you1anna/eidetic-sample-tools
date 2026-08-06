@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-08-04
+**Updated:** 2026-08-06
 
 ## Current position
 
@@ -21,6 +21,12 @@ state" below).
 
 The immediate objective remains a small, trusted collection for Octatrack first,
 then Digitakt and TR-8S.
+
+The first local audio-classified rollout now has a guarded 63-file packet with nine mutually
+exclusive audition playlists. Its explicit 24-row reviewed benchmark passed at 23 form matches,
+20 content matches and 19 joint content/group matches under the accepted approximately 20% error
+policy. This validates shortlist publication, not musical approval: no row becomes exportable until
+Robin chooses favourites and `sample-curate promote` creates hash-verified copies below `CURATED/`.
 
 ## Working software
 
@@ -161,20 +167,21 @@ requires a human removal label.
 2. Retain the reconciliation evidence: the 22,952-file inventory confirms all
    18 audited destination hashes and absent former source paths. Use the audit,
    manifests and undo records to review any recovery plan.
-3. Block promotion and hardware export until the integrity discrepancies are
-   resolved through human recovery review.
+3. Keep the protected-`PACKS/` discrepancy as an open preservation risk, but enforce the recorded
+   per-file hash gate for every promotion and export. Do not resume organisation moves while the
+   source library remains single-copy.
 4. Review, test and deliberately decide whether the unmerged
    confidence-organisation code belongs in the main workflow. If it is used,
    generate and inspect a fresh preview; only an explicit `--apply` against a
    backed-up library may move audio.
-5. Prepare or restore the canonical Foundation v1 audition packet, then listen
-   and complete every canonical `labels.tsv` row. The 214-row reference file is
-   useful context, not a substitute for the human gate.
-6. Validate labels, promote only hash-verified favourites and write consumer
-   views. No favourites means no curated promotion.
-7. Resolve and preview the Octatrack crate with `--list` and `--dry-run`, then
-   build and test it before the other devices.
-8. Record real-session outcomes for the exported crate before expanding the
+5. Audition the guarded `tribal-140-01` category playlists and select the smallest useful palette;
+   classifier groups are shortlist evidence, not favourite decisions.
+6. Validate the resulting decisions and promote only hash-verified favourites. No favourites means
+   no curated promotion.
+7. Build one-sample Digitakt and Octatrack smoke crates from promoted paths, preview each with
+   `--list` and `--dry-run`, then stage and test one device at a time. Add TR-8S only after a native
+   voice fails the role.
+8. Record save/reload and real-session outcomes before expanding either crate or the
    intelligence layer; see the [Foundation v1 decision corpus](docs/FOUNDATION-V1-DECISION-CORPUS.md).
 
 Follow the canonical [workflow](docs/WORKFLOWS.md) and
