@@ -14,6 +14,7 @@ from .curate import (
 )
 from .inventory import LibraryDatabase
 from .packet_classifier import PacketClassifierError, classify_packet
+from .classification.review_server import load_review_packet, serve_review
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,6 +37,10 @@ def main(argv: list[str] | None = None) -> int:
     classify = sub.add_parser("classify-packet")
     classify.add_argument("--labels", type=Path, required=True)
     classify.add_argument("--benchmark", type=Path, required=True)
+    packet_review = sub.add_parser("review-packet")
+    packet_review.add_argument("--labels", type=Path, required=True)
+    packet_review.add_argument("--port", type=int, default=0)
+    packet_review.add_argument("--open", action="store_true", dest="open_browser")
     validate = sub.add_parser("validate")
     validate.add_argument("--labels", type=Path, required=True)
     promote = sub.add_parser("promote")
@@ -52,6 +57,16 @@ def main(argv: list[str] | None = None) -> int:
             paths = regenerate_packet_playlists(args.labels)
             categories = len(paths) - 2  # combined playlist and index are not categories
             print(f"category playlists: {categories} -> {args.labels.parent / 'playlists'}")
+            return 0
+        if args.command == "review-packet":
+            root, session, candidates = load_review_packet(args.labels)
+            serve_review(
+                root,
+                session,
+                candidates,
+                port=args.port,
+                open_browser=args.open_browser,
+            )
             return 0
         db = LibraryDatabase(args.library_db)
         if args.command == "classify-packet":

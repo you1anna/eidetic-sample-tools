@@ -218,13 +218,24 @@ sample-curate \
   --benchmark manifests/foundation-v1-review/benchmark-labels.tsv
 ```
 
-The first run writes `classification.tsv`, a combined 24-file benchmark playlist and six
-four-file benchmark-stratum playlists. Listen through `benchmark-playlists/README.md`, then fill
-`true_form`, `true_content`, `true_audition_group` and optional notes in
-`benchmark-labels.tsv`. Rerun the same command. It calibrates deterministic signal/text weights
-against those labels and publishes the nine category playlists only when the strict 22/24 form
-and 20/24 joint content-and-group gate passes. Before that first replacement, the rejected name-derived
-playlist set is retained once under the packet's `archive/` directory.
+The classifier keeps form acoustic, runs the two pinned CLAP models one at a time and stores their
+embeddings in the library database. It writes best guesses, a structured audit and a resumable
+review state, but it does not publish playlists. Filenames have zero decision weight.
+
+Review every exception plus one blind sentinel from each accepted group in the local browser:
+
+```bash
+sample-curate review-packet \
+  --labels manifests/foundation-v1-review/labels.tsv \
+  --open
+```
+
+The page provides audio playback, one-click form/content choices, notes, undo and resume. It writes
+`review-state.json` atomically and regenerates the 24-row benchmark when the queue completes; never
+edit TSV rows manually. A failed sentinel reopens the rest of that group. Publication remains
+blocked until review is complete and the strict 22/24 form and 20/24 joint content-and-group gate
+passes. Before the first replacement, the rejected name-derived playlists are retained once under
+the packet's `archive/` directory.
 
 Open `playlists/README.md` only after that pass and listen through one audio-derived group at a
 time. Mark every `labels.tsv` row as `reject`, `keep` or `favourite`. A favourite also needs its

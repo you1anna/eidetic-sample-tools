@@ -243,6 +243,37 @@ def test_playlists_cli_regenerates_packet_without_library_database(tmp_path, cap
     assert capsys.readouterr().out == f"category playlists: 1 -> {packet / 'playlists'}\n"
 
 
+def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path, monkeypatch):
+    labels = tmp_path / "packet" / "labels.tsv"
+    calls = []
+    monkeypatch.setattr(
+        curate_cli,
+        "load_review_packet",
+        lambda path: (Path("/samples"), "session", ["candidate"]),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        curate_cli,
+        "serve_review",
+        lambda root, session, candidates, **options: calls.append(
+            (root, session, candidates, options)
+        ),
+        raising=False,
+    )
+
+    rc = curate_cli.main([
+        "review-packet", "--labels", str(labels), "--port", "4321", "--open",
+    ])
+
+    assert rc == 0
+    assert calls == [(
+        Path("/samples"),
+        "session",
+        ["candidate"],
+        {"port": 4321, "open_browser": True},
+    )]
+
+
 def test_playlists_refuses_to_bypass_unpassed_benchmark_and_preserves_old_output(tmp_path):
     root = tmp_path / "SAMPLES"
     _audio(root / "CATALOGUE" / "RIM" / "rim.wav")

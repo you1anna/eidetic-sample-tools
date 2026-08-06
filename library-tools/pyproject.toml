@@ -18,6 +18,7 @@ dev = ["pytest>=8"]
 # tidy tools stay light. Weights are user-supplied (unlicensed upstream), never shipped.
 classifier = ["torch>=2.2", "librosa>=0.10"]
 audio-classifier = ["torch>=2.2", "librosa>=0.10", "transformers>=4.40"]
+review-ui = ["flask>=3.1,<4"]
 
 [project.scripts]
 sample-classify = "librarytools.classify:main"
