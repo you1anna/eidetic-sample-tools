@@ -1,7 +1,9 @@
 import csv
 import gzip
+import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -193,6 +195,44 @@ def test_regenerate_packet_playlists_requires_packet_metadata(tmp_path):
         curate.regenerate_packet_playlists(labels)
 
 
+def test_playlist_render_failure_preserves_the_previous_publication(tmp_path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    source = _audio(root / "PACKS" / "rim.wav")
+    packet = tmp_path / "packet"
+    packet.mkdir()
+    sample_id = hashlib.sha256(source.read_bytes()).hexdigest()
+    labels = packet / "labels.tsv"
+    labels.write_text(
+        "sample_id\tcurrent_path\tsuggested_role\tdecision\ttrue_role\tdescriptor\ttags\tnotes\n"
+        f"{sample_id}\tPACKS/rim.wav\tRIM\t\t\t\t\t\n",
+        encoding="utf-8",
+    )
+    classification = packet / "classification.tsv"
+    classification.write_text(
+        "sample_id\tcurrent_path\tform\tcontent\taudition_group\tform_confidence\tcontent_confidence\tevidence\tclassifier_version\n"
+        f"{sample_id}\tPACKS/rim.wav\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\tensemble-v2\n",
+        encoding="utf-8",
+    )
+    playlists = packet / "playlists"
+    playlists.mkdir()
+    (playlists / "old.m3u8").write_text("#EXTM3U\n/old.wav\n", encoding="utf-8")
+    (packet / "audition.m3u8").write_text("#EXTM3U\n/old.wav\n", encoding="utf-8")
+    original = curate._write_m3u8
+
+    def fail_during_staging(path, sources):
+        if path.name == "rim-one-shots.m3u8":
+            raise OSError("simulated render failure")
+        original(path, sources)
+
+    monkeypatch.setattr(curate, "_write_m3u8", fail_during_staging)
+
+    with pytest.raises(OSError, match="simulated render failure"):
+        curate.write_audition_playlists(root, labels, classification)
+
+    assert (playlists / "old.m3u8").read_text() == "#EXTM3U\n/old.wav\n"
+    assert (packet / "audition.m3u8").read_text() == "#EXTM3U\n/old.wav\n"
+
+
 def test_regenerate_packet_playlists_requires_classification_sheet(tmp_path):
     root = tmp_path / "SAMPLES"
     root.mkdir()
@@ -272,6 +312,42 @@ def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path
         ["candidate"],
         {"port": 4321, "open_browser": True},
     )]
+
+
+def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_path, monkeypatch):
+    labels = tmp_path / "packet" / "labels.tsv"
+    benchmark = labels.parent / "benchmark-labels.tsv"
+    calls = []
+    monkeypatch.setattr(
+        curate_cli,
+        "classify_packet",
+        lambda *args, **kwargs: (
+            calls.append((args, kwargs)) or [object()],
+            SimpleNamespace(
+                ready=True,
+                passed=True,
+                form_correct=24,
+                content_correct=24,
+                group_correct=24,
+                content_group_correct=24,
+                total=24,
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        curate_cli,
+        "regenerate_packet_playlists",
+        lambda path: pytest.fail("classification must not publish playlists"),
+    )
+
+    rc = curate_cli.main([
+        "--library-db", str(tmp_path / "library.sqlite"),
+        "classify-packet", "--labels", str(labels), "--benchmark", str(benchmark),
+        "--carry-review",
+    ])
+
+    assert rc == 0
+    assert calls[0][1] == {"restart_review": False, "carry_review": True}
 
 
 def test_playlists_refuses_to_bypass_unpassed_benchmark_and_preserves_old_output(tmp_path):

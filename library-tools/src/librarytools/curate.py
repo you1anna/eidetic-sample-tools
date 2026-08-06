@@ -6,6 +6,7 @@ import csv
 import gzip
 import json
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -229,15 +230,7 @@ def write_audition_playlists(
 
     output_dir = labels_path.parent
     combined_path = output_dir / "audition.m3u8"
-    _write_m3u8(combined_path, combined)
-
     playlists_dir = output_dir / "playlists"
-    if playlists_dir.is_symlink() or playlists_dir.is_file():
-        playlists_dir.unlink()
-    elif playlists_dir.exists():
-        shutil.rmtree(playlists_dir)
-    playlists_dir.mkdir(parents=True)
-
     generated = {"combined": combined_path}
     index_lines = [
         "# Audition playlists",
@@ -247,24 +240,59 @@ def write_audition_playlists(
         "| Category | Files | Playlist |",
         "|---|---:|---|",
     ]
-    if not grouped:
-        index_lines.extend(["", "No categories are present in this label sheet."])
-    for role in ordered_groups:
-        filename = f"{role}.m3u8"
-        playlist_path = playlists_dir / filename
-        _write_m3u8(playlist_path, [source for _, source in grouped[role]])
-        generated[role] = playlist_path
-        index_lines.append(
-            f"| `{role}` | {len(grouped[role])} | [{filename}]({filename}) |"
+    publish_root = Path(tempfile.mkdtemp(prefix=".playlist-publish-", dir=output_dir))
+    staged_playlists = publish_root / "playlists"
+    staged_combined = publish_root / "audition.m3u8"
+    staged_playlists.mkdir()
+    try:
+        _write_m3u8(staged_combined, combined)
+        if not grouped:
+            index_lines.extend(["", "No categories are present in this label sheet."])
+        for role in ordered_groups:
+            filename = f"{role}.m3u8"
+            _write_m3u8(
+                staged_playlists / filename,
+                [source for _, source in grouped[role]],
+            )
+            generated[role] = playlists_dir / filename
+            index_lines.append(
+                f"| `{role}` | {len(grouped[role])} | [{filename}]({filename}) |"
+            )
+        index_lines.extend([
+            "",
+            "[Complete packet](../audition.m3u8) follows the category table above; within each "
+            "category, confidence runs from highest to lowest.",
+        ])
+        (staged_playlists / "README.md").write_text(
+            "\n".join(index_lines) + "\n", encoding="utf-8",
         )
-    index_lines.extend([
-        "",
-        "[Complete packet](../audition.m3u8) follows the category table above; within each "
-        "category, confidence runs from highest to lowest.",
-    ])
-    index_path = playlists_dir / "README.md"
-    index_path.write_text("\n".join(index_lines) + "\n", encoding="utf-8")
-    generated["index"] = index_path
+
+        previous_playlists = publish_root / "previous-playlists"
+        previous_combined = publish_root / "previous-audition.m3u8"
+        try:
+            if playlists_dir.exists() or playlists_dir.is_symlink():
+                playlists_dir.replace(previous_playlists)
+            if combined_path.exists() or combined_path.is_symlink():
+                combined_path.replace(previous_combined)
+            staged_playlists.replace(playlists_dir)
+            staged_combined.replace(combined_path)
+        except OSError:
+            if playlists_dir.exists() or playlists_dir.is_symlink():
+                if playlists_dir.is_dir() and not playlists_dir.is_symlink():
+                    shutil.rmtree(playlists_dir)
+                else:
+                    playlists_dir.unlink()
+            if combined_path.exists() or combined_path.is_symlink():
+                combined_path.unlink()
+            if previous_playlists.exists() or previous_playlists.is_symlink():
+                previous_playlists.replace(playlists_dir)
+            if previous_combined.exists() or previous_combined.is_symlink():
+                previous_combined.replace(combined_path)
+            raise
+    finally:
+        shutil.rmtree(publish_root, ignore_errors=True)
+
+    generated["index"] = playlists_dir / "README.md"
     return generated
 
 

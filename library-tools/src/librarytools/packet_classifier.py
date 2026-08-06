@@ -68,7 +68,7 @@ from .classification.policy import (
     tokenise_path,
 )
 from .classification.workers import SampleRef, generate_model_votes
-from .classification.review import ReviewSession
+from .classification.review import ReviewSession, finalise_review
 from .classification.workers import EXCERPT_POLICY
 from .featurecache import FEATURE_COLUMNS
 from .inventory import sha256_file
@@ -105,6 +105,7 @@ def classify_packet(
     scorer: SemanticScorer | None = None,
     *,
     restart_review: bool = False,
+    carry_review: bool = False,
 ) -> tuple[list[Classification], BenchmarkScore]:
     """Classify a packet and create/score its 24-row ear benchmark."""
     with labels_path.open(encoding="utf-8", newline="") as fh:
@@ -240,6 +241,7 @@ def classify_packet(
             candidates,
             candidate_digest,
             restart=restart_review,
+            carry_decisions=carry_review,
         )
         strata = benchmark_strata(classifications)
         write_benchmark_sheet(benchmark_path, classifications, strata)
@@ -280,4 +282,6 @@ def classify_packet(
             "failed_sentinel_groups": list(gate.failed_sentinel_groups),
         }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    if candidates is not None and session.queue.gate().passed:
+        score = finalise_review(labels_path.parent, session.queue)
     return classifications, score

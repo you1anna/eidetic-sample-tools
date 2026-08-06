@@ -231,7 +231,7 @@ sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 |---|---|---|
 | `migrate-catalogue` | `--ableton-root`, `--manifest`, `--undo` | Writes a migration plan; `--apply` moves after preflight. |
 | `prepare` | `--output-dir` | Writes labels and a combined candidate playlist; it never publishes name-derived categories. |
-| `classify-packet` | `--labels`, `--benchmark` | Runs two pinned CLAP checkpoints sequentially, caches embeddings and writes review candidates. |
+| `classify-packet` | `--labels`, `--benchmark` | Runs two pinned CLAP checkpoints sequentially, caches embeddings and writes review candidates. `--carry-review` preserves same-sample decisions across an intentional tuning run; `--restart-review` archives and discards them. |
 | `review-packet` | `--labels` | Serves the exception/sentinel queue on `127.0.0.1`; `--open` opens it and `--port` selects a port. |
 | `playlists` | `--labels` | Publishes combined and category playlists only after the digest-bound review and benchmark gates pass. |
 | `validate` | `--labels` | Checks that required human decisions are complete. |
@@ -248,6 +248,8 @@ tom and general percussion one-shots; percussion and full-drum loops; vocal stab
 and long sources; and out-of-brief. Filenames have zero decision weight. Review only model/acoustic
 exceptions plus one blind sentinel per accepted group in `review-packet`; the UI writes and resumes
 the audit state and regenerates `benchmark-labels.tsv`, so no spreadsheet editing is required.
+If prompt tuning changes the classification digest, rerun with `--carry-review`; only newly affected
+automatic samples are reopened. The two review-state flags are mutually exclusive.
 Category playlists remain unavailable until review is complete and the 22/24 form and 20/24
 joint content-and-group benchmark gate passes. Low-confidence files appear last. On the first pass,
 the rejected name-derived playlists are preserved below the packet's `archive/` directory.

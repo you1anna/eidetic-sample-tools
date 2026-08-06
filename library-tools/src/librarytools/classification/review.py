@@ -101,7 +101,8 @@ class ReviewQueue:
     def items(self) -> tuple[ReviewItem, ...]:
         items = list(self._base_items)
         existing = {item.sample_id for item in items}
-        for group in self.failed_sentinel_groups():
+        reopen_groups = set(self.failed_sentinel_groups()) | set(self.trusted_mismatch_groups())
+        for group in (value for value in AUDITION_GROUPS if value in reopen_groups):
             reopened = sorted(
                 (
                     candidate for candidate in self._candidates.values()
@@ -130,6 +131,21 @@ class ReviewQueue:
             raise ClassificationError(f"sample is not pending review: {sample_id}")
         self._decisions.append(ReviewDecision(sample_id, form, content, notes.strip()))
 
+    def restore_decision(self, decision: ReviewDecision) -> None:
+        """Restore a digest-bound or explicitly carried human decision by sample identity."""
+        if decision.form not in FORMS or decision.content not in CONTENTS:
+            raise ClassificationError("review decision has an invalid form or content")
+        if decision.sample_id not in self._candidates:
+            raise ClassificationError(f"review decision sample is absent: {decision.sample_id}")
+        if decision.sample_id in {item.sample_id for item in self._decisions}:
+            raise ClassificationError(f"duplicate review decision: {decision.sample_id}")
+        self._decisions.append(ReviewDecision(
+            decision.sample_id,
+            decision.form,
+            decision.content,
+            decision.notes.strip(),
+        ))
+
     def undo(self) -> ReviewDecision:
         if not self._decisions:
             raise ClassificationError("there is no review decision to undo")
@@ -145,6 +161,17 @@ class ReviewQueue:
                 or decision.content != sentinel.predicted_content
             ):
                 groups.add(sentinel.audition_group)
+        return tuple(group for group in AUDITION_GROUPS if group in groups)
+
+    def trusted_mismatch_groups(self) -> tuple[str, ...]:
+        groups: set[str] = set()
+        for decision in self._decisions:
+            candidate = self._candidates[decision.sample_id]
+            if candidate.automatic and (
+                decision.form != candidate.form.label
+                or decision.content != candidate.content.label
+            ):
+                groups.add(candidate.audition_group)
         return tuple(group for group in AUDITION_GROUPS if group in groups)
 
     def gate(self) -> GateResult:
@@ -196,8 +223,10 @@ class ReviewSession:
         classification_digest: str,
         *,
         restart: bool = False,
+        carry_decisions: bool = False,
     ) -> ReviewSession:
         """Start a classifier run without silently discarding human review work."""
+        carried_decisions: list[object] = []
         if path.is_file():
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
@@ -206,11 +235,14 @@ class ReviewSession:
             previous_digest = str(raw.get("classification_digest", ""))
             if previous_digest and previous_digest != classification_digest:
                 decisions = raw.get("decisions", [])
-                if decisions and not restart:
+                if decisions and not restart and not carry_decisions:
                     raise ClassificationError(
-                        "review state contains human decisions; rerun with --restart-review to archive them"
+                        "review state contains human decisions; rerun with --carry-review to reuse "
+                        "them or --restart-review to archive them"
                     )
                 if decisions:
+                    if carry_decisions:
+                        carried_decisions = list(decisions)
                     archive_dir = path.parent / "archive" / "review-state"
                     archive_dir.mkdir(parents=True, exist_ok=True)
                     target = archive_dir / f"{previous_digest}.json"
@@ -221,7 +253,20 @@ class ReviewSession:
                     path.replace(target)
                 else:
                     path.unlink()
-        return cls.open(path, candidates, classification_digest)
+        session = cls.open(path, candidates, classification_digest)
+        if carried_decisions:
+            for raw_decision in carried_decisions:
+                try:
+                    session.queue.restore_decision(ReviewDecision(
+                        sample_id=str(raw_decision["sample_id"]),
+                        form=str(raw_decision["form"]),
+                        content=str(raw_decision["content"]),
+                        notes=str(raw_decision.get("notes", "")),
+                    ))
+                except (KeyError, TypeError, ClassificationError) as exc:
+                    raise ClassificationError(f"cannot carry review decision: {exc}") from exc
+            session._save()
+        return session
 
     @classmethod
     def open(
@@ -241,12 +286,12 @@ class ReviewSession:
                 raise ClassificationError("stale review state does not match current classification")
             try:
                 for decision in raw.get("decisions", []):
-                    queue.apply_decision(
+                    queue.restore_decision(ReviewDecision(
                         str(decision["sample_id"]),
                         str(decision["form"]),
                         str(decision["content"]),
                         str(decision.get("notes", "")),
-                    )
+                    ))
             except (KeyError, TypeError, ClassificationError) as exc:
                 raise ClassificationError(f"invalid review state: {exc}") from exc
         else:

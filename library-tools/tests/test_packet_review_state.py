@@ -130,6 +130,24 @@ def test_beginning_new_run_replaces_empty_state_but_preserves_human_decisions(tm
     assert list((tmp_path / "archive" / "review-state").glob("digest-two*.json"))
 
 
+def test_tuning_run_can_carry_same_sample_human_decisions_to_new_digest(tmp_path) -> None:
+    state_path = tmp_path / "review-state.json"
+    candidates = [_candidate(1), _candidate(2), _candidate(3)]
+    first = ReviewSession.open(state_path, candidates, "digest-one")
+    sentinel = first.queue.pending()[0]
+    first.apply_decision(
+        sentinel.sample_id, sentinel.predicted_form, sentinel.predicted_content, "heard",
+    )
+
+    carried = ReviewSession.begin(
+        state_path, candidates, "digest-two", carry_decisions=True,
+    )
+
+    assert carried.queue.decisions[0].sample_id == sentinel.sample_id
+    assert carried.queue.decisions[0].notes == "heard"
+    assert list((tmp_path / "archive" / "review-state").glob("digest-one*.json"))
+
+
 def test_completed_review_regenerates_benchmark_without_manual_tsv_edits(tmp_path) -> None:
     candidates = [_candidate(index) for index in range(24)]
     queue = ReviewQueue.build(candidates, "digest")

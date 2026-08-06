@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from librarytools.classification.models import (
+    CONTENT_PROMPTS,
     ClapScorer,
     ModelSpec,
     batches_of,
@@ -16,6 +17,18 @@ def test_prompt_ranking_returns_cosine_similarity_by_label():
     )
 
     assert scores == {"RIM": pytest.approx(1.0), "TOM": pytest.approx(0.0)}
+
+
+def test_content_prompts_explicitly_contrast_top_loops_and_full_drum_kits():
+    percussion = " ".join(CONTENT_PROMPTS["PERCUSSION"]).lower()
+    full_drums = " ".join(CONTENT_PROMPTS["FULL_DRUMS"]).lower()
+    vocal = " ".join(CONTENT_PROMPTS["VOCAL"]).lower()
+
+    assert "top loop" in percussion
+    assert "without kick or snare" in percussion
+    assert "kick" in full_drums and "snare" in full_drums and "hi-hat" in full_drums
+    assert "not a top loop" in full_drums
+    assert "clearly audible human voice" in vocal
 
 
 def test_clap_scorer_builds_a_typed_vote_from_fixed_embeddings():

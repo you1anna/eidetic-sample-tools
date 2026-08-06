@@ -221,6 +221,9 @@ sample-curate \
 The classifier keeps form acoustic, runs the two pinned CLAP models one at a time and stores their
 embeddings in the library database. It writes best guesses, a structured audit and a resumable
 review state, but it does not publish playlists. Filenames have zero decision weight.
+For an intentional prompt-tuning rerun, add `--carry-review` to retain decisions by sample hash and
+reopen only newly affected automatic samples. Use `--restart-review` instead only when the prior
+human decisions must be archived and discarded; the two flags cannot be combined.
 
 Review every exception plus one blind sentinel from each accepted group in the local browser:
 

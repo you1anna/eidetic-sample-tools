@@ -37,7 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     classify = sub.add_parser("classify-packet")
     classify.add_argument("--labels", type=Path, required=True)
     classify.add_argument("--benchmark", type=Path, required=True)
-    classify.add_argument("--restart-review", action="store_true")
+    review_state = classify.add_mutually_exclusive_group()
+    review_state.add_argument("--restart-review", action="store_true")
+    review_state.add_argument("--carry-review", action="store_true")
     packet_review = sub.add_parser("review-packet")
     packet_review.add_argument("--labels", type=Path, required=True)
     packet_review.add_argument("--port", type=int, default=0)
@@ -74,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
             classifications, score = classify_packet(
                 args.root, db, args.labels, args.benchmark,
                 restart_review=args.restart_review,
+                carry_review=args.carry_review,
             )
             print(f"classified: {len(classifications)} -> {args.labels.parent / 'classification.tsv'}")
             if not score.ready:
@@ -88,8 +91,7 @@ def main(argv: list[str] | None = None) -> int:
             if not score.passed:
                 print("benchmark gate failed; playlists were not regenerated", file=sys.stderr)
                 return 3
-            paths = regenerate_packet_playlists(args.labels)
-            print(f"quality gate passed; category playlists: {len(paths) - 2}")
+            print("quality gate passed; run `sample-curate playlists --labels ...` to publish")
         elif args.command == "migrate-catalogue":
             plan = plan_catalogue_migration(args.root, args.ableton_root, db)
             moves.write_plan(args.manifest, plan)
