@@ -27,6 +27,10 @@ BENCHMARK_STRATA = (
     "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
     "out-of-brief", "control",
 )
+MIN_FORM_CORRECT = 22
+# A 24-row benchmark cannot represent exactly 80%; 19/24 is the nearest
+# practical boundary to the operator-approved approximately 20% group error.
+MIN_CONTENT_GROUP_CORRECT = 19
 
 
 @dataclass(frozen=True)
@@ -76,7 +80,11 @@ def score_benchmark(rows: Sequence[Mapping[str, str]]) -> BenchmarkScore:
         content_group_correct=content_group_correct,
         total=len(ready_rows),
         ready=ready,
-        passed=ready and form_correct >= 22 and content_group_correct >= 20,
+        passed=(
+            ready
+            and form_correct >= MIN_FORM_CORRECT
+            and content_group_correct >= MIN_CONTENT_GROUP_CORRECT
+        ),
     )
 
 

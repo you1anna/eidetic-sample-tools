@@ -210,6 +210,31 @@ def test_benchmark_requires_20_rows_with_both_content_and_group_correct():
     assert score.passed is False
 
 
+def test_benchmark_accepts_authorised_twenty_percent_group_error_margin():
+    strata = (
+        "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+        "out-of-brief", "control",
+    )
+    rows = []
+    for index in range(24):
+        correct = index < 19
+        rows.append({
+            "sample_id": f"{index:064x}",
+            "current_path": f"PACKS/{index}.wav",
+            "stratum": strata[index // 4],
+            "true_form": "ONE_SHOT",
+            "true_content": "PERCUSSION",
+            "true_audition_group": "percussion-one-shots",
+            "form": "ONE_SHOT" if index < 22 else "LOOP",
+            "content": "PERCUSSION" if correct else "TOM",
+            "audition_group": "percussion-one-shots" if correct else "tom-one-shots",
+        })
+    assert score_benchmark(rows).passed is True
+    rows[18]["content"] = "TOM"
+    rows[18]["audition_group"] = "tom-one-shots"
+    assert score_benchmark(rows).passed is False
+
+
 def test_benchmark_rejects_duplicate_ids_bad_strata_and_invalid_truth_values():
     strata = (
         "form-boundary", "loop-content", "drum-one-shot", "vocal-form",

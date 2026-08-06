@@ -303,6 +303,17 @@ def test_finalise_review_writes_classifications_and_digest_bound_gate(tmp_path) 
     assert metadata["resolution_digest"] == session.queue.resolution_digest()
     assert (tmp_path / "classification.tsv").is_file()
 
+    playlists = tmp_path / "playlists"
+    playlists.mkdir()
+    (playlists / "README.md").write_text("published\n", encoding="utf-8")
+    (playlists / "rim-one-shots.m3u8").write_text("#EXTM3U\n/rim.wav\n", encoding="utf-8")
+    (tmp_path / "audition.m3u8").write_text("#EXTM3U\n/rim.wav\n", encoding="utf-8")
+    metadata["audio_playlists_published"] = True
+    metadata["published_digest"] = metadata["resolution_digest"]
+    (tmp_path / "packet-meta.json").write_text(
+        json.dumps(metadata), encoding="utf-8",
+    )
+
     session.undo()
     invalidated = json.loads((tmp_path / "packet-meta.json").read_text(encoding="utf-8"))
     assert invalidated["review"]["passed"] is False
@@ -310,6 +321,11 @@ def test_finalise_review_writes_classifications_and_digest_bound_gate(tmp_path) 
     assert invalidated["audio_playlists_published"] is False
     assert "resolution_digest" not in invalidated
     assert "published_digest" not in invalidated
+    stale = tmp_path / "archive" / "stale-publications" / metadata["published_digest"]
+    assert (stale / "playlists" / "rim-one-shots.m3u8").is_file()
+    assert (stale / "audition.m3u8").is_file()
+    assert not playlists.exists()
+    assert not (tmp_path / "audition.m3u8").exists()
 
 
 def test_resolution_digest_changes_with_human_form_or_content() -> None:

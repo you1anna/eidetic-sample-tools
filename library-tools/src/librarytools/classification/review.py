@@ -27,7 +27,7 @@ from .domain import (
     ClassificationError,
     audition_group,
 )
-from .packets import resolution_digest, write_classifications
+from .packets import resolution_digest, withdraw_published_playlists, write_classifications
 
 
 @dataclass(frozen=True)
@@ -427,6 +427,11 @@ class ReviewSession:
         benchmark = metadata.get("benchmark")
         if isinstance(benchmark, dict):
             benchmark.update({"ready": False, "passed": False})
+        if metadata.get("audio_playlists_published"):
+            withdraw_published_playlists(
+                self.path.parent,
+                str(metadata.get("published_digest") or self.queue.classification_digest),
+            )
         metadata["audio_playlists_published"] = False
         metadata.pop("resolution_digest", None)
         metadata.pop("published_digest", None)
@@ -529,6 +534,12 @@ def finalise_review(packet_dir: Path, queue: ReviewQueue) -> BenchmarkScore:
         raise ClassificationError(f"invalid packet metadata: {exc}") from exc
     if metadata.get("classification_digest") != queue.classification_digest:
         raise ClassificationError("packet metadata has a stale classification digest")
+
+    if metadata.get("audio_playlists_published"):
+        withdraw_published_playlists(
+            packet_dir,
+            str(metadata.get("published_digest") or queue.classification_digest),
+        )
 
     write_classifications(packet_dir / "classification.tsv", queue.resolved_classifications())
     benchmark_path = packet_dir / "benchmark-labels.tsv"

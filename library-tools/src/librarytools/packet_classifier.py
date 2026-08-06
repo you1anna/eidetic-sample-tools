@@ -56,6 +56,7 @@ from .classification.packets import (
     CLASSIFICATION_FIELDS,
     classification_digest,
     read_classifications,
+    withdraw_published_playlists,
     write_classification_audit,
     write_classifications,
 )
@@ -248,6 +249,11 @@ def classify_packet(
     benchmark_metadata = dict(previous_benchmark) if isinstance(previous_benchmark, dict) else {}
     benchmark_metadata.update({"ready": False, "passed": False})
     metadata["benchmark"] = benchmark_metadata
+    if metadata.get("audio_playlists_published"):
+        withdraw_published_playlists(
+            labels_path.parent,
+            str(metadata.get("published_digest") or metadata.get("classification_digest", "")),
+        )
     metadata["audio_playlists_published"] = False
     metadata.pop("published_digest", None)
     metadata.pop("resolution_digest", None)

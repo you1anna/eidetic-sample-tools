@@ -99,6 +99,48 @@ def resolution_digest(
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
+def withdraw_published_playlists(
+    packet_dir: Path,
+    publication_digest: str,
+) -> Path | None:
+    """Atomically withdraw playable packet links into a recoverable stale archive."""
+    sources = [packet_dir / "playlists", packet_dir / "audition.m3u8"]
+    sources = [path for path in sources if path.exists() or path.is_symlink()]
+    if not sources:
+        return None
+
+    digest = str(publication_digest)
+    if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+        digest = hashlib.sha256(digest.encode("utf-8")).hexdigest()
+    parent = packet_dir / "archive" / "stale-publications"
+    parent.mkdir(parents=True, exist_ok=True)
+    target = parent / digest
+    suffix = 2
+    while target.exists() or target.is_symlink():
+        target = parent / f"{digest}-{suffix}"
+        suffix += 1
+    staging = parent / f".{target.name}.incomplete"
+    while staging.exists() or staging.is_symlink():
+        staging = parent / f".{target.name}.{suffix}.incomplete"
+        suffix += 1
+    staging.mkdir()
+    moved: list[tuple[Path, Path]] = []
+    try:
+        for source in sources:
+            destination = staging / source.name
+            source.replace(destination)
+            moved.append((source, destination))
+        staging.replace(target)
+    except OSError as exc:
+        for source, destination in reversed(moved):
+            if destination.exists() or destination.is_symlink():
+                destination.replace(source)
+        if staging.exists():
+            staging.rmdir()
+        raise ClassificationError(f"cannot withdraw stale playlist publication: {exc}") from exc
+    return target
+
+
 def write_classification_audit(
     path: Path,
     candidates: Sequence[CandidateClassification],
