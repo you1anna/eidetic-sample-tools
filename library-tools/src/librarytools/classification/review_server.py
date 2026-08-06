@@ -57,7 +57,22 @@ def load_review_packet(
     audited = {(candidate.sample_id, candidate.current_path.as_posix()) for candidate in candidates}
     if labelled != audited or len(rows) != len(candidates):
         raise ClassificationError("classification audit does not match labels.tsv membership")
-    session = ReviewSession.open(packet_dir / "review-state.json", candidates, digest)
+    try:
+        with (packet_dir / "benchmark-labels.tsv").open(encoding="utf-8", newline="") as fh:
+            benchmark_rows = list(csv.DictReader(fh, delimiter="\t"))
+    except OSError as exc:
+        raise ClassificationError(f"cannot read frozen benchmark: {exc}") from exc
+    benchmark_sample_ids = tuple(row.get("sample_id", "") for row in benchmark_rows)
+    if len(benchmark_sample_ids) != 24 or len(set(benchmark_sample_ids)) != 24:
+        raise ClassificationError("frozen benchmark must contain 24 unique samples")
+    session = ReviewSession.open(
+        packet_dir / "review-state.json",
+        candidates,
+        digest,
+        benchmark_sample_ids=benchmark_sample_ids,
+    )
+    if session.queue.gate().passed and metadata.get("resolution_digest") != session.queue.resolution_digest():
+        finalise_review(packet_dir, session.queue)
     return root, session, candidates
 
 

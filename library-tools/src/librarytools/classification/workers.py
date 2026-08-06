@@ -93,7 +93,7 @@ class EmbeddingWorker:
         misses: list[SampleRef] = []
         cache_hits = 0
         for sample in samples:
-            cached = cache.get(_key(sample, spec))
+            cached = cache.get(_key(sample, spec), expected_dimensions=spec.embedding_dimensions)
             if cached is None:
                 misses.append(sample)
             elif cached.size != spec.embedding_dimensions:
@@ -106,7 +106,12 @@ class EmbeddingWorker:
 
         prompt_key = prompt_policy(prompts) if prompts else ""
         prompt_embeddings = (
-            cache.get_prompt_set(spec.model_id, spec.revision, prompt_key) if prompts else None
+            cache.get_prompt_set(
+                spec.model_id,
+                spec.revision,
+                prompt_key,
+                expected_dimensions=spec.embedding_dimensions,
+            ) if prompts else None
         )
         prompt_cache_hit = bool(
             prompts and prompt_embeddings is not None and set(prompt_embeddings) == set(prompts)
@@ -276,12 +281,19 @@ def generate_model_votes(
         )
         reports.append(report)
         del worker
-        prompt_vectors = cache.get_prompt_set(spec.model_id, spec.revision, policy)
+        prompt_vectors = cache.get_prompt_set(
+            spec.model_id,
+            spec.revision,
+            policy,
+            expected_dimensions=spec.embedding_dimensions,
+        )
         if prompt_vectors is None or set(prompt_vectors) != set(prompts):
             raise ClassificationError(f"missing cached prompt embeddings for {spec.model_id}")
         scorer = ClapScorer(spec)
         for sample in samples:
-            audio = cache.get(_key(sample, spec))
+            audio = cache.get(
+                _key(sample, spec), expected_dimensions=spec.embedding_dimensions,
+            )
             if audio is None:
                 raise ClassificationError(
                     f"missing cached audio embedding for {sample.sample_id} using {spec.model_id}"

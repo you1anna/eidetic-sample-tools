@@ -11,6 +11,7 @@ from librarytools.classification.ensemble import build_candidate
 from librarytools.classification.packets import (
     classification_digest,
     read_classification_audit,
+    resolution_digest,
     write_classification_audit,
 )
 from librarytools.classification.review import (
@@ -79,6 +80,19 @@ def test_queue_contains_all_exceptions_and_one_deterministic_sentinel_per_group(
     ]
 
 
+def test_queue_requires_explicit_decisions_for_every_frozen_benchmark_sample() -> None:
+    candidates = [_candidate(index) for index in range(30)]
+    required = tuple(candidate.sample_id for candidate in candidates[:24])
+
+    queue = ReviewQueue.build(candidates, "digest", benchmark_sample_ids=required)
+
+    assert set(required) <= {item.sample_id for item in queue.items}
+    assert all(
+        any(item.sample_id == sample_id and item.kind in {"exception", "benchmark"} for item in queue.items)
+        for sample_id in required
+    )
+
+
 def test_failed_sentinel_reopens_its_automatic_group() -> None:
     candidates = [_candidate(1), _candidate(2), _candidate(3)]
     queue = ReviewQueue.build(candidates, "digest")
@@ -95,7 +109,8 @@ def test_failed_sentinel_reopens_its_automatic_group() -> None:
     for item in list(pending):
         queue.apply_decision(item.sample_id, "ONE_SHOT", "PERCUSSION", "checked")
     assert queue.gate().passed is True
-    assert queue.gate().failed_sentinel_groups == ("percussion-one-shots",)
+    assert queue.gate().failed_sentinel_groups == ()
+    assert queue.gate().escalated_sentinel_groups == ("percussion-one-shots",)
 
 
 def test_review_session_persists_resumes_undoes_and_rejects_stale_digest(tmp_path) -> None:
@@ -171,12 +186,37 @@ def test_carried_confirmation_covers_a_fresh_blind_sentinel_in_the_same_group(tm
     assert carried.queue.gate().passed is True
 
 
+def test_only_a_proven_blind_sentinel_can_cover_a_fresh_sentinel(tmp_path) -> None:
+    state_path = tmp_path / "review-state.json"
+    candidates = [_candidate(1), _candidate(2), _candidate(3)]
+    required = (candidates[0].sample_id,)
+    first = ReviewSession.open(
+        state_path, candidates, "digest-one", benchmark_sample_ids=required,
+    )
+    benchmark = next(item for item in first.queue.pending() if item.kind == "benchmark")
+    first.apply_decision(
+        benchmark.sample_id, benchmark.predicted_form, benchmark.predicted_content, "heard",
+    )
+
+    carried = ReviewSession.begin(
+        state_path,
+        candidates,
+        "digest-two",
+        benchmark_sample_ids=required,
+        carry_decisions=True,
+    )
+
+    assert any(item.kind == "sentinel" for item in carried.queue.pending())
+
+
 def test_completed_review_regenerates_benchmark_without_manual_tsv_edits(tmp_path) -> None:
     candidates = [_candidate(index) for index in range(24)]
-    queue = ReviewQueue.build(candidates, "digest")
+    required = tuple(candidate.sample_id for candidate in candidates)
+    queue = ReviewQueue.build(candidates, "digest", benchmark_sample_ids=required)
     for item in list(queue.pending()):
         queue.apply_decision(item.sample_id, item.predicted_form, item.predicted_content, "sentinel")
     path = tmp_path / "benchmark-labels.tsv"
+    _write_blank_benchmark(path, candidates)
     score = write_review_benchmark(path, queue)
 
     rows = list(csv.DictReader(path.open(encoding="utf-8"), delimiter="\t"))
@@ -187,7 +227,9 @@ def test_completed_review_regenerates_benchmark_without_manual_tsv_edits(tmp_pat
 
 def test_completed_tuning_review_preserves_existing_benchmark_membership_and_strata(tmp_path) -> None:
     candidates = [_candidate(index) for index in range(24)]
-    queue = ReviewQueue.build(candidates, "digest")
+    queue = ReviewQueue.build(
+        candidates, "digest", benchmark_sample_ids=tuple(item.sample_id for item in candidates),
+    )
     for item in list(queue.pending()):
         queue.apply_decision(item.sample_id, item.predicted_form, item.predicted_content, "heard")
     path = tmp_path / "benchmark-labels.tsv"
@@ -241,7 +283,11 @@ def test_finalise_review_writes_classifications_and_digest_bound_gate(tmp_path) 
         "classification_digest": digest,
         "classification_context": context,
     }), encoding="utf-8")
-    session = ReviewSession.open(tmp_path / "review-state.json", candidates, digest)
+    required = tuple(candidate.sample_id for candidate in candidates)
+    _write_blank_benchmark(tmp_path / "benchmark-labels.tsv", candidates)
+    session = ReviewSession.open(
+        tmp_path / "review-state.json", candidates, digest, benchmark_sample_ids=required,
+    )
     for item in list(session.queue.pending()):
         session.apply_decision(
             item.sample_id, item.predicted_form, item.predicted_content, "confirmed",
@@ -254,4 +300,47 @@ def test_finalise_review_writes_classifications_and_digest_bound_gate(tmp_path) 
     assert metadata["review"]["passed"] is True
     assert metadata["review"]["classification_digest"] == digest
     assert metadata["benchmark"]["passed"] is True
+    assert metadata["resolution_digest"] == session.queue.resolution_digest()
     assert (tmp_path / "classification.tsv").is_file()
+
+    session.undo()
+    invalidated = json.loads((tmp_path / "packet-meta.json").read_text(encoding="utf-8"))
+    assert invalidated["review"]["passed"] is False
+    assert invalidated["benchmark"]["passed"] is False
+    assert invalidated["audio_playlists_published"] is False
+    assert "resolution_digest" not in invalidated
+    assert "published_digest" not in invalidated
+
+
+def test_resolution_digest_changes_with_human_form_or_content() -> None:
+    candidate = "a" * 64
+    first = resolution_digest("candidate-digest", [{
+        "sample_id": candidate, "form": "ONE_SHOT", "content": "RIM",
+    }])
+    second = resolution_digest("candidate-digest", [{
+        "sample_id": candidate, "form": "ONE_SHOT", "content": "TOM",
+    }])
+    assert first != second
+
+
+def _write_blank_benchmark(path: Path, candidates) -> None:
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=(
+            "sample_id", "current_path", "stratum", "predicted_form", "predicted_content",
+            "predicted_audition_group", "true_form", "true_content",
+            "true_audition_group", "notes",
+        ), delimiter="\t")
+        writer.writeheader()
+        strata = (
+            "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+            "out-of-brief", "control",
+        )
+        for index, candidate in enumerate(candidates):
+            writer.writerow({
+                "sample_id": candidate.sample_id,
+                "current_path": candidate.current_path,
+                "stratum": strata[index // 4],
+                "predicted_form": candidate.form.label,
+                "predicted_content": candidate.content.label,
+                "predicted_audition_group": candidate.audition_group,
+            })

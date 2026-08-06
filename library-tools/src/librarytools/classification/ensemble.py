@@ -42,12 +42,9 @@ def classify_form(evidence: AcousticEvidence) -> AxisDecision:
         return AxisDecision("LONG_FORM", 0.95, True)
 
     one_shot = (
-        evidence.onset_count <= 2
+        evidence.duration_s <= 1.0
+        and evidence.onset_count <= 2
         and evidence.periodicity < 0.25
-        and (
-            evidence.duration_s <= 1.0
-            or (evidence.silence_ratio >= 0.80 and evidence.tail_ms <= 500.0)
-        )
     )
     if one_shot:
         confidence = min(0.98, 0.86 + max(0.0, 1.0 - evidence.duration_s) * 0.10)

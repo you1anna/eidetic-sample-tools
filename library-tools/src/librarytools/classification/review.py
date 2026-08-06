@@ -27,7 +27,7 @@ from .domain import (
     ClassificationError,
     audition_group,
 )
-from .packets import write_classifications
+from .packets import resolution_digest, write_classifications
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,8 @@ class ReviewDecision:
     form: str
     content: str
     notes: str = ""
+    kind: str = "legacy"
+    audition_group: str = ""
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,7 @@ class GateResult:
     unresolved: int
     classification_digest: str
     failed_sentinel_groups: tuple[str, ...] = ()
+    escalated_sentinel_groups: tuple[str, ...] = ()
 
 
 class ReviewQueue:
@@ -76,6 +79,7 @@ class ReviewQueue:
         cls,
         candidates: Sequence[CandidateClassification],
         classification_digest: str,
+        benchmark_sample_ids: Sequence[str] = (),
     ) -> ReviewQueue:
         exceptions = sorted(
             (candidate for candidate in candidates if candidate.review_reasons),
@@ -85,6 +89,16 @@ class ReviewQueue:
             ),
         )
         items = [_item(candidate, "exception") for candidate in exceptions]
+        existing = {item.sample_id for item in items}
+        for sample_id in benchmark_sample_ids:
+            candidate = next(
+                (item for item in candidates if item.sample_id == sample_id), None,
+            )
+            if candidate is None:
+                raise ClassificationError(f"benchmark sample is absent from candidates: {sample_id}")
+            if sample_id not in existing:
+                items.append(_item(candidate, "benchmark"))
+                existing.add(sample_id)
         automatic = [candidate for candidate in candidates if not candidate.review_reasons]
         for group in AUDITION_GROUPS:
             members = [candidate for candidate in automatic if candidate.audition_group == group]
@@ -96,7 +110,9 @@ class ReviewQueue:
                     f"{classification_digest}:{candidate.sample_id}".encode("utf-8")
                 ).hexdigest(),
             )
-            items.append(_item(sentinel, "sentinel"))
+            if sentinel.sample_id not in existing:
+                items.append(_item(sentinel, "sentinel"))
+                existing.add(sentinel.sample_id)
         return cls(candidates, classification_digest, items)
 
     @property
@@ -134,9 +150,17 @@ class ReviewQueue:
     def apply_decision(self, sample_id: str, form: str, content: str, notes: str = "") -> None:
         if form not in FORMS or content not in CONTENTS:
             raise ClassificationError("review decision has an invalid form or content")
-        if sample_id not in {item.sample_id for item in self.pending()}:
+        item = next((item for item in self.pending() if item.sample_id == sample_id), None)
+        if item is None:
             raise ClassificationError(f"sample is not pending review: {sample_id}")
-        self._decisions.append(ReviewDecision(sample_id, form, content, notes.strip()))
+        self._decisions.append(ReviewDecision(
+            sample_id,
+            form,
+            content,
+            notes.strip(),
+            item.kind,
+            item.audition_group,
+        ))
 
     def restore_decision(self, decision: ReviewDecision) -> None:
         """Restore a digest-bound or explicitly carried human decision by sample identity."""
@@ -151,6 +175,8 @@ class ReviewQueue:
             decision.form,
             decision.content,
             decision.notes.strip(),
+            decision.kind,
+            decision.audition_group,
         ))
 
     def undo(self) -> ReviewDecision:
@@ -189,6 +215,8 @@ class ReviewQueue:
             candidate = self._candidates[decision.sample_id]
             if (
                 candidate.automatic
+                and decision.kind == "sentinel"
+                and decision.audition_group == candidate.audition_group
                 and decision.form == candidate.form.label
                 and decision.content == candidate.content.label
                 and candidate.audition_group not in excluded
@@ -196,14 +224,34 @@ class ReviewQueue:
                 groups.add(candidate.audition_group)
         return tuple(group for group in AUDITION_GROUPS if group in groups)
 
+    def resolution_digest(self) -> str:
+        return resolution_digest(
+            self.classification_digest,
+            [
+                {
+                    "sample_id": decision.sample_id,
+                    "form": decision.form,
+                    "content": decision.content,
+                }
+                for decision in self._decisions
+            ],
+        )
+
     def gate(self) -> GateResult:
-        unresolved = len(self.pending())
+        pending = self.pending()
+        unresolved = len(pending)
+        escalated = self.failed_sentinel_groups()
+        active_failed = tuple(
+            group for group in escalated
+            if any(item.audition_group == group for item in pending)
+        )
         return GateResult(
             ready=unresolved == 0,
             passed=unresolved == 0,
             unresolved=unresolved,
             classification_digest=self.classification_digest,
-            failed_sentinel_groups=self.failed_sentinel_groups(),
+            failed_sentinel_groups=active_failed,
+            escalated_sentinel_groups=escalated,
         )
 
     def resolved_classifications(self) -> list[Classification]:
@@ -246,6 +294,7 @@ class ReviewSession:
         *,
         restart: bool = False,
         carry_decisions: bool = False,
+        benchmark_sample_ids: Sequence[str] = (),
     ) -> ReviewSession:
         """Start a classifier run without silently discarding human review work."""
         carried_decisions: list[object] = []
@@ -275,7 +324,12 @@ class ReviewSession:
                     path.replace(target)
                 else:
                     path.unlink()
-        session = cls.open(path, candidates, classification_digest)
+        session = cls.open(
+            path,
+            candidates,
+            classification_digest,
+            benchmark_sample_ids=benchmark_sample_ids,
+        )
         if carried_decisions:
             for raw_decision in carried_decisions:
                 try:
@@ -284,6 +338,8 @@ class ReviewSession:
                         form=str(raw_decision["form"]),
                         content=str(raw_decision["content"]),
                         notes=str(raw_decision.get("notes", "")),
+                        kind=str(raw_decision.get("kind", "legacy")),
+                        audition_group=str(raw_decision.get("audition_group", "")),
                     ))
                 except (KeyError, TypeError, ClassificationError) as exc:
                     raise ClassificationError(f"cannot carry review decision: {exc}") from exc
@@ -296,26 +352,46 @@ class ReviewSession:
         path: Path,
         candidates: Sequence[CandidateClassification],
         classification_digest: str,
+        benchmark_sample_ids: Sequence[str] = (),
     ) -> ReviewSession:
-        queue = ReviewQueue.build(candidates, classification_digest)
+        queue = ReviewQueue.build(
+            candidates,
+            classification_digest,
+            benchmark_sample_ids=benchmark_sample_ids,
+        )
         session = cls(path, queue)
         if path.is_file():
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise ClassificationError(f"invalid review state: {exc}") from exc
-            if raw.get("schema_version") != 1 or raw.get("classification_digest") != classification_digest:
+            schema_version = raw.get("schema_version")
+            if schema_version not in {1, 2} or raw.get("classification_digest") != classification_digest:
                 raise ClassificationError("stale review state does not match current classification")
             try:
                 for decision in raw.get("decisions", []):
+                    base_item = next(
+                        (
+                            item for item in queue._base_items
+                            if item.sample_id == str(decision["sample_id"])
+                        ),
+                        None,
+                    )
                     queue.restore_decision(ReviewDecision(
                         str(decision["sample_id"]),
                         str(decision["form"]),
                         str(decision["content"]),
                         str(decision.get("notes", "")),
+                        str(decision.get("kind", base_item.kind if base_item else "legacy")),
+                        str(decision.get(
+                            "audition_group",
+                            base_item.audition_group if base_item else "",
+                        )),
                     ))
             except (KeyError, TypeError, ClassificationError) as exc:
                 raise ClassificationError(f"invalid review state: {exc}") from exc
+            if schema_version == 1:
+                session._save()
         else:
             session._save()
         return session
@@ -327,13 +403,42 @@ class ReviewSession:
     def undo(self) -> ReviewDecision:
         decision = self.queue.undo()
         self._save()
+        self._invalidate_completion()
         return decision
+
+    def _invalidate_completion(self) -> None:
+        metadata_path = self.path.parent / "packet-meta.json"
+        if not metadata_path.is_file():
+            return
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ClassificationError(f"invalid packet metadata: {exc}") from exc
+        gate = self.queue.gate()
+        metadata["review"] = {
+            "state": "pending",
+            "ready": False,
+            "passed": False,
+            "unresolved": gate.unresolved,
+            "classification_digest": self.queue.classification_digest,
+            "failed_sentinel_groups": list(gate.failed_sentinel_groups),
+            "escalated_sentinel_groups": list(gate.escalated_sentinel_groups),
+        }
+        benchmark = metadata.get("benchmark")
+        if isinstance(benchmark, dict):
+            benchmark.update({"ready": False, "passed": False})
+        metadata["audio_playlists_published"] = False
+        metadata.pop("resolution_digest", None)
+        metadata.pop("published_digest", None)
+        temporary = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
+        temporary.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(metadata_path)
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "classification_digest": self.queue.classification_digest,
             "decisions": [asdict(decision) for decision in self.queue.decisions],
         }
@@ -345,7 +450,6 @@ class ReviewSession:
 
 
 def write_review_benchmark(path: Path, queue: ReviewQueue) -> BenchmarkScore:
-    resolved = {row.sample_id: row for row in queue.resolved_classifications()}
     predicted = [
         Classification(
             sample_id=candidate.sample_id,
@@ -360,30 +464,41 @@ def write_review_benchmark(path: Path, queue: ReviewQueue) -> BenchmarkScore:
         )
         for candidate in queue._candidates.values()
     ]
-    if len(read_benchmark_truth(path)) == 24:
-        return score_benchmark(
-            refresh_benchmark_predictions(path, {row.sample_id: row for row in predicted})
-        )
-    strata = benchmark_strata(predicted)
+    try:
+        with path.open(encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh, delimiter="\t")
+            if tuple(reader.fieldnames or ()) != BENCHMARK_FIELDS:
+                raise ClassificationError("benchmark-labels.tsv has an unexpected schema")
+            benchmark_rows = list(reader)
+    except OSError as exc:
+        raise ClassificationError(f"cannot read frozen benchmark: {exc}") from exc
+    if len(benchmark_rows) != 24:
+        raise ClassificationError("frozen benchmark must contain exactly 24 samples")
+    predicted_by_id = {row.sample_id: row for row in predicted}
     decisions = {decision.sample_id: decision for decision in queue.decisions}
     saved: list[dict[str, str]] = []
     merged: list[dict[str, str]] = []
-    for row in sorted(predicted, key=lambda item: item.sample_id):
-        if row.sample_id not in strata:
-            continue
-        truth = resolved[row.sample_id]
+    for raw in benchmark_rows:
+        row = predicted_by_id.get(raw["sample_id"])
+        if row is None or Path(raw["current_path"]) != row.current_path:
+            raise ClassificationError(f"frozen benchmark sample is stale: {raw['sample_id']}")
         decision = decisions.get(row.sample_id)
+        if decision is None:
+            raise ClassificationError(
+                f"benchmark sample lacks an explicit human decision: {row.sample_id}"
+            )
+        true_group = audition_group(decision.form, decision.content)
         saved_row = {
             "sample_id": row.sample_id,
             "current_path": row.current_path.as_posix(),
-            "stratum": strata[row.sample_id],
+            "stratum": raw["stratum"],
             "predicted_form": row.form,
             "predicted_content": row.content,
             "predicted_audition_group": row.audition_group,
-            "true_form": truth.form,
-            "true_content": truth.content,
-            "true_audition_group": truth.audition_group,
-            "notes": decision.notes if decision else "automatic consensus",
+            "true_form": decision.form,
+            "true_content": decision.content,
+            "true_audition_group": true_group,
+            "notes": decision.notes,
         }
         saved.append(saved_row)
         merged.append({
@@ -427,7 +542,9 @@ def finalise_review(packet_dir: Path, queue: ReviewQueue) -> BenchmarkScore:
         "passed": True,
         "unresolved": 0,
         "classification_digest": queue.classification_digest,
+        "resolution_digest": queue.resolution_digest(),
         "failed_sentinel_groups": list(gate.failed_sentinel_groups),
+        "escalated_sentinel_groups": list(gate.escalated_sentinel_groups),
     }
     metadata["benchmark"] = {
         "path": benchmark_path.name,
@@ -439,6 +556,9 @@ def finalise_review(packet_dir: Path, queue: ReviewQueue) -> BenchmarkScore:
         "content_group_correct": score.content_group_correct,
         "total": score.total,
     }
+    metadata["resolution_digest"] = queue.resolution_digest()
+    metadata["audio_playlists_published"] = False
+    metadata.pop("published_digest", None)
     temporary = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
     temporary.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     temporary.replace(metadata_path)

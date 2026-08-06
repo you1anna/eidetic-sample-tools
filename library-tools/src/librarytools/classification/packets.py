@@ -7,7 +7,7 @@ import hashlib
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from .domain import (
     AUDITION_GROUPS,
@@ -67,6 +67,35 @@ def classification_digest(
     if len(sample_ids) != len(set(sample_ids)):
         raise ClassificationError("classification candidates contain duplicate sample IDs")
     payload = {"schema_version": 1, "context": context, "candidates": records}
+    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def resolution_digest(
+    candidate_digest: str,
+    resolutions: Sequence[Mapping[str, str]],
+) -> str:
+    """Bind human form/content resolutions to one candidate classifier snapshot."""
+    records = sorted(
+        (
+            {
+                "sample_id": str(item.get("sample_id", "")),
+                "form": str(item.get("form", "")),
+                "content": str(item.get("content", "")),
+            }
+            for item in resolutions
+        ),
+        key=lambda item: item["sample_id"],
+    )
+    sample_ids = [item["sample_id"] for item in records]
+    if not candidate_digest or any(not value for value in sample_ids):
+        raise ClassificationError("resolution digest requires candidate and sample identities")
+    if len(sample_ids) != len(set(sample_ids)):
+        raise ClassificationError("resolution digest contains duplicate sample IDs")
+    payload = {
+        "schema_version": 1,
+        "classification_digest": candidate_digest,
+        "resolutions": records,
+    }
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 

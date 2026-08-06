@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from pathlib import Path
 from typing import Mapping
 
@@ -36,8 +36,9 @@ from .classification.domain import (
     AcousticEvidence,
     Classification,
     ClassificationError,
+    audition_group,
 )
-from .classification.ensemble import build_candidate, select_model_weights
+from .classification.ensemble import build_candidate, classify_form, select_model_weights
 from .classification.models import (
     CONTENT_PROMPTS,
     MODEL_ID,
@@ -126,27 +127,32 @@ def classify_packet(
         measured.append((raw["sample_id"], rel, source, evidence))
 
     if scorer is not None:
-        raw_candidates = [
-            RawCandidate(sample_id, rel, evidence, scorer.score(source))
-            for sample_id, rel, source, evidence in measured
-        ]
-        truth = _read_benchmark_truth(benchmark_path)
-        config = calibrate_config(raw_candidates, truth) if len(truth) == 24 else DEFAULT_CONFIG
         classifications = []
-        for item in raw_candidates:
-            predicted = classify_evidence(
-                item.current_path, item.evidence, item.semantic_scores, config=config,
-            )
-            classifications.append(replace(
-                predicted,
-                sample_id=item.sample_id,
-                current_path=item.current_path,
+        for sample_id, rel, source, evidence in measured:
+            scores = {
+                label: max(0.0, float(value))
+                for label, value in scorer.score(source).items()
+            }
+            if not scores or not sum(scores.values()):
+                raise PacketClassifierError("semantic scorer returned no usable audio scores")
+            content, content_score = max(scores.items(), key=lambda item: (item[1], item[0]))
+            form = classify_form(evidence)
+            classifications.append(Classification(
+                sample_id=sample_id,
+                current_path=rel,
+                form=form.label,
+                content=content,
+                audition_group=audition_group(form.label, content),
+                form_confidence=form.confidence,
+                content_confidence=content_score / sum(scores.values()),
+                evidence="audio-only injected semantic scorer",
+                classifier_version="audio-only-test-adapter",
             ))
         classifier_metadata = {
-            "version": "hybrid-v1",
+            "version": "audio-only-test-adapter",
             "model_id": MODEL_ID,
             "model_revision": scorer.revision,
-            "config": asdict(config),
+            "filename_weight": 0.0,
         }
         candidates = None
         candidate_digest = None
@@ -231,7 +237,7 @@ def classify_packet(
             "ensemble_weights": list(calibration.weights),
             "filename_weight": 0.0,
         }
-        candidate_digest = classification_digest(candidates, digest_context)
+        candidate_digest = None
 
     # Revoke any previous pass before changing classifier-derived output.  If this
     # run fails afterwards, `playlists` must not trust a gate scored against older
@@ -242,12 +248,24 @@ def classify_packet(
     benchmark_metadata = dict(previous_benchmark) if isinstance(previous_benchmark, dict) else {}
     benchmark_metadata.update({"ready": False, "passed": False})
     metadata["benchmark"] = benchmark_metadata
+    metadata["audio_playlists_published"] = False
+    metadata.pop("published_digest", None)
+    metadata.pop("resolution_digest", None)
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
     classification_path = labels_path.parent / "classification.tsv"
     write_classifications(classification_path, classifications)
     by_id = {row.sample_id: row for row in classifications}
-    if candidates is not None and candidate_digest is not None:
+    if candidates is not None:
+        if not restart_review and len(_read_benchmark_truth(benchmark_path)) == 24:
+            benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
+        else:
+            strata = benchmark_strata(classifications)
+            write_benchmark_sheet(benchmark_path, classifications, strata)
+            benchmark_rows = read_benchmark_with_predictions(benchmark_path, by_id)
+        benchmark_sample_ids = tuple(row["sample_id"] for row in benchmark_rows)
+        digest_context["benchmark_sample_ids"] = list(benchmark_sample_ids)
+        candidate_digest = classification_digest(candidates, digest_context)
         write_classification_audit(
             labels_path.parent / "classification-audit.jsonl",
             candidates,
@@ -258,13 +276,8 @@ def classify_packet(
             candidate_digest,
             restart=restart_review,
             carry_decisions=carry_review,
+            benchmark_sample_ids=benchmark_sample_ids,
         )
-        if not restart_review and len(_read_benchmark_truth(benchmark_path)) == 24:
-            benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
-        else:
-            strata = benchmark_strata(classifications)
-            write_benchmark_sheet(benchmark_path, classifications, strata)
-            benchmark_rows = read_benchmark_with_predictions(benchmark_path, by_id)
     elif benchmark_path.is_file():
         benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
     else:
@@ -299,6 +312,7 @@ def classify_packet(
             "unresolved": gate.unresolved,
             "classification_digest": gate.classification_digest,
             "failed_sentinel_groups": list(gate.failed_sentinel_groups),
+            "escalated_sentinel_groups": list(gate.escalated_sentinel_groups),
         }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     if candidates is not None and session.queue.gate().passed:

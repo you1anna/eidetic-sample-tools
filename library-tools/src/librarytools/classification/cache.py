@@ -65,7 +65,7 @@ class EmbeddingCache:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def get(self, key: EmbeddingKey) -> np.ndarray | None:
+    def get(self, key: EmbeddingKey, *, expected_dimensions: int | None = None) -> np.ndarray | None:
         with self._connect() as conn:
             row = conn.execute(
                 """
@@ -78,11 +78,20 @@ class EmbeddingCache:
             return None
         dimensions = int(row["dimensions"])
         payload = bytes(row["embedding"])
-        if row["dtype"] != "float16" or len(payload) != dimensions * np.dtype(np.float16).itemsize:
+        if (
+            row["dtype"] != "float16"
+            or len(payload) != dimensions * np.dtype(np.float16).itemsize
+            or (expected_dimensions is not None and dimensions != expected_dimensions)
+        ):
             raise ClassificationError(
                 f"corrupt cached embedding for {key.sample_id} using {key.model_id}"
             )
-        return np.frombuffer(payload, dtype=np.float16).astype(np.float32)
+        vector = np.frombuffer(payload, dtype=np.float16).astype(np.float32)
+        if not np.all(np.isfinite(vector)) or not float(np.linalg.norm(vector)):
+            raise ClassificationError(
+                f"corrupt cached embedding for {key.sample_id} using {key.model_id}"
+            )
+        return vector
 
     def put(self, key: EmbeddingKey, embedding: np.ndarray) -> None:
         self.put_many([(key, embedding)])
@@ -131,6 +140,8 @@ class EmbeddingCache:
         model_id: str,
         model_revision: str,
         prompt_policy: str,
+        *,
+        expected_dimensions: int | None = None,
     ) -> dict[str, np.ndarray] | None:
         with self._connect() as conn:
             rows = conn.execute(
@@ -146,11 +157,20 @@ class EmbeddingCache:
         for row in rows:
             dimensions = int(row["dimensions"])
             payload = bytes(row["embedding"])
-            if row["dtype"] != "float16" or len(payload) != dimensions * 2:
+            if (
+                row["dtype"] != "float16"
+                or len(payload) != dimensions * 2
+                or (expected_dimensions is not None and dimensions != expected_dimensions)
+            ):
                 raise ClassificationError(
                     f"corrupt cached prompt embedding for {model_id}:{row['label']}"
                 )
-            restored[str(row["label"])] = np.frombuffer(payload, dtype=np.float16).astype(np.float32)
+            vector = np.frombuffer(payload, dtype=np.float16).astype(np.float32)
+            if not np.all(np.isfinite(vector)) or not float(np.linalg.norm(vector)):
+                raise ClassificationError(
+                    f"corrupt cached prompt embedding for {model_id}:{row['label']}"
+                )
+            restored[str(row["label"])] = vector
         return restored
 
     def put_prompt_set(

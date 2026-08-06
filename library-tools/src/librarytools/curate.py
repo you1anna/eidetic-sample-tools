@@ -201,6 +201,8 @@ def write_audition_playlists(
     root: Path,
     labels_path: Path,
     classification_path: Path,
+    *,
+    archive_rejected: bool = False,
 ) -> dict[str, Path]:
     rows = read_labels(labels_path)
     try:
@@ -269,6 +271,8 @@ def write_audition_playlists(
 
         previous_playlists = publish_root / "previous-playlists"
         previous_combined = publish_root / "previous-audition.m3u8"
+        archive_target = output_dir / "archive" / "name-derived-playlists"
+        archive_created = False
         try:
             if playlists_dir.exists() or playlists_dir.is_symlink():
                 playlists_dir.replace(previous_playlists)
@@ -276,7 +280,21 @@ def write_audition_playlists(
                 combined_path.replace(previous_combined)
             staged_playlists.replace(playlists_dir)
             staged_combined.replace(combined_path)
+            if archive_rejected and previous_playlists.exists() and not archive_target.exists():
+                archive_target.parent.mkdir(parents=True, exist_ok=True)
+                archive_created = True
+                shutil.copytree(previous_playlists, archive_target)
+                if previous_combined.is_file():
+                    shutil.copy2(
+                        previous_combined,
+                        archive_target.parent / "name-derived-audition.m3u8",
+                    )
         except OSError:
+            if archive_created and archive_target.exists():
+                shutil.rmtree(archive_target)
+                archived_combined = archive_target.parent / "name-derived-audition.m3u8"
+                if archived_combined.exists():
+                    archived_combined.unlink()
             if playlists_dir.exists() or playlists_dir.is_symlink():
                 if playlists_dir.is_dir() and not playlists_dir.is_symlink():
                     shutil.rmtree(playlists_dir)
@@ -335,13 +353,26 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
             )
             if classification_digest(candidates, context) != digest:
                 raise CurationError("classification audit digest does not match packet metadata")
+            with (labels_path.parent / "benchmark-labels.tsv").open(
+                encoding="utf-8", newline="",
+            ) as benchmark_fh:
+                benchmark_sample_ids = tuple(
+                    row["sample_id"]
+                    for row in csv.DictReader(benchmark_fh, delimiter="\t")
+                )
+            if len(benchmark_sample_ids) != 24 or len(set(benchmark_sample_ids)) != 24:
+                raise CurationError("frozen benchmark must contain 24 unique samples")
             session = ReviewSession.open(
                 labels_path.parent / "review-state.json",
                 candidates,
                 digest,
+                benchmark_sample_ids=benchmark_sample_ids,
             )
             if not session.queue.gate().passed:
                 raise CurationError("exception review quality gate has not passed")
+            resolved_digest = session.queue.resolution_digest()
+            if metadata.get("resolution_digest") != resolved_digest:
+                raise CurationError("human resolution digest does not match packet metadata")
             expected = session.queue.resolved_classifications()
             actual = read_classifications(classification_path)
         except PacketClassifierError as exc:
@@ -355,12 +386,19 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
         )
         if [signature(row) for row in actual] != [signature(row) for row in expected]:
             raise CurationError("classification.tsv does not match completed review state")
-    if not metadata.get("audio_playlists_published"):
-        archive_rejected_playlists(labels_path.parent)
-    generated = write_audition_playlists(root_path, labels_path, classification_path)
+    should_archive = (
+        not metadata.get("audio_playlists_published")
+        and not (labels_path.parent / "archive" / "name-derived-playlists").exists()
+    )
+    generated = write_audition_playlists(
+        root_path,
+        labels_path,
+        classification_path,
+        archive_rejected=should_archive,
+    )
     metadata["audio_playlists_published"] = True
     if metadata.get("schema_version", 0) >= 3:
-        metadata["published_digest"] = metadata["classification_digest"]
+        metadata["published_digest"] = metadata["resolution_digest"]
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     return generated
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -124,17 +125,33 @@ def test_audio_stream_refuses_bytes_changed_after_classification(tmp_path) -> No
 def test_packet_loader_verifies_digest_and_label_membership(tmp_path) -> None:
     root = tmp_path / "SAMPLES"
     candidate, _ = _candidate(root)
+    candidates = [
+        replace(candidate, sample_id=f"{index:064x}", current_path=Path(f"PACK/{index}.wav"))
+        for index in range(24)
+    ]
     context = {"prompt_policy": "v1"}
-    digest = classification_digest([candidate], context)
+    digest = classification_digest(candidates, context)
     packet = tmp_path / "packet"
     packet.mkdir()
     labels = packet / "labels.tsv"
-    labels.write_text(
-        "sample_id\tcurrent_path\n"
-        f"{candidate.sample_id}\t{candidate.current_path.as_posix()}\n",
+    labels.write_text("sample_id\tcurrent_path\n" + "".join(
+        f"{item.sample_id}\t{item.current_path.as_posix()}\n" for item in candidates
+    ), encoding="utf-8")
+    write_classification_audit(packet / "classification-audit.jsonl", candidates)
+    strata = (
+        "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+        "out-of-brief", "control",
+    )
+    (packet / "benchmark-labels.tsv").write_text(
+        "sample_id\tcurrent_path\tstratum\tpredicted_form\tpredicted_content\t"
+        "predicted_audition_group\ttrue_form\ttrue_content\ttrue_audition_group\tnotes\n"
+        + "".join(
+            f"{item.sample_id}\t{item.current_path}\t{strata[index // 4]}\tONE_SHOT\tRIM\t"
+            "rim-one-shots\t\t\t\t\n"
+            for index, item in enumerate(candidates)
+        ),
         encoding="utf-8",
     )
-    write_classification_audit(packet / "classification-audit.jsonl", [candidate])
     (packet / "packet-meta.json").write_text(json.dumps({
         "schema_version": 3,
         "root": str(root),
@@ -144,7 +161,7 @@ def test_packet_loader_verifies_digest_and_label_membership(tmp_path) -> None:
 
     loaded_root, session, loaded = load_review_packet(labels)
     assert loaded_root == root.resolve()
-    assert loaded == [candidate]
+    assert loaded == candidates
     assert session.queue.classification_digest == digest
 
     metadata = json.loads((packet / "packet-meta.json").read_text(encoding="utf-8"))

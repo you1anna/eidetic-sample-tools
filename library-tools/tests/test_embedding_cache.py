@@ -50,6 +50,20 @@ def test_embedding_cache_rejects_corrupt_dimension_metadata(tmp_path) -> None:
         cache.get(key)
 
 
+@pytest.mark.parametrize("value", [np.nan, np.inf, 0.0])
+def test_embedding_cache_rejects_non_finite_or_zero_vectors(tmp_path, value) -> None:
+    database_path = tmp_path / "library.sqlite"
+    cache = EmbeddingCache(database_path)
+    key = EmbeddingKey("sample-1", "model-a", "revision-1", "three-10s-v1")
+    cache.put(key, np.ones(4, dtype=np.float32))
+    with sqlite3.connect(database_path) as conn:
+        payload = np.full(4, value, dtype=np.float16).tobytes()
+        conn.execute("update audio_embeddings set embedding=?", (payload,))
+
+    with pytest.raises(ClassificationError, match="corrupt cached embedding"):
+        cache.get(key, expected_dimensions=4)
+
+
 def test_prompt_embeddings_are_revision_and_policy_keyed(tmp_path) -> None:
     cache = EmbeddingCache(tmp_path / "library.sqlite")
     expected = {

@@ -51,8 +51,8 @@ def _vote(model: str, scores: dict[str, float]) -> ModelVote:
                 silence_ratio=0.95,
                 tail_ms=151.0,
             ),
-            "ONE_SHOT",
-            True,
+            "PHRASE",
+            False,
         ),
         (
             _evidence(
