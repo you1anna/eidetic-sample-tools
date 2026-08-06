@@ -49,7 +49,7 @@ CONTENT_PROMPTS: dict[str, tuple[str, ...]] = {
     "PERCUSSION": (
         "isolated hand percussion, conga, bongo, shaker or metallic percussion",
         "a top loop, hi-hat loop or percussion-only rhythmic loop without kick or snare",
-        "a rhythmic percussion groove without a complete drum kit",
+        "a drum top loop of hats, shakers or percussion without bass drum or snare drum",
     ),
     "FULL_DRUMS": (
         "a full drum kit loop with clearly audible kick, snare or clap, and hi-hat",
@@ -57,10 +57,12 @@ CONTENT_PROMPTS: dict[str, tuple[str, ...]] = {
     ),
     "VOCAL": (
         "a clearly audible human voice, vocal word, rap phrase, shout or acapella recording",
-        "a voice-only music sample with a clearly audible singer or speaker",
+        "a short processed vocal stab, chopped syllable, chant, shout or breath",
+        "a rhythmic vocal loop or sung vocal phrase, including a voice layered over a beat",
     ),
     "OUT_OF_BRIEF": (
         "an acid bass or synthesizer line, melody or chord loop",
+        "a tonal synth stab, bass hit, pitched impact or unrelated musical one-shot",
         "a waterfall, nature ambience, field recording or unrelated sound effect",
     ),
 }

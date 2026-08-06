@@ -37,7 +37,7 @@ from .classification.domain import (
     Classification,
     ClassificationError,
 )
-from .classification.ensemble import build_candidate
+from .classification.ensemble import build_candidate, select_model_weights
 from .classification.models import (
     CONTENT_PROMPTS,
     MODEL_ID,
@@ -157,10 +157,24 @@ def classify_packet(
             sample_refs,
             EmbeddingCache(database.path),
         )
+        benchmark_truth = _read_benchmark_truth(benchmark_path)
+        calibration = select_model_weights(
+            [
+                (sample_id, evidence, votes_by_id[sample_id])
+                for sample_id, _, _, evidence in measured
+            ],
+            benchmark_truth if len(benchmark_truth) == 24 else {},
+        )
         classifications = []
         candidates = []
         for sample_id, rel, _, evidence in measured:
-            candidate = build_candidate(sample_id, rel, evidence, votes_by_id[sample_id])
+            candidate = build_candidate(
+                sample_id,
+                rel,
+                evidence,
+                votes_by_id[sample_id],
+                calibration.weights,
+            )
             candidates.append(candidate)
             detail = (
                 f"duration_s={evidence.duration_s:.3f};onset_count={evidence.onset_count};"
@@ -188,6 +202,7 @@ def classify_packet(
         classifier_metadata = {
             "version": CLASSIFIER_VERSION,
             "filename_weight": 0.0,
+            "ensemble_calibration": asdict(calibration),
             "prompt_policy": PROMPT_POLICY,
             "models": [
                 {
@@ -213,6 +228,7 @@ def classify_packet(
             ],
             "excerpt_policy": EXCERPT_POLICY,
             "prompt_policy": PROMPT_POLICY,
+            "ensemble_weights": list(calibration.weights),
             "filename_weight": 0.0,
         }
         candidate_digest = classification_digest(candidates, digest_context)
@@ -243,9 +259,12 @@ def classify_packet(
             restart=restart_review,
             carry_decisions=carry_review,
         )
-        strata = benchmark_strata(classifications)
-        write_benchmark_sheet(benchmark_path, classifications, strata)
-        benchmark_rows = read_benchmark_with_predictions(benchmark_path, by_id)
+        if not restart_review and len(_read_benchmark_truth(benchmark_path)) == 24:
+            benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
+        else:
+            strata = benchmark_strata(classifications)
+            write_benchmark_sheet(benchmark_path, classifications, strata)
+            benchmark_rows = read_benchmark_with_predictions(benchmark_path, by_id)
     elif benchmark_path.is_file():
         benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
     else:

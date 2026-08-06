@@ -13,6 +13,8 @@ from .benchmarks import (
     BENCHMARK_FIELDS,
     BenchmarkScore,
     benchmark_strata,
+    read_benchmark_truth,
+    refresh_benchmark_predictions,
     score_benchmark,
     write_benchmark_audition,
 )
@@ -122,7 +124,12 @@ class ReviewQueue:
 
     def pending(self) -> tuple[ReviewItem, ...]:
         decided = {decision.sample_id for decision in self._decisions}
-        return tuple(item for item in self.items if item.sample_id not in decided)
+        covered_groups = set(self.covered_sentinel_groups())
+        return tuple(
+            item for item in self.items
+            if item.sample_id not in decided
+            and not (item.kind == "sentinel" and item.audition_group in covered_groups)
+        )
 
     def apply_decision(self, sample_id: str, form: str, content: str, notes: str = "") -> None:
         if form not in FORMS or content not in CONTENTS:
@@ -170,6 +177,21 @@ class ReviewQueue:
             if candidate.automatic and (
                 decision.form != candidate.form.label
                 or decision.content != candidate.content.label
+            ):
+                groups.add(candidate.audition_group)
+        return tuple(group for group in AUDITION_GROUPS if group in groups)
+
+    def covered_sentinel_groups(self) -> tuple[str, ...]:
+        """Reuse an ear-confirmed automatic sample as group coverage after tuning."""
+        excluded = set(self.failed_sentinel_groups()) | set(self.trusted_mismatch_groups())
+        groups: set[str] = set()
+        for decision in self._decisions:
+            candidate = self._candidates[decision.sample_id]
+            if (
+                candidate.automatic
+                and decision.form == candidate.form.label
+                and decision.content == candidate.content.label
+                and candidate.audition_group not in excluded
             ):
                 groups.add(candidate.audition_group)
         return tuple(group for group in AUDITION_GROUPS if group in groups)
@@ -338,6 +360,10 @@ def write_review_benchmark(path: Path, queue: ReviewQueue) -> BenchmarkScore:
         )
         for candidate in queue._candidates.values()
     ]
+    if len(read_benchmark_truth(path)) == 24:
+        return score_benchmark(
+            refresh_benchmark_predictions(path, {row.sample_id: row for row in predicted})
+        )
     strata = benchmark_strata(predicted)
     decisions = {decision.sample_id: decision for decision in queue.decisions}
     saved: list[dict[str, str]] = []

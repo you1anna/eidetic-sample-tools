@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 
 from librarytools.classification.domain import AcousticEvidence, ModelVote
-from librarytools.classification.ensemble import build_candidate, classify_form, resolve_content
+from librarytools.classification.ensemble import (
+    build_candidate,
+    classify_form,
+    resolve_content,
+    select_model_weights,
+)
 
 
 def _evidence(**overrides) -> AcousticEvidence:
@@ -39,6 +44,16 @@ def _vote(model: str, scores: dict[str, float]) -> ModelVote:
         (_evidence(duration_s=1.001, onset_count=2, periodicity=0.249), "PHRASE", False),
         (_evidence(duration_s=0.9, onset_count=3, periodicity=0.249), "ONE_SHOT", False),
         (_evidence(duration_s=0.9, onset_count=2, periodicity=0.25), "ONE_SHOT", False),
+        (
+            _evidence(
+                duration_s=3.75,
+                onset_count=1,
+                silence_ratio=0.95,
+                tail_ms=151.0,
+            ),
+            "ONE_SHOT",
+            True,
+        ),
         (
             _evidence(
                 duration_s=6.0,
@@ -94,6 +109,42 @@ def test_content_disagreement_and_weak_votes_are_reviewed() -> None:
     ))
     assert weak.resolved is False
     assert set(weak.review_reasons) == {"weak-model-score", "weak-model-margin"}
+
+
+def test_model_weights_are_selected_deterministically_against_ear_truth() -> None:
+    items = (
+        (
+            "one",
+            _evidence(),
+            (
+                _vote("first", {"RIM": 0.9, "VOCAL": 0.1}),
+                _vote("second", {"VOCAL": 0.8, "RIM": 0.2}),
+            ),
+        ),
+        (
+            "two",
+            _evidence(),
+            (
+                _vote("first", {"TOM": 0.8, "VOCAL": 0.2}),
+                _vote("second", {"VOCAL": 0.9, "TOM": 0.1}),
+            ),
+        ),
+    )
+    truth = {
+        sample_id: {
+            "true_form": "ONE_SHOT",
+            "true_content": "VOCAL",
+            "true_audition_group": "vocal-stabs",
+        }
+        for sample_id, _, _ in items
+    }
+
+    selected = select_model_weights(items, truth)
+
+    assert selected.weights == (0.2, 0.8)
+    assert selected.form_correct == 2
+    assert selected.content_correct == 2
+    assert selected.content_group_correct == 2
 
 
 def test_filename_has_zero_decision_weight() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -79,6 +80,18 @@ def main(argv: list[str] | None = None) -> int:
                 carry_review=args.carry_review,
             )
             print(f"classified: {len(classifications)} -> {args.labels.parent / 'classification.tsv'}")
+            metadata_path = args.labels.parent / "packet-meta.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            review = metadata.get("review")
+            if metadata.get("schema_version", 0) >= 3 and (
+                not isinstance(review, dict)
+                or not review.get("ready")
+                or not review.get("passed")
+            ):
+                unresolved = review.get("unresolved", "unknown") if isinstance(review, dict) else "unknown"
+                suffix = "" if unresolved == 1 else "s"
+                print(f"review awaiting {unresolved} ear check{suffix}: sample-curate review-packet")
+                return 3
             if not score.ready:
                 print(f"benchmark awaiting ear labels: {args.benchmark}")
                 return 3

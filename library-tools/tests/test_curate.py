@@ -317,6 +317,11 @@ def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path
 def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_path, monkeypatch):
     labels = tmp_path / "packet" / "labels.tsv"
     benchmark = labels.parent / "benchmark-labels.tsv"
+    labels.parent.mkdir()
+    (labels.parent / "packet-meta.json").write_text(json.dumps({
+        "schema_version": 3,
+        "review": {"ready": True, "passed": True, "unresolved": 0},
+    }), encoding="utf-8")
     calls = []
     monkeypatch.setattr(
         curate_cli,
@@ -348,6 +353,44 @@ def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_pat
 
     assert rc == 0
     assert calls[0][1] == {"restart_review": False, "carry_review": True}
+
+
+def test_classify_packet_cli_does_not_claim_success_while_review_is_pending(
+    tmp_path, monkeypatch, capsys,
+):
+    labels = tmp_path / "packet" / "labels.tsv"
+    benchmark = labels.parent / "benchmark-labels.tsv"
+    labels.parent.mkdir()
+    (labels.parent / "packet-meta.json").write_text(json.dumps({
+        "schema_version": 3,
+        "review": {"ready": False, "passed": False, "unresolved": 1},
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        curate_cli,
+        "classify_packet",
+        lambda *args, **kwargs: (
+            [object()],
+            SimpleNamespace(
+                ready=True,
+                passed=True,
+                form_correct=24,
+                content_correct=20,
+                group_correct=20,
+                content_group_correct=20,
+                total=24,
+            ),
+        ),
+    )
+
+    rc = curate_cli.main([
+        "--library-db", str(tmp_path / "library.sqlite"),
+        "classify-packet", "--labels", str(labels), "--benchmark", str(benchmark),
+    ])
+
+    output = capsys.readouterr()
+    assert rc == 3
+    assert "review awaiting 1 ear check" in output.out
+    assert "quality gate passed" not in output.out
 
 
 def test_playlists_refuses_to_bypass_unpassed_benchmark_and_preserves_old_output(tmp_path):

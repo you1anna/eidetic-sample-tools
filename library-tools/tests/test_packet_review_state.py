@@ -148,6 +148,29 @@ def test_tuning_run_can_carry_same_sample_human_decisions_to_new_digest(tmp_path
     assert list((tmp_path / "archive" / "review-state").glob("digest-one*.json"))
 
 
+def test_carried_confirmation_covers_a_fresh_blind_sentinel_in_the_same_group(tmp_path) -> None:
+    state_path = tmp_path / "review-state.json"
+    candidates = [_candidate(1), _candidate(2), _candidate(3)]
+    first = ReviewSession.open(state_path, candidates, "digest-one")
+    sentinel = first.queue.pending()[0]
+    first.apply_decision(
+        sentinel.sample_id, sentinel.predicted_form, sentinel.predicted_content, "heard",
+    )
+    different_digest = next(
+        f"digest-{index}"
+        for index in range(2, 100)
+        if ReviewQueue.build(candidates, f"digest-{index}").pending()[0].sample_id
+        != sentinel.sample_id
+    )
+
+    carried = ReviewSession.begin(
+        state_path, candidates, different_digest, carry_decisions=True,
+    )
+
+    assert carried.queue.pending() == ()
+    assert carried.queue.gate().passed is True
+
+
 def test_completed_review_regenerates_benchmark_without_manual_tsv_edits(tmp_path) -> None:
     candidates = [_candidate(index) for index in range(24)]
     queue = ReviewQueue.build(candidates, "digest")
@@ -160,6 +183,51 @@ def test_completed_review_regenerates_benchmark_without_manual_tsv_edits(tmp_pat
     assert score.ready is True and score.passed is True
     assert len(rows) == 24
     assert all(row["true_form"] and row["true_content"] and row["true_audition_group"] for row in rows)
+
+
+def test_completed_tuning_review_preserves_existing_benchmark_membership_and_strata(tmp_path) -> None:
+    candidates = [_candidate(index) for index in range(24)]
+    queue = ReviewQueue.build(candidates, "digest")
+    for item in list(queue.pending()):
+        queue.apply_decision(item.sample_id, item.predicted_form, item.predicted_content, "heard")
+    path = tmp_path / "benchmark-labels.tsv"
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=(
+            "sample_id", "current_path", "stratum", "predicted_form", "predicted_content",
+            "predicted_audition_group", "true_form", "true_content",
+            "true_audition_group", "notes",
+        ), delimiter="\t")
+        writer.writeheader()
+        for index, candidate in enumerate(reversed(candidates)):
+            writer.writerow({
+                "sample_id": candidate.sample_id,
+                "current_path": candidate.current_path,
+                "stratum": (
+                    "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+                    "out-of-brief", "control",
+                )[index // 4],
+                "predicted_form": candidate.form.label,
+                "predicted_content": candidate.content.label,
+                "predicted_audition_group": candidate.audition_group,
+                "true_form": candidate.form.label,
+                "true_content": candidate.content.label,
+                "true_audition_group": candidate.audition_group,
+                "notes": "heard",
+            })
+
+    score = write_review_benchmark(path, queue)
+    rows = list(csv.DictReader(path.open(encoding="utf-8"), delimiter="\t"))
+
+    assert score.passed is True
+    assert [row["sample_id"] for row in rows] == [
+        candidate.sample_id for candidate in reversed(candidates)
+    ]
+    assert [row["stratum"] for row in rows] == [
+        stratum for stratum in (
+            "form-boundary", "loop-content", "drum-one-shot", "vocal-form",
+            "out-of-brief", "control",
+        ) for _ in range(4)
+    ]
 
 
 def test_finalise_review_writes_classifications_and_digest_bound_gate(tmp_path) -> None:
