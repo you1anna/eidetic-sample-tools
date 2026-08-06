@@ -37,6 +37,32 @@ class AcousticEvidence:
     tempo_bpm: float
     beat_confidence: float
     periodicity: float
+    onset_count: int = 0
+    bar_fit_error: float = 1.0
+
+
+@dataclass(frozen=True)
+class AxisDecision:
+    label: str
+    confidence: float
+    resolved: bool
+    review_reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CandidateClassification:
+    sample_id: str
+    current_path: Path
+    evidence: AcousticEvidence
+    votes: tuple[ModelVote, ...]
+    form: AxisDecision
+    content: AxisDecision
+    audition_group: str
+    review_reasons: tuple[str, ...]
+
+    @property
+    def automatic(self) -> bool:
+        return not self.review_reasons
 
 
 @dataclass(frozen=True)

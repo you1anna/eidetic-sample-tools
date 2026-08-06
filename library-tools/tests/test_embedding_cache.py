@@ -48,3 +48,19 @@ def test_embedding_cache_rejects_corrupt_dimension_metadata(tmp_path) -> None:
 
     with pytest.raises(ClassificationError, match="corrupt cached embedding"):
         cache.get(key)
+
+
+def test_prompt_embeddings_are_revision_and_policy_keyed(tmp_path) -> None:
+    cache = EmbeddingCache(tmp_path / "library.sqlite")
+    expected = {
+        "RIM": np.array([1.0, 0.0], dtype=np.float32),
+        "TOM": np.array([0.0, 1.0], dtype=np.float32),
+    }
+    cache.put_prompt_set("model", "revision-1", "prompts-v1", expected)
+
+    restored = cache.get_prompt_set("model", "revision-1", "prompts-v1")
+    assert restored is not None
+    assert set(restored) == {"RIM", "TOM"}
+    np.testing.assert_allclose(restored["RIM"], expected["RIM"], atol=5e-4)
+    assert cache.get_prompt_set("model", "revision-2", "prompts-v1") is None
+    assert cache.get_prompt_set("model", "revision-1", "prompts-v2") is None

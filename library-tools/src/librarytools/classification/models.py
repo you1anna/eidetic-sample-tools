@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
 from typing import Mapping, Protocol
 
@@ -63,6 +65,14 @@ CONTENT_PROMPTS: dict[str, tuple[str, ...]] = {
 }
 
 
+def prompt_policy(prompts: Mapping[str, tuple[str, ...]]) -> str:
+    payload = json.dumps(prompts, sort_keys=True, separators=(",", ":"))
+    return "content-prompts-v1-" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+PROMPT_POLICY = prompt_policy(CONTENT_PROMPTS)
+
+
 class SemanticScorer(Protocol):
     @property
     def revision(self) -> str: ...
@@ -72,6 +82,8 @@ class SemanticScorer(Protocol):
 
 class EmbeddingRuntime(Protocol):
     def embed(self, paths: list[Path]) -> list[np.ndarray]: ...
+
+    def embed_prompts(self, prompts: Mapping[str, tuple[str, ...]]) -> dict[str, np.ndarray]: ...
 
 
 def feature_array(output):
@@ -193,6 +205,38 @@ class ClapEmbeddingRuntime:
             if not norm:
                 raise ClassificationError(f"{self.spec.model_id} returned a zero embedding")
             results.append(vector / norm)
+        return results
+
+    def embed_prompts(
+        self,
+        prompts: Mapping[str, tuple[str, ...]],
+    ) -> dict[str, np.ndarray]:
+        labels: list[str] = []
+        texts: list[str] = []
+        for label, label_prompts in sorted(prompts.items()):
+            for prompt in label_prompts:
+                labels.append(label)
+                texts.append(prompt)
+        inputs = self._processor(text=texts, return_tensors="pt", padding=True)
+        with self._torch.inference_mode():
+            raw = feature_array(self._model.get_text_features(**inputs))
+        results: dict[str, np.ndarray] = {}
+        for label in sorted(prompts):
+            vector = np.mean(
+                [raw[index] for index, current in enumerate(labels) if current == label],
+                axis=0,
+            ).astype(np.float32).reshape(-1)
+            if vector.size != self.spec.embedding_dimensions:
+                raise ClassificationError(
+                    f"{self.spec.model_id} returned {vector.size} prompt dimensions; "
+                    f"expected {self.spec.embedding_dimensions}"
+                )
+            norm = float(np.linalg.norm(vector))
+            if not norm:
+                raise ClassificationError(
+                    f"{self.spec.model_id} returned a zero prompt embedding for {label}"
+                )
+            results[label] = vector / norm
         return results
 
 

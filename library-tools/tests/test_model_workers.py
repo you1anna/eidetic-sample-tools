@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import time
 
 import numpy as np
 import pytest
 
 from librarytools.classification.cache import EmbeddingCache, EmbeddingKey
 from librarytools.classification.models import MODEL_SPECS, ModelSpec
-from librarytools.classification.workers import EmbeddingWorker, SampleRef, run_models_sequentially
+from librarytools.classification.workers import (
+    EmbeddingWorker,
+    SampleRef,
+    generate_model_votes,
+    run_models_sequentially,
+)
 
 
 class FakeRuntime:
@@ -22,6 +28,20 @@ class FakeRuntime:
         if self.fail_batch == len(self.batches):
             raise RuntimeError("synthetic model failure")
         return [np.full(self.dimensions, index + 1.0) for index, _ in enumerate(paths)]
+
+
+class VoteRuntime:
+    def __init__(self, dimensions: int):
+        self.dimensions = dimensions
+
+    def embed(self, paths: list[Path]) -> list[np.ndarray]:
+        return [np.array([1.0, 0.0]) for _ in paths]
+
+    def embed_prompts(self, prompts):
+        return {
+            label: np.array([1.0, 0.0]) if label == "RIM" else np.array([0.0, 1.0])
+            for label in prompts
+        }
 
 
 def _samples(count: int) -> list[SampleRef]:
@@ -117,6 +137,37 @@ def test_models_execute_strictly_sequentially(tmp_path) -> None:
     assert events == ["start:one", "stop:one", "start:two", "stop:two"]
 
 
+def test_model_votes_are_scored_from_persistent_audio_and_prompt_embeddings(tmp_path) -> None:
+    cache = EmbeddingCache(tmp_path / "library.sqlite")
+    specs = (ModelSpec("one", "r1", 2), ModelSpec("two", "r2", 2))
+    samples = [SampleRef("sample", Path("/sample.wav"))]
+    votes, reports = generate_model_votes(
+        specs,
+        samples,
+        cache,
+        worker_factory=lambda: EmbeddingWorker(
+            runtime_factory=lambda spec: VoteRuntime(spec.embedding_dimensions)
+        ),
+        prompts={"RIM": ("rim",), "TOM": ("tom",)},
+    )
+
+    assert [vote.model_id for vote in votes["sample"]] == ["one", "two"]
+    assert all(vote.top_label == "RIM" for vote in votes["sample"])
+    assert all(report.embedded == 1 for report in reports)
+
+    cached_votes, cached_reports = generate_model_votes(
+        specs,
+        samples,
+        cache,
+        worker_factory=lambda: EmbeddingWorker(
+            runtime_factory=lambda spec: (_ for _ in ()).throw(AssertionError("model loaded"))
+        ),
+        prompts={"RIM": ("rim",), "TOM": ("tom",)},
+    )
+    assert cached_votes == votes
+    assert all(report.cache_hits == 1 and report.embedded == 0 for report in cached_reports)
+
+
 @pytest.mark.skipif(
     os.environ.get("RUN_DUAL_CLAP_INTEGRATION") != "1",
     reason="downloads and runs both pinned CLAP checkpoints",
@@ -128,10 +179,20 @@ def test_real_workers_persist_both_pinned_model_embeddings(tmp_path) -> None:
     path = tmp_path / "tone.wav"
     sf.write(path, np.sin(2 * np.pi * 220 * np.arange(sample_rate) / sample_rate), sample_rate)
     cache = EmbeddingCache(tmp_path / "library.sqlite")
-    reports = run_models_sequentially(MODEL_SPECS, [SampleRef("tone", path)], cache)
+    votes, reports = generate_model_votes(MODEL_SPECS, [SampleRef("tone", path)], cache)
 
     assert [report.embedded for report in reports] == [1, 1]
+    assert len(votes["tone"]) == 2
     for spec in MODEL_SPECS:
         vector = cache.get(EmbeddingKey("tone", spec.model_id, spec.revision, "three-10s-v1"))
         assert vector is not None
         assert vector.shape == (spec.embedding_dimensions,)
+
+    started = time.perf_counter()
+    cached_votes, cached_reports = generate_model_votes(
+        MODEL_SPECS, [SampleRef("tone", path)], cache,
+    )
+    assert time.perf_counter() - started < 10.0
+    assert cached_votes == votes
+    assert [report.cache_hits for report in cached_reports] == [1, 1]
+    assert [report.embedded for report in cached_reports] == [0, 0]

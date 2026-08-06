@@ -16,7 +16,7 @@ from pathlib import Path
 from . import config
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SKIP_TOP = frozenset({"_EXPORT", "_TO-DELETE", "_QUARANTINE"})
 
 
@@ -150,6 +150,18 @@ class LibraryDatabase:
                     created_at text not null,
                     updated_at text not null,
                     primary key(sample_id, model_id, model_revision, excerpt_policy)
+                );
+                create table if not exists prompt_embeddings (
+                    model_id text not null,
+                    model_revision text not null,
+                    prompt_policy text not null,
+                    label text not null,
+                    dimensions integer not null check(dimensions > 0),
+                    dtype text not null check(dtype = 'float16'),
+                    embedding blob not null,
+                    created_at text not null,
+                    updated_at text not null,
+                    primary key(model_id, model_revision, prompt_policy, label)
                 );
                 """
             )

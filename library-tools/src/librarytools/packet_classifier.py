@@ -1,9 +1,8 @@
 """Local audio-derived classification for audition packets.
 
-The classifier deliberately separates form (one-shot/loop/phrase/long-form) from
-content (rim/tom/percussion/full drums/vocal/out-of-brief).  Path text is tokenised
-and contributes only a small tie-breaking bonus; acoustic and CLAP evidence remain
-the primary signals.
+The replacement classifier separates acoustic form from two-model semantic
+content consensus. Path text is retained only in audit output and has zero
+decision weight. The legacy single-scorer path remains injectable for compatibility tests.
 """
 
 from __future__ import annotations
@@ -29,6 +28,7 @@ from .classification.benchmarks import (
     write_benchmark_sheet,
 )
 from .classification.acoustics import measure_acoustic, rhythm_periodicity
+from .classification.cache import EmbeddingCache
 from .classification.domain import (
     AUDITION_GROUPS,
     CONTENTS,
@@ -37,10 +37,13 @@ from .classification.domain import (
     Classification,
     ClassificationError,
 )
+from .classification.ensemble import build_candidate
 from .classification.models import (
     CONTENT_PROMPTS,
     MODEL_ID,
     MODEL_REVISION,
+    MODEL_SPECS,
+    PROMPT_POLICY,
     ClapSemanticScorer,
     SemanticScorer,
     clap_audio_inputs,
@@ -62,11 +65,12 @@ from .classification.policy import (
     classify_evidence,
     tokenise_path,
 )
+from .classification.workers import SampleRef, generate_model_votes
 from .featurecache import FEATURE_COLUMNS
 from .inventory import sha256_file
 
 
-CLASSIFIER_VERSION = "hybrid-v1"
+CLASSIFIER_VERSION = "ensemble-v2"
 
 PacketClassifierError = ClassificationError
 
@@ -97,12 +101,11 @@ def classify_packet(
     scorer: SemanticScorer | None = None,
 ) -> tuple[list[Classification], BenchmarkScore]:
     """Classify a packet and create/score its 24-row ear benchmark."""
-    scorer = scorer or ClapSemanticScorer()
     with labels_path.open(encoding="utf-8", newline="") as fh:
         label_reader = csv.DictReader(fh, delimiter="\t")
         label_rows = list(label_reader)
     cached = database.features()
-    raw_candidates: list[RawCandidate] = []
+    measured: list[tuple[str, Path, Path, AcousticEvidence]] = []
     for raw in label_rows:
         rel = Path(raw["current_path"])
         source = verify_packet_source(root, database, raw["sample_id"], rel)
@@ -113,29 +116,81 @@ def classify_packet(
                 raise PacketClassifierError(f"cannot analyse {rel}: {record.error}")
             payload = {column: getattr(record, column) for column in FEATURE_COLUMNS}
         evidence = measure_acoustic(source, payload)
-        raw_candidates.append(RawCandidate(
-            sample_id=raw["sample_id"],
-            current_path=rel,
-            evidence=evidence,
-            semantic_scores=scorer.score(source),
-        ))
+        measured.append((raw["sample_id"], rel, source, evidence))
 
-    truth = _read_benchmark_truth(benchmark_path)
-    config = (
-        calibrate_config(raw_candidates, truth)
-        if len(truth) == 24
-        else DEFAULT_CONFIG
-    )
-    classifications = []
-    for item in raw_candidates:
-        predicted = classify_evidence(
-            item.current_path, item.evidence, item.semantic_scores, config=config,
+    if scorer is not None:
+        raw_candidates = [
+            RawCandidate(sample_id, rel, evidence, scorer.score(source))
+            for sample_id, rel, source, evidence in measured
+        ]
+        truth = _read_benchmark_truth(benchmark_path)
+        config = calibrate_config(raw_candidates, truth) if len(truth) == 24 else DEFAULT_CONFIG
+        classifications = []
+        for item in raw_candidates:
+            predicted = classify_evidence(
+                item.current_path, item.evidence, item.semantic_scores, config=config,
+            )
+            classifications.append(replace(
+                predicted,
+                sample_id=item.sample_id,
+                current_path=item.current_path,
+            ))
+        classifier_metadata = {
+            "version": "hybrid-v1",
+            "model_id": MODEL_ID,
+            "model_revision": scorer.revision,
+            "config": asdict(config),
+        }
+    else:
+        sample_refs = [SampleRef(sample_id, source) for sample_id, _, source, _ in measured]
+        votes_by_id, reports = generate_model_votes(
+            MODEL_SPECS,
+            sample_refs,
+            EmbeddingCache(database.path),
         )
-        classifications.append(replace(
-            predicted,
-            sample_id=item.sample_id,
-            current_path=item.current_path,
-        ))
+        classifications = []
+        for sample_id, rel, _, evidence in measured:
+            candidate = build_candidate(sample_id, rel, evidence, votes_by_id[sample_id])
+            detail = (
+                f"duration_s={evidence.duration_s:.3f};onset_count={evidence.onset_count};"
+                f"periodicity={evidence.periodicity:.3f};beat_confidence="
+                f"{evidence.beat_confidence:.3f};bar_fit_error={evidence.bar_fit_error:.4f};"
+                "models="
+                + ",".join(
+                    f"{vote.model_id}:{vote.top_label}:{vote.top_score:.3f}:{vote.margin:.3f}"
+                    for vote in candidate.votes
+                )
+                + ";review="
+                + (",".join(candidate.review_reasons) or "none")
+            )
+            classifications.append(Classification(
+                sample_id=sample_id,
+                current_path=rel,
+                form=candidate.form.label,
+                content=candidate.content.label,
+                audition_group=candidate.audition_group,
+                form_confidence=candidate.form.confidence,
+                content_confidence=candidate.content.confidence,
+                evidence=detail,
+                classifier_version=CLASSIFIER_VERSION,
+            ))
+        classifier_metadata = {
+            "version": CLASSIFIER_VERSION,
+            "filename_weight": 0.0,
+            "prompt_policy": PROMPT_POLICY,
+            "models": [
+                {
+                    "model_id": report.model_id,
+                    "model_revision": report.model_revision,
+                    "cache_hits": report.cache_hits,
+                    "embedded": report.embedded,
+                    "batch_sizes": list(report.batch_sizes),
+                    "excerpt_policy": report.excerpt_policy,
+                    "prompt_cache_hit": report.prompt_cache_hit,
+                }
+                for report in reports
+            ],
+        }
 
     # Revoke any previous pass before changing classifier-derived output.  If this
     # run fails afterwards, `playlists` must not trust a gate scored against older
@@ -162,12 +217,7 @@ def classify_packet(
 
     metadata.update({
         "schema_version": 2,
-        "classifier": {
-            "version": CLASSIFIER_VERSION,
-            "model_id": MODEL_ID,
-            "model_revision": scorer.revision,
-            "config": asdict(config),
-        },
+        "classifier": classifier_metadata,
         "benchmark": {
             "path": benchmark_path.name,
             "ready": score.ready,

@@ -31,7 +31,7 @@ class EmbeddingCache:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
-            conn.execute(
+            conn.executescript(
                 """
                 create table if not exists audio_embeddings (
                     sample_id text not null,
@@ -44,7 +44,19 @@ class EmbeddingCache:
                     created_at text not null,
                     updated_at text not null,
                     primary key(sample_id, model_id, model_revision, excerpt_policy)
-                )
+                );
+                create table if not exists prompt_embeddings (
+                    model_id text not null,
+                    model_revision text not null,
+                    prompt_policy text not null,
+                    label text not null,
+                    dimensions integer not null check(dimensions > 0),
+                    dtype text not null check(dtype = 'float16'),
+                    embedding blob not null,
+                    created_at text not null,
+                    updated_at text not null,
+                    primary key(model_id, model_revision, prompt_policy, label)
+                );
                 """
             )
 
@@ -111,5 +123,76 @@ class EmbeddingCache:
                         now,
                     )
                     for key, compact in prepared
+                ],
+            )
+
+    def get_prompt_set(
+        self,
+        model_id: str,
+        model_revision: str,
+        prompt_policy: str,
+    ) -> dict[str, np.ndarray] | None:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                select label,dimensions,dtype,embedding from prompt_embeddings
+                where model_id=? and model_revision=? and prompt_policy=? order by label
+                """,
+                (model_id, model_revision, prompt_policy),
+            ).fetchall()
+        if not rows:
+            return None
+        restored: dict[str, np.ndarray] = {}
+        for row in rows:
+            dimensions = int(row["dimensions"])
+            payload = bytes(row["embedding"])
+            if row["dtype"] != "float16" or len(payload) != dimensions * 2:
+                raise ClassificationError(
+                    f"corrupt cached prompt embedding for {model_id}:{row['label']}"
+                )
+            restored[str(row["label"])] = np.frombuffer(payload, dtype=np.float16).astype(np.float32)
+        return restored
+
+    def put_prompt_set(
+        self,
+        model_id: str,
+        model_revision: str,
+        prompt_policy: str,
+        embeddings: dict[str, np.ndarray],
+    ) -> None:
+        if not model_id or not model_revision or not prompt_policy or not embeddings:
+            raise ClassificationError("prompt embedding identity and values must not be empty")
+        prepared: list[tuple[str, np.ndarray]] = []
+        for label, embedding in sorted(embeddings.items()):
+            vector = np.asarray(embedding, dtype=np.float32).reshape(-1)
+            if not label or vector.size == 0 or not np.all(np.isfinite(vector)):
+                raise ClassificationError("prompt embeddings must be named, finite vectors")
+            prepared.append((label, vector.astype(np.float16)))
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.executemany(
+                """
+                insert into prompt_embeddings
+                (model_id,model_revision,prompt_policy,label,dimensions,dtype,embedding,
+                 created_at,updated_at)
+                values(?,?,?,?,?,'float16',?,?,?)
+                on conflict(model_id,model_revision,prompt_policy,label) do update set
+                  dimensions=excluded.dimensions,
+                  dtype=excluded.dtype,
+                  embedding=excluded.embedding,
+                  updated_at=excluded.updated_at
+                """,
+                [
+                    (
+                        model_id,
+                        model_revision,
+                        prompt_policy,
+                        label,
+                        int(vector.size),
+                        vector.tobytes(),
+                        now,
+                        now,
+                    )
+                    for label, vector in prepared
                 ],
             )

@@ -9,13 +9,20 @@ import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Mapping, Sequence
 
 import numpy as np
 
 from .cache import EmbeddingCache, EmbeddingKey
-from .domain import ClassificationError
-from .models import ClapEmbeddingRuntime, EmbeddingRuntime, ModelSpec
+from .domain import ClassificationError, ModelVote
+from .models import (
+    CONTENT_PROMPTS,
+    ClapEmbeddingRuntime,
+    ClapScorer,
+    EmbeddingRuntime,
+    ModelSpec,
+    prompt_policy,
+)
 
 
 EXCERPT_POLICY = "three-10s-v1"
@@ -35,6 +42,7 @@ class WorkerReport:
     embedded: int
     batch_sizes: tuple[int, ...]
     excerpt_policy: str = EXCERPT_POLICY
+    prompt_cache_hit: bool = True
 
 
 class EmbeddingWorker:
@@ -54,14 +62,19 @@ class EmbeddingWorker:
         *,
         batch_size: int = 8,
         threads: int = 8,
+        prompts: Mapping[str, tuple[str, ...]] | None = None,
     ) -> WorkerReport:
         if not 1 <= batch_size <= 8:
             raise ClassificationError("model batch size must be between 1 and 8")
         if threads <= 0:
             raise ClassificationError("model worker thread count must be positive")
         if self._runtime_factory is not None:
-            return self._run_inline(spec, samples, cache, batch_size=batch_size, threads=threads)
-        return self._run_subprocess(spec, samples, cache, batch_size=batch_size, threads=threads)
+            return self._run_inline(
+                spec, samples, cache, batch_size=batch_size, threads=threads, prompts=prompts,
+            )
+        return self._run_subprocess(
+            spec, samples, cache, batch_size=batch_size, threads=threads, prompts=prompts,
+        )
 
     def _run_inline(
         self,
@@ -71,6 +84,7 @@ class EmbeddingWorker:
         *,
         batch_size: int,
         threads: int,
+        prompts: Mapping[str, tuple[str, ...]] | None,
     ) -> WorkerReport:
         misses: list[SampleRef] = []
         cache_hits = 0
@@ -86,12 +100,36 @@ class EmbeddingWorker:
             else:
                 cache_hits += 1
 
-        if not misses:
-            return WorkerReport(spec.model_id, spec.revision, cache_hits, 0, ())
+        prompt_key = prompt_policy(prompts) if prompts else ""
+        prompt_embeddings = (
+            cache.get_prompt_set(spec.model_id, spec.revision, prompt_key) if prompts else None
+        )
+        prompt_cache_hit = bool(
+            prompts and prompt_embeddings is not None and set(prompt_embeddings) == set(prompts)
+        )
+        if not misses and (not prompts or prompt_cache_hit):
+            return WorkerReport(
+                spec.model_id,
+                spec.revision,
+                cache_hits,
+                0,
+                (),
+                prompt_cache_hit=prompt_cache_hit,
+            )
 
         os.environ["OMP_NUM_THREADS"] = str(threads)
         os.environ["MKL_NUM_THREADS"] = str(threads)
         runtime = self._runtime_factory(spec)  # type: ignore[misc]
+        if prompts and not prompt_cache_hit:
+            prompt_vectors = runtime.embed_prompts(prompts)
+            if set(prompt_vectors) != set(prompts):
+                raise ClassificationError(f"{spec.model_id} returned an incomplete prompt set")
+            if any(
+                np.asarray(vector).size != spec.embedding_dimensions
+                for vector in prompt_vectors.values()
+            ):
+                raise ClassificationError(f"{spec.model_id} returned invalid prompt dimensions")
+            cache.put_prompt_set(spec.model_id, spec.revision, prompt_key, prompt_vectors)
         batch_sizes: list[int] = []
         embedded = 0
         for offset in range(0, len(misses), batch_size):
@@ -119,6 +157,7 @@ class EmbeddingWorker:
             cache_hits,
             embedded,
             tuple(batch_sizes),
+            prompt_cache_hit=prompt_cache_hit,
         )
 
     def _run_subprocess(
@@ -129,6 +168,7 @@ class EmbeddingWorker:
         *,
         batch_size: int,
         threads: int,
+        prompts: Mapping[str, tuple[str, ...]] | None,
     ) -> WorkerReport:
         job = {
             "spec": asdict(spec),
@@ -138,6 +178,7 @@ class EmbeddingWorker:
             "cache_path": str(cache.path),
             "batch_size": batch_size,
             "threads": threads,
+            "prompts": prompts,
         }
         with tempfile.TemporaryDirectory(prefix="sample-classifier-worker-") as temporary:
             directory = Path(temporary)
@@ -177,6 +218,7 @@ class EmbeddingWorker:
             embedded=int(raw["embedded"]),
             batch_sizes=tuple(int(value) for value in raw["batch_sizes"]),
             excerpt_policy=str(raw["excerpt_policy"]),
+            prompt_cache_hit=bool(raw.get("prompt_cache_hit", True)),
         )
 
 
@@ -200,6 +242,46 @@ def run_models_sequentially(
     return reports
 
 
+def generate_model_votes(
+    specs: Sequence[ModelSpec],
+    samples: Sequence[SampleRef],
+    cache: EmbeddingCache,
+    *,
+    worker_factory: Callable[[], EmbeddingWorker] = EmbeddingWorker,
+    prompts: Mapping[str, tuple[str, ...]] = CONTENT_PROMPTS,
+    batch_size: int = 8,
+    threads: int = 8,
+) -> tuple[dict[str, tuple[ModelVote, ...]], list[WorkerReport]]:
+    """Run one model at a time, then score only compact cached vectors in the parent."""
+    collected: dict[str, list[ModelVote]] = {sample.sample_id: [] for sample in samples}
+    reports: list[WorkerReport] = []
+    policy = prompt_policy(prompts)
+    for spec in specs:
+        worker = worker_factory()
+        report = worker.run(
+            spec,
+            samples,
+            cache,
+            batch_size=batch_size,
+            threads=threads,
+            prompts=prompts,
+        )
+        reports.append(report)
+        del worker
+        prompt_vectors = cache.get_prompt_set(spec.model_id, spec.revision, policy)
+        if prompt_vectors is None or set(prompt_vectors) != set(prompts):
+            raise ClassificationError(f"missing cached prompt embeddings for {spec.model_id}")
+        scorer = ClapScorer(spec)
+        for sample in samples:
+            audio = cache.get(_key(sample, spec))
+            if audio is None:
+                raise ClassificationError(
+                    f"missing cached audio embedding for {sample.sample_id} using {spec.model_id}"
+                )
+            collected[sample.sample_id].append(scorer.score(audio, prompt_vectors))
+    return {sample_id: tuple(votes) for sample_id, votes in collected.items()}, reports
+
+
 def _key(sample: SampleRef, spec: ModelSpec) -> EmbeddingKey:
     return EmbeddingKey(sample.sample_id, spec.model_id, spec.revision, EXCERPT_POLICY)
 
@@ -215,5 +297,9 @@ def run_real_worker_job(job_path: Path, report_path: Path) -> None:
         EmbeddingCache(Path(raw["cache_path"])),
         batch_size=int(raw["batch_size"]),
         threads=int(raw["threads"]),
+        prompts={
+            str(label): tuple(str(value) for value in values)
+            for label, values in (raw.get("prompts") or {}).items()
+        } or None,
     )
     report_path.write_text(json.dumps(asdict(report), sort_keys=True), encoding="utf-8")
