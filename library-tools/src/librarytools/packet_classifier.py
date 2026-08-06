@@ -53,7 +53,9 @@ from .classification.models import (
 )
 from .classification.packets import (
     CLASSIFICATION_FIELDS,
+    classification_digest,
     read_classifications,
+    write_classification_audit,
     write_classifications,
 )
 from .classification.policy import (
@@ -66,6 +68,8 @@ from .classification.policy import (
     tokenise_path,
 )
 from .classification.workers import SampleRef, generate_model_votes
+from .classification.review import ReviewSession
+from .classification.workers import EXCERPT_POLICY
 from .featurecache import FEATURE_COLUMNS
 from .inventory import sha256_file
 
@@ -141,6 +145,8 @@ def classify_packet(
             "model_revision": scorer.revision,
             "config": asdict(config),
         }
+        candidates = None
+        candidate_digest = None
     else:
         sample_refs = [SampleRef(sample_id, source) for sample_id, _, source, _ in measured]
         votes_by_id, reports = generate_model_votes(
@@ -149,8 +155,10 @@ def classify_packet(
             EmbeddingCache(database.path),
         )
         classifications = []
+        candidates = []
         for sample_id, rel, _, evidence in measured:
             candidate = build_candidate(sample_id, rel, evidence, votes_by_id[sample_id])
+            candidates.append(candidate)
             detail = (
                 f"duration_s={evidence.duration_s:.3f};onset_count={evidence.onset_count};"
                 f"periodicity={evidence.periodicity:.3f};beat_confidence="
@@ -191,6 +199,18 @@ def classify_packet(
                 for report in reports
             ],
         }
+        digest_context = {
+            "classifier_version": CLASSIFIER_VERSION,
+            "feature_schema": list(FEATURE_COLUMNS),
+            "models": [
+                {"model_id": spec.model_id, "model_revision": spec.revision}
+                for spec in MODEL_SPECS
+            ],
+            "excerpt_policy": EXCERPT_POLICY,
+            "prompt_policy": PROMPT_POLICY,
+            "filename_weight": 0.0,
+        }
+        candidate_digest = classification_digest(candidates, digest_context)
 
     # Revoke any previous pass before changing classifier-derived output.  If this
     # run fails afterwards, `playlists` must not trust a gate scored against older
@@ -206,7 +226,20 @@ def classify_packet(
     classification_path = labels_path.parent / "classification.tsv"
     write_classifications(classification_path, classifications)
     by_id = {row.sample_id: row for row in classifications}
-    if benchmark_path.is_file():
+    if candidates is not None and candidate_digest is not None:
+        write_classification_audit(
+            labels_path.parent / "classification-audit.jsonl",
+            candidates,
+        )
+        session = ReviewSession.open(
+            labels_path.parent / "review-state.json",
+            candidates,
+            candidate_digest,
+        )
+        strata = benchmark_strata(classifications)
+        write_benchmark_sheet(benchmark_path, classifications, strata)
+        benchmark_rows = read_benchmark_with_predictions(benchmark_path, by_id)
+    elif benchmark_path.is_file():
         benchmark_rows = refresh_benchmark_predictions(benchmark_path, by_id)
     else:
         strata = benchmark_strata(classifications)
@@ -216,7 +249,7 @@ def classify_packet(
     score = score_benchmark(benchmark_rows)
 
     metadata.update({
-        "schema_version": 2,
+        "schema_version": 3 if candidates is not None else 2,
         "classifier": classifier_metadata,
         "benchmark": {
             "path": benchmark_path.name,
@@ -229,5 +262,17 @@ def classify_packet(
             "total": score.total,
         },
     })
+    if candidates is not None and candidate_digest is not None:
+        gate = session.queue.gate()
+        metadata["classification_digest"] = candidate_digest
+        metadata["classification_context"] = digest_context
+        metadata["review"] = {
+            "state": "complete" if gate.passed else "pending",
+            "ready": gate.ready,
+            "passed": gate.passed,
+            "unresolved": gate.unresolved,
+            "classification_digest": gate.classification_digest,
+            "failed_sentinel_groups": list(gate.failed_sentinel_groups),
+        }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     return classifications, score

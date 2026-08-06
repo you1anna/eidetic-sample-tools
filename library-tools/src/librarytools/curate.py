@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import moves, review
+from .classification.packets import classification_digest, read_classification_audit
+from .classification.review import ReviewSession
 from .inventory import LibraryDatabase, InventoryLocation, sha256_file
 from .packet_classifier import AUDITION_GROUPS, PacketClassifierError, read_classifications
 
@@ -214,6 +216,8 @@ def write_audition_playlists(
         source = (root / row.current_path).resolve()
         if not source.is_relative_to(root):
             raise CurationError(f"sample path escapes root: {row.current_path}")
+        if not source.is_file() or sha256_file(source) != row.sample_id:
+            raise CurationError(f"sample is missing or changed: {row.current_path}")
         confidence = min(classification.form_confidence, classification.content_confidence)
         grouped.setdefault(classification.audition_group, []).append((confidence, source))
 
@@ -284,10 +288,51 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
     classification_path = labels_path.parent / "classification.tsv"
     if not classification_path.is_file():
         raise CurationError(f"classification.tsv is missing beside {labels_path.name}")
+    if metadata.get("schema_version", 0) >= 3:
+        digest = metadata.get("classification_digest")
+        context = metadata.get("classification_context")
+        review_metadata = metadata.get("review")
+        if not isinstance(digest, str) or not isinstance(context, dict):
+            raise CurationError("classification digest metadata is missing")
+        if (
+            not isinstance(review_metadata, dict)
+            or not review_metadata.get("ready")
+            or not review_metadata.get("passed")
+            or review_metadata.get("classification_digest") != digest
+        ):
+            raise CurationError("exception review quality gate has not passed")
+        try:
+            candidates = read_classification_audit(
+                labels_path.parent / "classification-audit.jsonl"
+            )
+            if classification_digest(candidates, context) != digest:
+                raise CurationError("classification audit digest does not match packet metadata")
+            session = ReviewSession.open(
+                labels_path.parent / "review-state.json",
+                candidates,
+                digest,
+            )
+            if not session.queue.gate().passed:
+                raise CurationError("exception review quality gate has not passed")
+            expected = session.queue.resolved_classifications()
+            actual = read_classifications(classification_path)
+        except PacketClassifierError as exc:
+            raise CurationError(str(exc)) from exc
+        signature = lambda row: (
+            row.sample_id,
+            row.current_path,
+            row.form,
+            row.content,
+            row.audition_group,
+        )
+        if [signature(row) for row in actual] != [signature(row) for row in expected]:
+            raise CurationError("classification.tsv does not match completed review state")
     if not metadata.get("audio_playlists_published"):
         archive_rejected_playlists(labels_path.parent)
     generated = write_audition_playlists(root_path, labels_path, classification_path)
     metadata["audio_playlists_published"] = True
+    if metadata.get("schema_version", 0) >= 3:
+        metadata["published_digest"] = metadata["classification_digest"]
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     return generated
 

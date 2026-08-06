@@ -266,6 +266,44 @@ def test_playlists_refuses_to_bypass_unpassed_benchmark_and_preserves_old_output
     assert (old / "rejected.m3u8").read_text() == "#EXTM3U\n/old.wav\n"
 
 
+def test_schema_three_playlists_reject_tampered_candidate_digest(tmp_path):
+    root = tmp_path / "SAMPLES"
+    _audio(root / "CATALOGUE" / "RIM" / "rim.wav")
+    db = LibraryDatabase(tmp_path / "library.sqlite")
+    scan_library(root, db)
+    packet = tmp_path / "packet"
+    prepare_packet(root, db, packet, quotas={"RIM": 1}, multiplier=1)
+    row = next(csv.DictReader((packet / "labels.tsv").open(), delimiter="\t"))
+    (packet / "classification.tsv").write_text(
+        "sample_id\tcurrent_path\tform\tcontent\taudition_group\tform_confidence\tcontent_confidence\tevidence\tclassifier_version\n"
+        f"{row['sample_id']}\t{row['current_path']}\tONE_SHOT\tRIM\trim-one-shots\t0.9\t0.8\ttest\tensemble-v2\n",
+        encoding="utf-8",
+    )
+    metadata_path = packet / "packet-meta.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata.update({
+        "schema_version": 3,
+        "classification_digest": "0" * 64,
+        "classification_context": {},
+        "review": {
+            "ready": True,
+            "passed": True,
+            "classification_digest": "0" * 64,
+        },
+        "benchmark": {"ready": True, "passed": True},
+    })
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    (packet / "classification-audit.jsonl").write_text("", encoding="utf-8")
+    old = packet / "playlists"
+    old.mkdir()
+    (old / "rejected.m3u8").write_text("#EXTM3U\n/old.wav\n", encoding="utf-8")
+
+    with pytest.raises(CurationError, match="audit digest"):
+        curate.regenerate_packet_playlists(packet / "labels.tsv")
+
+    assert (old / "rejected.m3u8").read_text() == "#EXTM3U\n/old.wav\n"
+
+
 def test_archive_rejected_name_derived_playlists_is_one_time_and_non_destructive(tmp_path):
     packet = tmp_path / "packet"
     old = packet / "playlists"
