@@ -16,7 +16,7 @@ from pathlib import Path
 from . import config
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SKIP_TOP = frozenset({"_EXPORT", "_TO-DELETE", "_QUARANTINE"})
 
 
@@ -138,6 +138,18 @@ class LibraryDatabase:
                     kept integer not null default 1,
                     recorded_at text not null,
                     primary key(sample_id, kit_id)
+                );
+                create table if not exists audio_embeddings (
+                    sample_id text not null,
+                    model_id text not null,
+                    model_revision text not null,
+                    excerpt_policy text not null,
+                    dimensions integer not null check(dimensions > 0),
+                    dtype text not null check(dtype = 'float16'),
+                    embedding blob not null,
+                    created_at text not null,
+                    updated_at text not null,
+                    primary key(sample_id, model_id, model_revision, excerpt_policy)
                 );
                 """
             )
