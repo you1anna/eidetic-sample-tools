@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from librarytools.classification.models import rank_prompt_embeddings
+from librarytools.classification.models import ClapScorer, ModelSpec, rank_prompt_embeddings
 
 
 def test_prompt_ranking_returns_cosine_similarity_by_label():
@@ -11,3 +11,16 @@ def test_prompt_ranking_returns_cosine_similarity_by_label():
     )
 
     assert scores == {"RIM": pytest.approx(1.0), "TOM": pytest.approx(0.0)}
+
+
+def test_clap_scorer_builds_a_typed_vote_from_fixed_embeddings():
+    vote = ClapScorer(ModelSpec("fake/model", "revision", 2)).score(
+        np.array([1.0, 0.0]),
+        {"RIM": np.array([1.0, 0.0]), "TOM": np.array([0.0, 1.0])},
+    )
+
+    assert vote.model_id == "fake/model"
+    assert vote.model_revision == "revision"
+    assert vote.top_label == "RIM"
+    assert vote.top_score > 0.99
+    assert vote.margin > 0.99

@@ -73,13 +73,21 @@ class EmbeddingCache:
         return np.frombuffer(payload, dtype=np.float16).astype(np.float32)
 
     def put(self, key: EmbeddingKey, embedding: np.ndarray) -> None:
-        vector = np.asarray(embedding, dtype=np.float32).reshape(-1)
-        if vector.size == 0 or not np.all(np.isfinite(vector)):
-            raise ClassificationError("embedding must be a non-empty finite vector")
-        compact = vector.astype(np.float16)
+        self.put_many([(key, embedding)])
+
+    def put_many(self, items: list[tuple[EmbeddingKey, np.ndarray]]) -> None:
+        """Persist one completed inference batch in a single transaction."""
+        prepared: list[tuple[EmbeddingKey, np.ndarray]] = []
+        for key, embedding in items:
+            vector = np.asarray(embedding, dtype=np.float32).reshape(-1)
+            if vector.size == 0 or not np.all(np.isfinite(vector)):
+                raise ClassificationError("embedding must be a non-empty finite vector")
+            prepared.append((key, vector.astype(np.float16)))
+        if not prepared:
+            return
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
-            conn.execute(
+            conn.executemany(
                 """
                 insert into audio_embeddings
                 (sample_id,model_id,model_revision,excerpt_policy,dimensions,dtype,embedding,
@@ -91,14 +99,17 @@ class EmbeddingCache:
                   embedding=excluded.embedding,
                   updated_at=excluded.updated_at
                 """,
-                (
-                    key.sample_id,
-                    key.model_id,
-                    key.model_revision,
-                    key.excerpt_policy,
-                    int(compact.size),
-                    compact.tobytes(),
-                    now,
-                    now,
-                ),
+                [
+                    (
+                        key.sample_id,
+                        key.model_id,
+                        key.model_revision,
+                        key.excerpt_policy,
+                        int(compact.size),
+                        compact.tobytes(),
+                        now,
+                        now,
+                    )
+                    for key, compact in prepared
+                ],
             )
