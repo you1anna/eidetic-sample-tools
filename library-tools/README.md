@@ -229,6 +229,7 @@ sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 
 | Subcommand | Required options | Effect |
 |---|---|---|
+| `check` | None; optional `--run-id`, `--json` | Reads recorded promotions and verifies current source, curated and relevant quarantine hashes. Never writes. |
 | `migrate-catalogue` | `--ableton-root`, `--manifest`, `--undo` | Writes a migration plan; `--apply` moves after preflight. |
 | `prepare` | `--output-dir` | Writes labels and a combined candidate playlist; it never publishes name-derived categories. |
 | `classify-packet` | `--labels`, `--benchmark` | Runs two pinned CLAP checkpoints sequentially, caches embeddings and writes review candidates. `--carry-review` preserves same-sample decisions across an intentional tuning run; `--restart-review` archives and discards them. |
@@ -238,6 +239,38 @@ sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 | `promote` | `--labels`, `--run-id` | Hash-checks and copies approved favourites to `CURATED/`. |
 | `views` | `--labels`, `--output-dir` | Writes device and Ableton consumer TSVs. |
 | `undo-promotion` | `--run-id` | Moves promoted copies to quarantine. |
+
+Check a previously approved collection before reusing it:
+
+```bash
+sample-curate --root /path/to/SAMPLES --library-db /path/to/sample-library.sqlite \
+  check --run-id session-01
+```
+
+Omit `--run-id` to check all recorded promotions. Add `--json` for a structured
+report containing `summary` counts and per-promotion source, curated and quarantine
+results. A file is reported as `ok`, `missing` or `changed`; hashes are calculated
+from its current bytes, rather than trusting inventory timestamps.
+
+When a curated copy is missing, `check` also examines its existing
+`_QUARANTINE/promotion-undo/<run-id>/` location. Matching bytes there are reported
+as quarantine evidence, without inferring why an absent file was removed. A
+matching quarantined copy is accounted for only when its original also matches.
+
+Exit codes are `0` for no discrepancies among the recorded promotions, `1` for
+missing or changed content, and `2` for invalid inputs or unreadable evidence.
+An empty promotion history reports "No promotions recorded"; it does not certify
+the library. An unknown requested run is an input error. In JSON mode, input
+errors are returned as an `error` object on stdout.
+
+This command opens the existing database read-only and does not create its parent
+directory, update its schema, rescan the inventory, restore files or alter audio.
+It requires a settled index: pending database journal evidence or a database change
+observed during the query returns `2`. Finish other database work before retrying;
+retained journal evidence may need recovery by the tool that owns the database.
+The check does not create sidecar files, checkpoint or repair the index.
+It checks recorded promotion paths only, so it is not a complete library audit
+or proof of musical suitability or hardware save state.
 
 Use the complete [curation workflow](../docs/WORKFLOWS.md#3-curate-by-ear).
 Promotion accepts only a complete label set. Every favourite needs a canonical

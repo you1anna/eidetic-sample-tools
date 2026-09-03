@@ -115,6 +115,26 @@ profile crates, hardware-native paths such as `EIDETIC-CURATED/AUDIO/` and
 `ROLAND/TR-8S/SAMPLE/` are copied directly to the card root. Legacy flat exports
 use an `EIDETIC-<DEVICE>/` wrapper.
 
+When `--crate` is supplied, sync copies only the staged WAVs in that resolved
+crate plan. It does not scan the rest of the device staging folder, so other
+crates and stale files are excluded. Existing staged outputs that conversion
+skips are still included when they belong to the selected crate. Before copying,
+the exporter checks every selected staged file and its card destination.
+
+Preview the selected transfer scope without writing converted audio or card
+files:
+
+```bash
+sample-export tr8s \
+  --profile eidetic-studio \
+  --crate /path/to/foundation-v1-one-shots.tsv \
+  --sync /Volumes/TR8S-SD \
+  --dry-run
+```
+
+The preview reports the selected crate file count. It does not inspect or create
+files on the card.
+
 Digitakt's +Drive is not a mounted disk. Stage the Digitakt export, then drag it
 into Elektron Transfer. `--sync` is intentionally unsupported for Digitakt.
 

@@ -242,19 +242,67 @@ def export_device(
     return converted, skipped
 
 
-def sync_to_card(spec: DeviceSpec, dest_root: Path) -> int:
-    """Copy EXPORT_ROOT/<DEVICE>/ into a mounted card. Returns files copied."""
+def _safe_sync_relative(path: Path) -> Path:
+    if path.is_absolute() or not path.parts or path == Path(".") or ".." in path.parts:
+        raise ExportError(f"invalid staged export path: {path}")
+    return path
+
+
+def _sync_pairs(spec: DeviceSpec, dest_root: Path, plan: Plan | None) -> list[tuple[Path, Path]]:
+    """Resolve and validate every staged source/card destination before copying."""
+    if not dest_root.is_dir():
+        raise ExportError(f"sync target not found: {dest_root}")
+
     src_dir = EXPORT_ROOT / spec.export_dir
-    # Profile crates already contain the hardware-native root (for example
-    # ROLAND/TR-8S/SAMPLE or EIDETIC-CURATED/AUDIO).  Legacy flat exports keep
-    # the historical EIDETIC-<DEVICE> wrapper.
-    nested = any(path.is_dir() for path in src_dir.iterdir()) if src_dir.is_dir() else False
-    target = dest_root if nested else dest_root / f"EIDETIC-{spec.export_dir}"
-    target.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for f in sorted(src_dir.rglob("*.wav")):
-        rel = f.relative_to(src_dir)
-        (target / rel).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(f, target / rel)
-        count += 1
-    return count
+    export_root = src_dir.resolve()
+    card_root = dest_root.resolve()
+    if plan is None:
+        # Profile crates already contain the hardware-native root (for example
+        # ROLAND/TR-8S/SAMPLE or EIDETIC-CURATED/AUDIO). Legacy flat exports
+        # keep the historical EIDETIC-<DEVICE> wrapper.
+        nested = any(path.is_dir() for path in src_dir.iterdir()) if src_dir.is_dir() else False
+        target_root = card_root if nested else card_root / f"EIDETIC-{spec.export_dir}"
+        sources = [
+            (staged, staged.relative_to(src_dir))
+            for staged in sorted(src_dir.rglob("*.wav"))
+        ] if src_dir.is_dir() else []
+    else:
+        target_root = card_root
+        sources = [
+            (src_dir / _safe_sync_relative(item.out_rel or Path(item.out_name)),
+             _safe_sync_relative(item.out_rel or Path(item.out_name)))
+            for item in plan.items
+        ]
+
+    pairs: list[tuple[Path, Path]] = []
+    for staged, relative in sources:
+        resolved_staged = staged.resolve()
+        if not resolved_staged.is_relative_to(export_root):
+            raise ExportError(f"staged export escapes export root: {staged}")
+        if not staged.is_file():
+            raise ExportError(f"missing staged export: {staged}")
+
+        destination = target_root / _safe_sync_relative(relative)
+        resolved_parent = destination.parent.resolve()
+        if not resolved_parent.is_relative_to(card_root):
+            raise ExportError(f"sync destination escapes card root: {destination}")
+        ancestor = card_root
+        for part in destination.parent.relative_to(card_root).parts:
+            ancestor /= part
+            if ancestor.is_symlink() and not ancestor.exists():
+                raise ExportError(f"destination ancestor is a dangling symlink: {ancestor}")
+            if ancestor.exists() and not ancestor.is_dir():
+                raise ExportError(f"destination ancestor is not a directory: {ancestor}")
+        if destination.is_dir() or destination.is_symlink():
+            raise ExportError(f"invalid sync destination: {destination}")
+        pairs.append((staged, destination))
+    return pairs
+
+
+def sync_to_card(spec: DeviceSpec, dest_root: Path, *, plan: Plan | None = None) -> int:
+    """Copy staged exports to a mounted card. A plan restricts copying to its items."""
+    pairs = _sync_pairs(spec, dest_root, plan)
+    for staged, destination in pairs:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(staged, destination)
+    return len(pairs)

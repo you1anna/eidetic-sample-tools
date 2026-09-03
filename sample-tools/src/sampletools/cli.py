@@ -42,13 +42,20 @@ def _run_export(spec_name: str, *, dry_run: bool, force: bool, sync: str | None,
             print(f"  --sync not supported for {spec.name}: {spec.sync_note}")
             return 0
         if dry_run:
-            print(f"  (dry-run) would sync to {sync}")
+            if plan is None:
+                print(f"  (dry-run) would sync the staged {spec.export_dir} export to {sync}")
+            else:
+                print(f"  (dry-run) would sync {len(plan.items)} selected crate file(s) to {sync}")
             return 0
         dest = Path(sync)
         if not dest.is_dir():
             print(f"  --sync target not found: {dest}", file=sys.stderr)
             return 2
-        copied = export_mod.sync_to_card(spec, dest)
+        try:
+            copied = export_mod.sync_to_card(spec, dest, plan=plan)
+        except export_mod.ExportError as exc:
+            print(f"  --sync failed: {exc}", file=sys.stderr)
+            return 2
         print(f"  synced {copied} file(s) to {dest}  ({spec.sync_note})")
     return 0
 

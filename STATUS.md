@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-08-06
+**Updated:** 2026-09-03
 
 ## Current position
 
@@ -45,12 +45,23 @@ Robin chooses favourites and `sample-curate promote` creates hash-verified copie
 - Ableton-aware catalogue migration planning.
 - Human audition packets and hash-verified favourite promotion.
 - Profile-aware consumer crates and device validation.
+- Read-only promotion checks for original, curated and relevant quarantine hashes.
+- Selected-crate card sync, including pre-existing staged conversions, with all
+  selected source and destination paths checked before copying.
 
-All current automated tests pass. Beta describes operational maturity, not a
-known test failure.
+Verification on 2026-09-03: 310 library tests passed (4 skipped), 23 sample-export
+tests passed and 10 Ableton tests passed. Beta describes operational maturity,
+not a known test failure. The new commands retain existing profiles, filenames,
+device layouts and safety defaults. Promotion checks require a settled database
+and report unreadable journal evidence rather than repairing or checkpointing it.
 
 ## Live-library state
 
+- The read-only promotion check on 2026-09-03 examined 24 recorded promotions.
+  Every original matched its recorded SHA-256; all 24 curated copies and their
+  expected promotion-undo quarantine copies were absent. The database and its
+  sidecar files were unchanged. This checks recorded promotions only, does not
+  explain the absences and does not restore files.
 - **The Extreme SSD has no current backup.** The earlier "backed up, confirmed 2026-07-07"
   claim was checked on 2026-07-31 and does not hold: `tmutil destinationinfo` reports no
   destinations configured on the Mac mini. 28 GB across 22,952 audio files is single-copy,

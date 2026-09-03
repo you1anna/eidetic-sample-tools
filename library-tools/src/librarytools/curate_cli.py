@@ -14,6 +14,7 @@ from .curate import (
     undo_promotions, write_consumer_views,
 )
 from .inventory import LibraryDatabase
+from .promotion_health import HealthCheckError, check_promotions
 from .packet_classifier import PacketClassifierError, classify_packet
 from .classification.review_server import load_review_packet, serve_review
 
@@ -26,6 +27,9 @@ def main(argv: list[str] | None = None) -> int:
         default=config.MANIFEST_DIR / "sample-library.sqlite",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+    check = sub.add_parser("check", help="read-only verification of recorded promotions")
+    check.add_argument("--run-id", help="check one recorded promotion run")
+    check.add_argument("--json", action="store_true", dest="json_output")
     migrate = sub.add_parser("migrate-catalogue")
     migrate.add_argument("--ableton-root", type=Path, required=True)
     migrate.add_argument("--manifest", type=Path, required=True)
@@ -56,6 +60,17 @@ def main(argv: list[str] | None = None) -> int:
     undo_promotion = sub.add_parser("undo-promotion")
     undo_promotion.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
+    if args.command == "check":
+        try:
+            report = check_promotions(args.root, args.library_db, args.run_id)
+        except HealthCheckError as exc:
+            if args.json_output:
+                print(json.dumps({"error": str(exc)}))
+            else:
+                print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(report.to_dict(), indent=2) if args.json_output else report.text())
+        return report.exit_code
     try:
         if args.command == "playlists":
             paths = regenerate_packet_playlists(args.labels)
