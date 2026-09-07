@@ -48,6 +48,41 @@ cd /path/to/eidetic-sample-tools
 This installs `sample-export`. See the [sample export reference](../sample-tools/README.md)
 for device formats and transfer routes.
 
+## Install Ableton inspection when needed
+
+To index saved Live Sets and report their sample dependencies, add the third
+package to the same environment:
+
+```bash
+cd /path/to/eidetic-sample-tools
+.venv/bin/pip install -e "./ableton-tools"
+```
+
+This installs `als-index` and `als-samples`. The package uses Python's standard
+library and reads saved `.als` files directly, so Live does not need to be running.
+
+## Optional audio classification and browser review
+
+For model-assisted audition grouping and the local review page, install the
+library extras:
+
+```bash
+cd /path/to/eidetic-sample-tools
+.venv/bin/pip install -e "./library-tools[audio-classifier,review-ui]"
+```
+
+These add PyTorch, Transformers, librosa and Flask. The two pinned CLAP models
+download on first use and run locally on the CPU; allow time and disk space for
+that initial setup. Core review, tag search, `--like` acoustic search and device
+export use the base packages.
+
+Follow the [curation workflow](WORKFLOWS.md#3-curate-by-ear) to prepare a packet,
+classify it and complete its review. The
+[technology guide](TECHNOLOGY.md#optional-local-ai-for-listening-packets) explains
+the model cache and human review gates.
+
+## Activate the environment
+
 Activate the environment if you want to use commands without the `.venv/bin/`
 prefix:
 
@@ -142,15 +177,43 @@ It reads audio but never moves, renames or converts it.
 Then search, and audition what comes back:
 
 ```bash
-sample-find perc tribal analog --limit 20 --m3u8 manifests/hunt.m3u8
+sample-find perc tribal analog --root /path/to/SAMPLES \
+  --limit 20 --m3u8 manifests/hunt.m3u8
 ```
 
-Run without `--apply` first if you want to see what the vocabulary would match before
-writing anything.
+Run `sample-tag` without `--apply` to preview vocabulary coverage before replacing
+stored tags. Scanning, origin recovery and feature extraction can still update
+the derived index and write a proposal; source audio stays in place.
+
+Once a reference sample has measurements, use its ID or a unique path fragment to
+rank candidates by sound:
+
+```bash
+sample-find --like YOUR_SAMPLE_ID --role PERC --limit 10
+```
+
+Replace `YOUR_SAMPLE_ID` with a real indexed sample ID or an unambiguous fragment
+of its path. This compares acoustic measurements and requires no model download.
+The [search reference](../library-tools/README.md#sample-find) covers filters,
+playlists, kit picks and `--curated-only` crates for already promoted favourites.
+
+## Inspect saved Ableton projects
+
+With `ableton-tools` installed, point both reports at a projects directory:
+
+```bash
+als-index --root /path/to/ABLETON_PROJECTS --out manifests/ableton
+als-samples --root /path/to/ABLETON_PROJECTS --out manifests/ableton
+```
+
+These write `als-index.tsv` and `als-samples.tsv`. They report Set structure and
+present or missing sample references without editing a Set or its audio. See the
+[Ableton reference](../ableton-tools/README.md) for root configuration.
 
 ## Choose your next workflow
 
 - Read [Workflows](WORKFLOWS.md) to move from inspection to curation and export.
+- Read [Technology and architecture](TECHNOLOGY.md) for the search, data and model implementation.
 - Read the [Safety model](SAFETY.md) before using an apply step.
 - Check the [Roadmap](ROADMAP.md) to distinguish stable, beta and experimental
   work.
@@ -164,7 +227,7 @@ portable environment shown above:
 |---|---|
 | Repository | `/Users/macmini/Projects/eidetic-sample-tools` |
 | Sample library | `/Volumes/Extreme SSD/Production/SAMPLES` |
-| Python environments | `~/.venvs/library-tools` and `~/.venvs/sample-tools` |
+| Python environments | `~/.venvs/library-tools`, `~/.venvs/sample-tools` and `~/.venvs/ableton-tools` |
 | Studio profile | `profiles/studios/eidetic-studio.toml` |
 
 These paths are examples, not requirements. The current studio keeps its sample
