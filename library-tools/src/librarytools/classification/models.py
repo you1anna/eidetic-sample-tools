@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Mapping, Protocol
 
@@ -181,6 +182,7 @@ class ClapEmbeddingRuntime:
                 "audio classification requires the audio-classifier extra (torch, transformers)"
             ) from exc
         self.spec = spec
+        torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS', '2')))
         self._torch = torch
         self._processor = ClapProcessor.from_pretrained(spec.model_id, revision=spec.revision)
         self._model = (

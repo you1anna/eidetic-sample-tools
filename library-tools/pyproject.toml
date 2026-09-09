@@ -13,11 +13,11 @@ dependencies = [
 ]  # ffmpeg/ffprobe used via subprocess for format fallbacks and duration probes
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "flask>=3.1,<4"]
 # Drum-role classifier vote (sample-analyze --classifier). Heavy + optional so the core
 # tidy tools stay light. Weights are user-supplied (unlicensed upstream), never shipped.
 classifier = ["torch>=2.2", "librosa>=0.10"]
-audio-classifier = ["torch>=2.2", "librosa>=0.10", "transformers>=4.40"]
+audio-classifier = ["torch>=2.6,<3", "librosa>=0.11,<0.12", "transformers>=4.57,<5"]
 review-ui = ["flask>=3.1,<4"]
 
 [project.scripts]
@@ -36,6 +36,7 @@ sample-tag = "librarytools.tag_cli:main"
 sample-find = "librarytools.find_cli:main"
 sample-library = "librarytools.library_cli:main"
 sample-vibe = "librarytools.vibe_cli:main"
+sample-ai = "librarytools.ai_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

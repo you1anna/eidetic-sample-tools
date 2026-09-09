@@ -277,7 +277,7 @@ def test_playlists_cli_regenerates_packet_without_library_database(tmp_path, cap
     )
     _mark_benchmark_passed(packet)
 
-    rc = curate_cli.main(["playlists", "--labels", str(packet / "labels.tsv")])
+    rc = curate_cli.main(["--root", str(root), "playlists", "--labels", str(packet / "labels.tsv")])
 
     assert rc == 0
     assert capsys.readouterr().out == f"category playlists: 1 -> {packet / 'playlists'}\n"
@@ -306,7 +306,7 @@ def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path
     )
 
     rc = curate_cli.main([
-        "review-packet", "--labels", str(labels), "--port", "4321", "--open",
+        "--root", str(root), "review-packet", "--labels", str(labels), "--port", "4321", "--open",
     ])
 
     assert rc == 0
@@ -355,11 +355,12 @@ def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_pat
     rc = curate_cli.main([
         "--root", str(root), "--library-db", str(tmp_path / "library.sqlite"),
         "classify-packet", "--labels", str(labels), "--benchmark", str(benchmark),
-        "--carry-review",
+        "--carry-review", "--threads", "1", "--batch-size", "1", "--worker-timeout", "60",
     ])
 
     assert rc == 0
-    assert calls[0][1] == {"restart_review": False, "carry_review": True}
+    assert calls[0][1] == {"restart_review": False, "carry_review": True,
+                           "threads": 1, "batch_size": 1, "worker_timeout": 60.0}
 
 
 def test_classify_packet_cli_does_not_claim_success_while_review_is_pending(
@@ -420,7 +421,7 @@ def test_playlists_refuses_to_bypass_unpassed_benchmark_and_preserves_old_output
     old.mkdir()
     (old / "rejected.m3u8").write_text("#EXTM3U\n/old.wav\n", encoding="utf-8")
 
-    rc = curate_cli.main(["playlists", "--labels", str(packet / "labels.tsv")])
+    rc = curate_cli.main(["--root", str(root), "playlists", "--labels", str(packet / "labels.tsv")])
 
     assert rc == 2
     assert (old / "rejected.m3u8").read_text() == "#EXTM3U\n/old.wav\n"

@@ -99,7 +99,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     samples_root = args.root if args.root is not None else SAMPLES_ROOT
-    export_root = args.export_root if args.export_root is not None else (samples_root / "_EXPORT" if args.root is not None else EXPORT_ROOT)
+    if samples_root is None:
+        parser.error('No sample library selected; pass --root PATH or set SAMPLES_ROOT.')
+    samples_root = samples_root.expanduser()
+    export_root = args.export_root if args.export_root is not None else (samples_root / "_EXPORT" if args.root is not None else EXPORT_ROOT or samples_root / '_EXPORT')
     if not samples_root.is_dir():
         print(f"SAMPLES_ROOT not found: {samples_root}\n"
               f"Mount the SSD or set $SAMPLES_ROOT.", file=sys.stderr)

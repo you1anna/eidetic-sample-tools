@@ -7,6 +7,7 @@ being checked. All library state and exports are created in a temporary director
 from __future__ import annotations
 
 import contextlib
+import argparse
 import hashlib
 from importlib import import_module, metadata
 import io
@@ -60,6 +61,9 @@ def check_audition(root: Path, scratch: Path, source: Path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--core-only', action='store_true', help='verify the base install without optional browser review')
+    args = parser.parse_args()
     installed = Path(sysconfig.get_path('purelib')).resolve()
     for name in ('librarytools', 'sampletools', 'abletontools'):
         package = import_module(name)
@@ -105,7 +109,8 @@ def main():
         assert not (root / '.eidetic').exists()
         invoke(library_main, [*setup, '--apply'])
         invoke(tag_cli.main, ['--root', str(root), '--rescan', '--skip-features', '--apply'])
-        check_audition(root, scratch, source)
+        if not args.core_only:
+            check_audition(root, scratch, source)
 
         unverified = scratch / 'unverified.tsv'
         invoke(find_cli.main, ['--root', str(root), '--curated-only', '--crate', str(unverified)])
@@ -144,7 +149,10 @@ def main():
         backup_bundle(remounted / '.eidetic/library.sqlite', scratch / 'backup', root=remounted)
         restore_bundle(scratch / 'backup', scratch / 'restored')
         assert next((scratch / 'restored').rglob('labels.tsv')).read_bytes() == (evidence / 'labels.tsv').read_bytes()
-    print('Installed-package checks passed: commands, resources, audition, onboarding, approval, export, handoff and restore.')
+    checks = 'commands, resources, onboarding, approval, export, handoff and restore'
+    if not args.core_only:
+        checks += ', audition'
+    print(f'Installed-package checks passed: {checks}.')
 
 
 if __name__ == '__main__':

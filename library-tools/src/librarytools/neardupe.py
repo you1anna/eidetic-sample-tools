@@ -321,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--apply-manifest", type=Path, help="reviewed near-dupes TSV to stage from")
     ap.add_argument("--apply", action="store_true", help="perform approved moves from --apply-manifest (default: dry-run)")
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
     runs = args.root / '.eidetic' / 'runs'
     args.features = args.features or runs / 'sample-intelligence-pilot' / 'sample-features-latest.tsv'
     args.output_dir = args.output_dir or runs / 'near-dupes-pilot'

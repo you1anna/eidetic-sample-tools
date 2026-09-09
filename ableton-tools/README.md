@@ -12,7 +12,7 @@ need to be running; Sets and audio are never edited or relinked.
 From the repository root, in an activated Python 3.12 environment:
 
 ```bash
-python -m pip install -e './ableton-tools[dev]'
+python -m pip install -e ./ableton-tools
 ```
 
 See [Getting started](../docs/GETTING-STARTED.md) for environment setup.
@@ -57,11 +57,13 @@ export ALS_ROOTS="/path/to/active-projects:/path/to/project-archive"
 als-samples --out "$RUNS/ableton"
 ```
 
-An explicit `--root` takes precedence. Set one of these options to avoid the
-legacy machine-specific root defaults.
+An explicit `--root` takes precedence. One of these options is required;
+omitting both fails before creating reports. Sample-library `SAMPLES_ROOT` is
+not used for Ableton project selection.
 
 ## Verify
 
 ```bash
+python -m pip install -e './ableton-tools[dev]'
 python -m pytest ableton-tools -q
 ```

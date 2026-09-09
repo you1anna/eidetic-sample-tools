@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -28,6 +29,18 @@ from .models import (
 
 
 EXCERPT_POLICY = "three-10s-v1"
+DEFAULT_BATCH_SIZE = 2
+DEFAULT_THREADS = 2
+DEFAULT_TIMEOUT = 300.0
+
+
+def validate_worker_limits(batch_size: int, threads: int, timeout: float) -> None:
+    if not 1 <= batch_size <= 8:
+        raise ClassificationError("model batch size must be between 1 and 8")
+    if threads <= 0:
+        raise ClassificationError("model worker thread count must be positive")
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ClassificationError("model worker timeout must be a positive finite number")
 
 
 @dataclass(frozen=True)
@@ -64,21 +77,26 @@ class EmbeddingWorker:
         samples: Sequence[SampleRef],
         cache: EmbeddingCache,
         *,
-        batch_size: int = 8,
-        threads: int = 8,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        threads: int = DEFAULT_THREADS,
+        timeout: float = DEFAULT_TIMEOUT,
         prompts: Mapping[str, tuple[str, ...]] | None = None,
     ) -> WorkerReport:
-        if not 1 <= batch_size <= 8:
-            raise ClassificationError("model batch size must be between 1 and 8")
-        if threads <= 0:
-            raise ClassificationError("model worker thread count must be positive")
+        validate_worker_limits(batch_size, threads, timeout)
         if self._runtime_factory is not None:
             return self._run_inline(
                 spec, samples, cache, batch_size=batch_size, threads=threads, prompts=prompts,
             )
-        return self._run_subprocess(
-            spec, samples, cache, batch_size=batch_size, threads=threads, prompts=prompts,
-        )
+        try:
+            return self._run_subprocess(
+                spec, samples, cache, batch_size=batch_size, threads=threads,
+                timeout=timeout, prompts=prompts,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ClassificationError(
+                f'model worker timed out after {timeout:g}s for {spec.model_id}; '
+                'completed cached batches are retained; retry or increase --worker-timeout'
+            ) from exc
 
     def _run_inline(
         self,
@@ -177,6 +195,7 @@ class EmbeddingWorker:
         *,
         batch_size: int,
         threads: int,
+        timeout: float,
         prompts: Mapping[str, tuple[str, ...]] | None,
     ) -> WorkerReport:
         from ..locking import inherited_lock_fd
@@ -215,6 +234,7 @@ class EmbeddingWorker:
                 text=True,
                 env=environment,
                 pass_fds=(lock_fd,) if lock_fd is not None else (),
+                timeout=timeout,
             )
             wall_time_s = time.perf_counter() - started
             if completed.returncode:
@@ -247,15 +267,16 @@ def run_models_sequentially(
     cache: EmbeddingCache,
     *,
     worker_factory: Callable[[], object] = EmbeddingWorker,
-    batch_size: int = 8,
-    threads: int = 8,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    threads: int = DEFAULT_THREADS,
+    timeout: float = DEFAULT_TIMEOUT,
 ) -> list[object]:
     """Complete and release one worker before constructing the next."""
     reports: list[object] = []
     for spec in specs:
         worker = worker_factory()
         reports.append(
-            worker.run(spec, samples, cache, batch_size=batch_size, threads=threads)  # type: ignore[attr-defined]
+            worker.run(spec, samples, cache, batch_size=batch_size, threads=threads, timeout=timeout)  # type: ignore[attr-defined]
         )
         del worker
     return reports
@@ -268,8 +289,9 @@ def generate_model_votes(
     *,
     worker_factory: Callable[[], EmbeddingWorker] = EmbeddingWorker,
     prompts: Mapping[str, tuple[str, ...]] = CONTENT_PROMPTS,
-    batch_size: int = 8,
-    threads: int = 8,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    threads: int = DEFAULT_THREADS,
+    timeout: float = DEFAULT_TIMEOUT,
 ) -> tuple[dict[str, tuple[ModelVote, ...]], list[WorkerReport]]:
     """Run one model at a time, then score only compact cached vectors in the parent."""
     collected: dict[str, list[ModelVote]] = {sample.sample_id: [] for sample in samples}
@@ -283,6 +305,7 @@ def generate_model_votes(
             cache,
             batch_size=batch_size,
             threads=threads,
+            timeout=timeout,
             prompts=prompts,
         )
         reports.append(report)

@@ -1,0 +1,45 @@
+name: Optional local AI checks
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  models:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      HF_HOME: ${{ github.workspace }}/.model-cache
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked environment
+        run: |
+          python -c 'import platform; assert platform.machine() == "arm64"'
+          python -m venv "$RUNNER_TEMP/eidetic-ai"
+          "$RUNNER_TEMP/eidetic-ai/bin/python" -m pip install --require-hashes --only-binary=:all: -r requirements-ai-macos-arm64.txt
+          "$RUNNER_TEMP/eidetic-ai/bin/python" -m pip install --no-build-isolation --no-deps './library-tools[audio-classifier,review-ui,dev]'
+          "$RUNNER_TEMP/eidetic-ai/bin/python" -m pip check
+      - uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: clap-models-v1-${{ hashFiles('library-tools/src/librarytools/classification/models.py') }}
+      - name: Fetch pinned checkpoints
+        run: '"$RUNNER_TEMP/eidetic-ai/bin/sample-ai" download'
+      - name: Verify offline inference and reuse
+        env:
+          HF_HUB_OFFLINE: '1'
+          RUN_CLAP_INTEGRATION: '1'
+          RUN_DUAL_CLAP_INTEGRATION: '1'
+        run: |
+          "$RUNNER_TEMP/eidetic-ai/bin/sample-ai" check --worker-timeout 180 > ai-check.json
+          "$RUNNER_TEMP/eidetic-ai/bin/python" -m pytest library-tools/tests/test_model_workers.py library-tools/tests/test_packet_classifier.py library-tools/tests/test_ai_cli.py -q
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-ai-check
+          path: ai-check.json

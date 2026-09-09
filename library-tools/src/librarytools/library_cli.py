@@ -98,6 +98,8 @@ def _migrate(args):
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command != 'restore':
+            args.root = config.require_root(args.root)
         code = 0
         if args.command == 'doctor':
             report = doctor(args.root, args.library_db)

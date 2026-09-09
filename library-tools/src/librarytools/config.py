@@ -2,7 +2,7 @@
 
 Overridable via environment so the tool survives a different mount point:
 
-    SAMPLES_ROOT   default: /Volumes/Extreme SSD/Production/SAMPLES
+    SAMPLES_ROOT   required unless --root is supplied
 """
 
 from __future__ import annotations
@@ -11,14 +11,21 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-SAMPLES_ROOT: Path = Path(
-    os.environ.get("SAMPLES_ROOT", "/Volumes/Extreme SSD/Production/SAMPLES")
-)
+SAMPLES_ROOT = Path(os.environ['SAMPLES_ROOT']).expanduser() if os.environ.get('SAMPLES_ROOT', '').strip() else None
+
+
+def require_root(root: Path | None, parser=None) -> Path:
+    if root is None:
+        message = 'No sample library selected; pass --root PATH or set SAMPLES_ROOT.'
+        if parser is not None:
+            parser.error(message)
+        raise ValueError(message)
+    return Path(root).expanduser()
 
 # Two-zone model: CURATED/ = role folders (renamed by convention);
 # PACKS/ = whole vendor packs kept intact.
-CURATED_ROOT: Path = SAMPLES_ROOT / "CURATED"
-PACKS_ROOT: Path = SAMPLES_ROOT / "PACKS"
+CURATED_ROOT = SAMPLES_ROOT / "CURATED" if SAMPLES_ROOT else None
+PACKS_ROOT = SAMPLES_ROOT / "PACKS" if SAMPLES_ROOT else None
 
 # Top-level folders classify is allowed to read from (the messy bulk).
 IN_SCOPE: tuple[str, ...] = ("_PACKS", "DRUM-KITS", "00_INBOX")
@@ -34,12 +41,12 @@ SOURCE_EXTS: frozenset[str] = frozenset(
 
 BUCKETS: tuple[str, ...] = ("LOOPS", "ONE-SHOTS", "PADS-DRONES", "OTHER")
 
-TO_DELETE_ROOT: Path = SAMPLES_ROOT / "_TO-DELETE"
+TO_DELETE_ROOT = SAMPLES_ROOT / "_TO-DELETE" if SAMPLES_ROOT else None
 
 # Historical state is discovered explicitly; it must never silently compete with
 # portable state on the sample drive.
 LEGACY_MANIFEST_DIR: Path = Path(__file__).resolve().parents[2] / "manifests"
-MANIFEST_DIR: Path = SAMPLES_ROOT / '.eidetic' / 'runs'
+MANIFEST_DIR = SAMPLES_ROOT / '.eidetic' / 'runs' if SAMPLES_ROOT else None
 
 # Optional drum-role classifier weights. USER-SUPPLIED and gitignored: the upstream
 # weights carry no license, so they are never committed or redistributed — the package
@@ -64,5 +71,5 @@ PAD_KEYWORDS: tuple[str, ...] = (
 def manifest_path(prefix: str, root: Path | None = None) -> Path:
     """Timestamped manifest path under the selected library's .eidetic/runs/."""
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    directory = root / '.eidetic' / 'runs' if root is not None else MANIFEST_DIR
+    directory = require_root(root if root is not None else SAMPLES_ROOT) / '.eidetic' / 'runs'
     return directory / f"{prefix}-{stamp}.tsv"

@@ -159,7 +159,7 @@ def build_feature_rows(
     cache_path: Path | None = None,
 ) -> list[FeatureRow]:
     rows: list[FeatureRow] = []
-    cache = FeatureCache(cache_path or (config.MANIFEST_DIR / "sample-intelligence.sqlite")) if audio_features else None
+    cache = FeatureCache(cache_path or (root / '.eidetic' / 'cache' / "sample-intelligence.sqlite")) if audio_features else None
     for source in sources:
         if not _is_sample_source(source):
             continue

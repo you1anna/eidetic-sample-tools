@@ -3,7 +3,7 @@
 All values are overridable via environment variables so the tool works even if
 the SSD mounts at a different point or the library is relocated:
 
-    SAMPLES_ROOT   default: /Volumes/Extreme SSD/Production/SAMPLES
+    SAMPLES_ROOT   required unless --root is supplied
     EXPORT_ROOT    default: <SAMPLES_ROOT>/_EXPORT
 """
 
@@ -15,10 +15,15 @@ import tomllib
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-SAMPLES_ROOT: Path = Path(
-    os.environ.get("SAMPLES_ROOT", "/Volumes/Extreme SSD/Production/SAMPLES")
-)
-EXPORT_ROOT: Path = Path(os.environ.get("EXPORT_ROOT", str(SAMPLES_ROOT / "_EXPORT")))
+SAMPLES_ROOT = Path(os.environ['SAMPLES_ROOT']).expanduser() if os.environ.get('SAMPLES_ROOT', '').strip() else None
+EXPORT_ROOT = (Path(os.environ['EXPORT_ROOT']).expanduser() if os.environ.get('EXPORT_ROOT', '').strip()
+               else SAMPLES_ROOT / '_EXPORT' if SAMPLES_ROOT else None)
+
+
+def require_root(root: Path | None) -> Path:
+    if root is None:
+        raise ValueError('No sample library selected; pass --root PATH or set SAMPLES_ROOT.')
+    return Path(root).expanduser()
 DEFAULT_PROFILE_CONFIG = Path.home() / ".config" / "eidetic-sample-tools" / "config.toml"
 
 # Source extensions ffmpeg can decode into our 16-bit/44.1 WAV target.
@@ -145,8 +150,10 @@ def get_profile_spec(
 
 def manifest_path(device: str, *, samples_root: Path | None = None) -> Path:
     """Prefer the selected library's manifest, then checkout or packaged defaults."""
-    portable = (samples_root or SAMPLES_ROOT) / '.eidetic' / 'manifests' / f'{get_spec(device).name}.txt'
-    if portable.is_file():
-        return portable
+    root = samples_root or SAMPLES_ROOT
+    if root is not None:
+        portable = root / '.eidetic' / 'manifests' / f'{get_spec(device).name}.txt'
+        if portable.is_file():
+            return portable
     legacy = Path(__file__).resolve().parents[2] / "manifests" / f"{get_spec(device).name}.txt"
     return legacy if legacy.is_file() else Path(__file__).parent / 'resources' / 'manifests' / f'{get_spec(device).name}.txt'

@@ -128,6 +128,7 @@ def _main(argv: list[str] | None = None) -> int:
         help="write stable SHA-256 inventory to this new SQLite database",
     )
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
     args.output_dir = args.output_dir or args.root / '.eidetic' / 'runs' / 'sample-intelligence-pilot'
     args.feature_cache = args.feature_cache or args.root / '.eidetic' / 'cache' / 'sample-intelligence.sqlite'
     if args.library_db is not None or (args.root / '.eidetic' / 'library.sqlite').is_file():

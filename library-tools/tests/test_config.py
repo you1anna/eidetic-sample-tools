@@ -11,12 +11,15 @@ def test_in_scope_is_the_messy_folders_only():
     assert config.IN_SCOPE == ("_PACKS", "DRUM-KITS", "00_INBOX")
 
 
-def test_to_delete_root_under_samples_root():
-    assert config.TO_DELETE_ROOT == config.SAMPLES_ROOT / "_TO-DELETE"
+def test_unconfigured_root_requires_explicit_selection(monkeypatch):
+    import pytest
+    monkeypatch.setattr(config, 'SAMPLES_ROOT', None)
+    with pytest.raises(ValueError, match='--root.*SAMPLES_ROOT'):
+        config.manifest_path('classify')
 
 
-def test_manifest_path_has_prefix_and_tsv_suffix():
-    p = config.manifest_path("classify")
+def test_manifest_path_has_prefix_and_tsv_suffix(tmp_path):
+    p = config.manifest_path("classify", root=tmp_path)
     assert p.name.startswith("classify-")
     assert p.suffix == ".tsv"
-    assert p.parent == config.MANIFEST_DIR
+    assert p.parent == tmp_path / '.eidetic' / 'runs'

@@ -1,6 +1,4 @@
-# Core sample-export runtime has no third-party deps:
-# it shells out to ffmpeg/ffprobe (installed via Homebrew) and uses the stdlib.
-#
-# Future work (BPM detection for inventory/auto-naming) would add e.g.:
-#   librosa
-#   soundfile
+# Compatibility placeholder; pyproject.toml owns dependency declarations.
+# This file does not install sample-export. From the repository root use:
+#   python -m pip install ./sample-tools
+# The runtime uses the stdlib and system-installed ffmpeg/ffprobe.

@@ -22,6 +22,7 @@ from .curation_policy import CurationPolicyError, load_quotas, validate_crate_na
 from .promotion_health import HealthCheckError, check_promotions
 from .packet_classifier import PacketClassifierError, classify_packet
 from .classification.review_server import load_review_packet, serve_review
+from .classification.workers import DEFAULT_BATCH_SIZE, DEFAULT_THREADS, DEFAULT_TIMEOUT
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     classify = sub.add_parser("classify-packet")
     classify.add_argument("--labels", type=Path, required=True)
     classify.add_argument("--benchmark", type=Path, required=True)
+    classify.add_argument('--batch-size', type=int, default=DEFAULT_BATCH_SIZE, help='audio files per committed batch (1–8; default 2)')
+    classify.add_argument('--threads', type=int, default=DEFAULT_THREADS, help='CPU threads per model worker (default 2)')
+    classify.add_argument('--worker-timeout', type=float, default=DEFAULT_TIMEOUT, help='seconds per model worker, including load (default 300); completed batches survive a timeout')
     review_state = classify.add_mutually_exclusive_group()
     review_state.add_argument("--restart-review", action="store_true")
     review_state.add_argument("--carry-review", action="store_true")
@@ -68,8 +72,8 @@ def main(argv: list[str] | None = None) -> int:
     undo_promotion = sub.add_parser("undo-promotion")
     undo_promotion.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
+    args.root = config.require_root(args.root or config.SAMPLES_ROOT, parser)
     packet_root_override = args.root
-    args.root = args.root or config.SAMPLES_ROOT
     try:
         args.library_db = resolve_library_db(args.root, args.library_db)
     except (ValueError, OSError) as exc:
@@ -115,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.root, db, args.labels, args.benchmark,
                     restart_review=args.restart_review,
                     carry_review=args.carry_review,
+                    batch_size=args.batch_size, threads=args.threads, worker_timeout=args.worker_timeout,
                 )
             print(f"classified: {len(classifications)} -> {args.labels.parent / 'classification.tsv'}")
             metadata_path = args.labels.parent / "packet-meta.json"

@@ -15,8 +15,8 @@ export RUNS="$SAMPLES_ROOT/.eidetic/runs"
 ```
 
 Install FFmpeg and FFprobe as described in
-[Getting started](../docs/GETTING-STARTED.md). Set `SAMPLES_ROOT` explicitly;
-the code retains a legacy machine-specific fallback. `EXPORT_ROOT` defaults to
+[Getting started](../docs/GETTING-STARTED.md). Set `SAMPLES_ROOT` or pass `--root`;
+omitting both gives a clear error before export. `EXPORT_ROOT` defaults to
 `$SAMPLES_ROOT/_EXPORT`. Pass `--root /path/to/SAMPLES` to choose the attached
 library explicitly for one invocation. With `--root`, exports default to that
 library's `_EXPORT/`; pass `--export-root /path/to/staging` to override it.

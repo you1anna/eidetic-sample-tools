@@ -68,7 +68,7 @@ def test_invalid_quotas_fail_before_creating_an_index_or_packet(tmp_path, capsys
     packet = tmp_path / "packet"
 
     assert _run([
-        "--library-db", database, "prepare", "--output-dir", packet, "--quotas", quotas,
+        "--root", tmp_path, "--library-db", database, "prepare", "--output-dir", packet, "--quotas", quotas,
     ]) == 2
 
     assert "invalid quotas" in capsys.readouterr().err.lower()
@@ -81,7 +81,7 @@ def test_custom_crate_name_cannot_escape_output_directory(tmp_path, capsys):
     output = tmp_path / "views"
 
     assert _run([
-        "--library-db", database, "views", "--labels", tmp_path / "labels.tsv",
+        "--root", tmp_path, "--library-db", database, "views", "--labels", tmp_path / "labels.tsv",
         "--output-dir", output, "--name", "../escape",
     ]) == 2
 

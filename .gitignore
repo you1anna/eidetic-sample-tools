@@ -20,6 +20,10 @@ __pycache__/
 build/
 dist/
 
+# Portable library state is private data, including when testing a local library.
+.eidetic/
+.model-cache/
+
 # macOS / exFAT litter
 .DS_Store
 ._*

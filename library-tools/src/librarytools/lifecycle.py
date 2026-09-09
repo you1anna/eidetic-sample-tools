@@ -129,10 +129,19 @@ def _copy_evidence(source: Path, target: Path, *, database: Path, excluded: Path
 
 def _verify_bundle(bundle: Path) -> dict:
     manifest = json.loads((bundle / 'manifest.json').read_text(encoding='utf-8'))
-    if manifest.get('format_version') != 1 or not isinstance(manifest.get('files'), dict):
+    if (not isinstance(manifest, dict)
+            or type(manifest.get('format_version')) is not int
+            or manifest['format_version'] != 1
+            or not isinstance(manifest.get('files'), dict)):
         raise ValueError('unsupported backup format')
     state = (bundle / 'state').resolve()
     for name, evidence in manifest['files'].items():
+        if (not isinstance(evidence, dict)
+                or type(evidence.get('size')) is not int or evidence['size'] < 0
+                or not isinstance(evidence.get('sha256'), str)
+                or len(evidence['sha256']) != 64
+                or any(char not in '0123456789abcdef' for char in evidence['sha256'])):
+            raise ValueError(f'invalid backup file metadata: {name}')
         relative = Path(name)
         path = state / relative
         if relative.is_absolute() or '..' in relative.parts or path.is_symlink() or not path.resolve().is_relative_to(state):

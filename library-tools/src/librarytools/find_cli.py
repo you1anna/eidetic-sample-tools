@@ -82,6 +82,7 @@ def _main(argv: list[str] | None = None) -> int:
     ap.add_argument("--crate", type=Path, help="write a crate TSV for sample-export")
     ap.add_argument("--kit-id", help="record these results as picks under this kit id")
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
     args.library_db = resolve_library_db(args.root, args.library_db)
     purpose = 'write search crate' if args.crate else 'record picks'
     with library_lock(args.root, purpose=purpose) if args.kit_id or args.crate else nullcontext():

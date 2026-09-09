@@ -225,7 +225,7 @@ def build_role_audit(root: Path | None = None, chunk: int = 64) -> list[RoleAudi
     """
     import csv  # noqa: F401  (kept local; writer lives in write_role_audit)
 
-    root = root or config.SAMPLES_ROOT
+    root = config.require_root(root or config.SAMPLES_ROOT)
     curated = root / "CURATED"
     clf = DrumRoleClassifier()
     rows: list[RoleAuditRow] = []

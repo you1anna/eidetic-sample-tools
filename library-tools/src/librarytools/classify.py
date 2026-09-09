@@ -74,6 +74,7 @@ def build_plan(
     root: Path = config.SAMPLES_ROOT, probe_durations: bool = True
 ) -> list[moves.Move]:
     """Classify every in-scope audio file into a bucket move."""
+    root = config.require_root(root)
     plan: list[moves.Move] = []
     for path in _iter_sources(root):
         rel = path.relative_to(root)
@@ -107,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--root", type=Path, default=config.SAMPLES_ROOT, help="library root")
     ap.add_argument("--no-probe", action="store_true", help="skip ffprobe duration fallback")
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
 
     if not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)

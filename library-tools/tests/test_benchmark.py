@@ -387,7 +387,7 @@ def test_score_cli_errors_when_labels_incomplete(tmp_path: Path) -> None:
         [("id1", "CURATED/KICKS/a.wav", "KICKS", "")],
     )
 
-    result = benchmark_cli.main(["score", "--output-dir", str(tmp_path / "run")])
+    result = benchmark_cli.main(["score", "--root", str(tmp_path), "--output-dir", str(tmp_path / "run")])
 
     assert result == 3
 

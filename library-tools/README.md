@@ -10,13 +10,17 @@ search and analysis leave source audio in place.
 From the repository root, in an activated Python 3.12 environment:
 
 ```bash
-python -m pip install -e './library-tools[dev]'
+python -m pip install -e ./library-tools
 ```
 
 See [Getting started](../docs/GETTING-STARTED.md) for environment setup, FFmpeg
 and library paths. Set `SAMPLES_ROOT` or pass `--root` explicitly. Index commands
 share `$SAMPLES_ROOT/.eidetic/library.sqlite` by default; use the same
 `--library-db` wherever you override it.
+
+Commands that need a sample library reject missing selection before doing work.
+The [pinned AI setup](../docs/AI-SETUP.md) covers optional model installation,
+offline verification, resource controls and reuse across a large library.
 
 The examples keep generated reports, packets and crates on the library drive:
 

@@ -187,6 +187,34 @@ one transaction and preserves human and unclassified legacy tags.
 
 ## Export, backup and retention
 
+Use this routine after significant listening or organisation work:
+
+1. Stop writers, including review servers, then run `sample-library doctor` and
+   inspect any unfinished operations before continuing.
+2. Back up durable state to a new, dated directory on a different backed-up disk.
+   Include human evidence stored outside `.eidetic/`; a backup on the sample SSD
+   alone does not protect against losing that SSD.
+3. Rehearse `sample-library restore` into a new scratch directory and compare
+   decision counts and representative evidence with the source. The restored
+   directory contains the **contents of `.eidetic/`**, not an audio library.
+4. Use `sample-library maintenance --root "$SAMPLES_ROOT" --json` to inspect growth.
+   It reports candidates and database caches without deleting them.
+
+| Data | Retention and recovery |
+|---|---|
+| Source audio in `PACKS/`, `CATALOGUE/`, `CURATED/` | Separate audio backup; absent from state bundles. |
+| `.eidetic/library.sqlite`, labels, packets, histories, journals, receipts and manifests | Preserve as durable evidence with the state backup; include external evidence explicitly. |
+| `.eidetic/cache/`, `caches/`, `tmp/` | Excluded from state bundles; inspect with maintenance before considering manual cleanup. |
+| Embeddings and acoustic features stored in SQLite | Included with the database even though they can be recomputed; maintenance reports their versions and size. |
+| `_EXPORT/` | Rebuildable WAVs and conversion receipts; preserve reviewed crates needed to reproduce the selection. |
+| Quarantine and incomplete copy stages | Retain until recovery has been reviewed; do not treat them as disposable cache. |
+| Local Python environments and model checkpoints | Reinstall locally; keep code revision and dependency records for reproducibility. |
+
+Keep multiple verified backup generations. A failed backup can leave a partial
+directory; it is not a valid recovery point. Restore checks manifest structure and
+checksums before creating its destination. Correct or recover damaged backup
+evidence rather than editing checksums to make verification pass.
+
 Each new exported WAV has a `.receipt.json` sidecar binding source hash, conversion
 settings, runtime versions and output hash. Only matching receipts and bytes are
 reused. `--list` and `--dry-run` preview as before; stale or unverified existing

@@ -12,17 +12,12 @@ TSV_HEADER = "path\ttempo\ttrack_count\ttracks\tscene_count\tdevices\tmtime"
 
 def _default_roots() -> list[Path]:
     env = os.environ.get("ALS_ROOTS")
-    if env:
-        return [Path(p) for p in env.split(":") if p]
-    return [
-        Path.home() / "Projects" / "Production",
-        Path("/Volumes/Extreme SSD/Production/ABLETON_PROJECTS"),
-    ]
+    return [Path(p).expanduser() for p in (env or '').split(os.pathsep) if p.strip()]
 
 
 def _roots_from_args(args: argparse.Namespace) -> list[Path]:
     if args.root:
-        return [Path(args.root)]
+        return [Path(args.root).expanduser()]
     return _default_roots()
 
 
@@ -31,6 +26,9 @@ def index_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", help="single root to scan (overrides ALS_ROOTS)")
     parser.add_argument("--out", required=True, help="output directory for the TSV report")
     args = parser.parse_args(argv)
+
+    if not _roots_from_args(args):
+        parser.error('No Ableton roots selected; pass --root PATH or set ALS_ROOTS.')
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -62,6 +60,9 @@ def samples_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", help="single root to scan (overrides ALS_ROOTS)")
     parser.add_argument("--out", required=True, help="output directory for the TSV report")
     args = parser.parse_args(argv)
+
+    if not _roots_from_args(args):
+        parser.error('No Ableton roots selected; pass --root PATH or set ALS_ROOTS.')
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)

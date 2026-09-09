@@ -122,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     scorer.add_argument("--model", default="cnn-lstm", choices=["cnn-lstm"])
 
     args = parser.parse_args(argv)
+    args.root = config.require_root(args.root, parser)
     if args.command == "prepare":
         args.features = args.features or args.root / '.eidetic' / 'runs' / 'sample-intelligence-pilot' / 'sample-features-latest.tsv'
         return _cmd_prepare(args)

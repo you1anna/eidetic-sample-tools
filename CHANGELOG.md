@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Require `--root` or `SAMPLES_ROOT` for sample-library commands and `--root` or
+  `ALS_ROOTS` for Ableton reports; remove machine-specific library defaults.
+- Add a hashed Python 3.12 Apple Silicon AI dependency snapshot and `sample-ai`
+  download/doctor/offline-check commands for the two existing CLAP checkpoints.
+- Expose classification thread, batch and timeout controls; default to two
+  threads and two files per batch, retain completed embeddings on timeout, and
+  add an opt-in CI workflow for real-model verification.
+- Restore reports malformed backup metadata as a controlled CLI error before
+  writing a destination, with regression coverage for preview and apply.
+- Wheel checks resolve declared dependencies in a fresh base installation before
+  testing the optional browser UI; CI also checks dependency consistency.
+- Clarified installation, upgrades, dependency updates and routine data retention;
+  development extras include browser-test dependencies and Git ignores `.eidetic/`.
 - Added an experimental `sample-vibe` chooser for explicit audio candidates:
   single-source playback, Keep/Skip, Undo and a resumable shortlist.
 - Kept originals can be handed to a playlist or a standard curation packet with

@@ -35,12 +35,32 @@ preserves its identity; promotion and crate export recheck the bytes.
 features into tags. NumPy signal analysis powers similarity search across
 attack, decay, spectrum and dynamics, with no model download required.
 
-**AI supports the listening process.** Two revision-pinned CLAP models compare
-audio with text prompts. Cached embeddings make reruns cheaper; a local review
-page and benchmark gates control publication of grouped playlists. Audio
-processing and inference run locally, with checkpoints downloaded on first use.
+**AI supports the listening process.** Optional audio models suggest groups for
+audition. A local review page lets you check those suggestions; your listening
+decisions determine what gets kept. Saved analysis makes repeat use faster.
 
 Read the [architecture guide](docs/TECHNOLOGY.md) for the algorithms and data model.
+
+## Local AI, practical scale
+
+For a library of 22,000 samples or more, **search first, then use AI on a small
+shortlist**. Tags and acoustic search work without AI models. Classify a listening
+packet when grouping would help, and reuse saved results across future packets.
+
+After the initial download, AI can run offline with no audio uploads or paid API
+calls. It uses CPU and memory while analysing new sounds; the models run one at
+a time and release their memory when finished.
+
+| Resource | Observed in setup checks |
+|---|---|
+| Installation | About **2.2 GB** for the AI environment and both models. |
+| Peak memory | About **1.2 GiB** per model worker. |
+| First analysis | **18–37 seconds**, including startup. |
+| Reusing saved analysis | **Under 0.3 seconds**. |
+
+These checks used one synthetic sound on an Apple Silicon Mac. Larger packets
+and different hardware will have different costs. See the [AI setup guide](docs/AI-SETUP.md)
+for a reproducible installation, resource controls and the full measurements.
 
 ## Start here
 

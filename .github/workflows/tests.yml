@@ -24,6 +24,7 @@ jobs:
           python -m venv "$RUNNER_TEMP/eidetic-tests"
           "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install -r requirements-dev.txt
           "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install --no-deps -e ./library-tools -e ./sample-tools -e ./ableton-tools
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip check
       - name: Test
         run: |
           "$RUNNER_TEMP/eidetic-tests/bin/python" -m pytest library-tools sample-tools ableton-tools -q -rs
@@ -31,7 +32,10 @@ jobs:
         run: |
           "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/eidetic-wheels" ./library-tools ./sample-tools ./ableton-tools
           python -m venv "$RUNNER_TEMP/eidetic-installed"
-          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -r requirements-dev.txt
-          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install --no-deps "$RUNNER_TEMP/eidetic-wheels/"*.whl
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c requirements-dev.txt "$RUNNER_TEMP/eidetic-wheels/"*.whl
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
+          "$RUNNER_TEMP/eidetic-installed/bin/python" scripts/check_installed_packages.py --core-only
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c requirements-dev.txt --find-links "$RUNNER_TEMP/eidetic-wheels" 'librarytools[review-ui]'
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py"

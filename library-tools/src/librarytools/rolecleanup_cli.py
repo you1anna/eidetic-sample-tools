@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     prepare.add_argument("--root", type=Path, default=config.SAMPLES_ROOT)
     prepare.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args(argv)
+    args.root = config.require_root(args.root, parser)
 
     if args.command == "prepare":
         if not args.audit.is_file():

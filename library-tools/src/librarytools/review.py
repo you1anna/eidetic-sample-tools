@@ -321,6 +321,7 @@ def build_item(path: Path, root: Path, probe_durations: bool = False) -> ReviewI
 
 def build_review(root: Path = config.SAMPLES_ROOT, probe_durations: bool = False) -> list[ReviewItem]:
     """Build a manifest-only review of in-scope files. Does not move or rename."""
+    root = config.require_root(root)
     return [build_item(path, root, probe_durations=probe_durations) for path in _iter_sources(root)]
 
 
@@ -413,6 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--summary", action="store_true", help="print compact counts")
     ap.add_argument("--no-probe", action="store_true", help="skip ffprobe duration fallback")
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
 
     if not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)

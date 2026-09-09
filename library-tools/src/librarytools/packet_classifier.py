@@ -69,7 +69,10 @@ from .classification.policy import (
     classify_evidence,
     tokenise_path,
 )
-from .classification.workers import SampleRef, generate_model_votes
+from .classification.workers import (
+    DEFAULT_BATCH_SIZE, DEFAULT_THREADS, DEFAULT_TIMEOUT,
+    SampleRef, generate_model_votes, validate_worker_limits,
+)
 from .classification.review import ReviewSession, finalise_review
 from .classification.workers import EXCERPT_POLICY
 from .featurecache import FEATURE_COLUMNS
@@ -108,8 +111,12 @@ def classify_packet(
     *,
     restart_review: bool = False,
     carry_review: bool = False,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    threads: int = DEFAULT_THREADS,
+    worker_timeout: float = DEFAULT_TIMEOUT,
 ) -> tuple[list[Classification], BenchmarkScore]:
     """Classify a packet and create/score its 24-row ear benchmark."""
+    validate_worker_limits(batch_size, threads, worker_timeout)
     meta_path = labels_path.parent / "packet-meta.json"
     if meta_path.is_file():
         from .artifacts import packet_root
@@ -174,6 +181,7 @@ def classify_packet(
             MODEL_SPECS,
             sample_refs,
             EmbeddingCache(database.path),
+            batch_size=batch_size, threads=threads, timeout=worker_timeout,
         )
         benchmark_truth = _read_benchmark_truth(benchmark_path)
         calibration = select_model_weights(
@@ -221,6 +229,7 @@ def classify_packet(
             "version": CLASSIFIER_VERSION,
             "filename_weight": 0.0,
             "ensemble_calibration": asdict(calibration),
+            "runtime_limits": {'batch_size': batch_size, 'threads': threads, 'worker_timeout': worker_timeout},
             "prompt_policy": PROMPT_POLICY,
             "models": [
                 {

@@ -47,6 +47,7 @@ def pick_canonical(paths: list[Path]) -> Path:
 
 def build_plan(root: Path = config.SAMPLES_ROOT) -> list[moves.Move]:
     """Confirm dupes by hash; move every non-canonical copy to _TO-DELETE/dupes/."""
+    root = config.require_root(root)
     plan: list[moves.Move] = []
     dupes_root = root / "_TO-DELETE" / "dupes"
     for candidates in find_candidates(root).values():
@@ -73,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--apply", action="store_true", help="perform the moves (default: dry-run)")
     ap.add_argument("--root", type=Path, default=config.SAMPLES_ROOT, help="library root")
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
 
     if not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)

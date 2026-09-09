@@ -95,6 +95,7 @@ def _main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument('--retry-failed', action='store_true', help='retry failed acoustic measurements')
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
     explicit = args.library_db is not None
     args.library_db = resolve_library_db(args.root, args.library_db)
     if not explicit and not args.library_db.is_file():

@@ -64,6 +64,7 @@ def build_plan(
     root: Path = config.SAMPLES_ROOT, include_review: bool = False
 ) -> list[moves.Move]:
     """Classify every in-scope file and plan a flat move into its role folder."""
+    root = config.require_root(root)
     plan: list[moves.Move] = []
     claimed: set[Path] = set()
     for path in iter_sources(root):
@@ -101,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         help="also gather low-confidence files into _REVIEW/ for manual triage",
     )
     args = ap.parse_args(argv)
+    args.root = config.require_root(args.root, ap)
 
     if not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)
