@@ -132,7 +132,7 @@ sample-find --root "$SAMPLES_ROOT" --like YOUR_SAMPLE_ID --role PERC --limit 10
 
 Replace `YOUR_SAMPLE_ID` with a sample ID or a unique path fragment. Similarity
 uses measured acoustic features and needs no AI models. See the
-[search reference](../library-tools/README.md#sample-find) for filters and kit picks.
+[search reference](../library-tools/REFERENCE.md#sample-find) for filters and kit picks.
 
 To tune the tags, copy [`vocabulary.toml`](../library-tools/vocabulary.toml) to
 `$RUNS/vocabulary.toml`, edit it and pass `--vocabulary "$RUNS/vocabulary.toml"`
@@ -181,10 +181,10 @@ schema; rehearse recovery using a separate restored backup.
 ## Next steps
 
 - [Workflows](WORKFLOWS.md): organise, approve favourites and export a crate.
-- [Export reference](../sample-tools/README.md): device formats and transfer.
+- [Export reference](../sample-tools/REFERENCE.md): device formats and transfer.
 - [Ableton reports](../ableton-tools/README.md): inspect Sets and sample dependencies.
 - [Architecture](TECHNOLOGY.md): understand identity, search and model review.
 
 Before moving audio, read the [safety model](SAFETY.md) and verify your library
-backup. [Configuration details](../library-tools/README.md#profiles) cover the
+backup. [Configuration details](../library-tools/REFERENCE.md#profiles) cover the
 bundled profile and selection order.

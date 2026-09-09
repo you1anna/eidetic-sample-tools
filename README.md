@@ -1,106 +1,56 @@
 # Eidetic Sample Tools
 
-**Find the sound. Build the collection. Play it.**
+Search your sample library, audition sounds, and export your favourites for
+**Octatrack MKII, Digitakt MKI and TR-8S**. Inspect saved Ableton Live Sets to find
+projects and missing samples without opening Live.
 
-Turn the samples you already own into collections for your next track or live
-set. Search beyond filenames, choose sounds by ear, and prepare validated
-exports for Octatrack, Digitakt and TR-8S.
-
-[Get started](docs/GETTING-STARTED.md) · [Workflows](docs/WORKFLOWS.md) ·
-[Architecture](docs/TECHNOLOGY.md) · [Safety](docs/SAFETY.md)
+[Get started](docs/GETTING-STARTED.md) · [Full workflow](docs/WORKFLOWS.md)
 
 ## What you can do
 
-- **Find a sound:** search musical tags and pack origins, or rank samples by
-  acoustic similarity. Send the shortlist to an audition playlist.
-- **Make an archive usable:** recover origins, inspect duplicates and plan
-  reversible organisation while retaining the link to original audio.
-- **Build a collection by ear:** record favourites and kit selections. Optional
-  local AI suggests groups for listening; you decide what gets kept.
-- **Prepare for hardware:** check device limits, generate compact filenames and
-  convert WAV copies to the required sample rate and channel layout.
-- **Inspect Ableton projects:** read tracks, devices and missing sample references
-  from saved Sets without opening Live.
+| Tool | Functionality |
+|---|---|
+| [Library tools](library-tools/README.md) | Search by tags or acoustic similarity; audition in a browser; organise packs, stage exact duplicates and curate favourites. |
+| [Sample export](sample-tools/README.md) | Check a selected collection against device limits, create WAV copies with compact names, and transfer supported exports to cards. |
+| [Ableton tools](ableton-tools/README.md) | Report Set tempo, tracks and devices; list sample references and flag missing media. |
 
-## How it works
+Search uses filenames, pack origins and measured audio features. Optional local
+AI suggests groups for listening; your decisions approve the favourites.
 
-```mermaid
-flowchart TD
-    index["1. Index<br/>SHA-256 identity + SQLite"]
-    search["2. Search<br/>Tags + acoustic similarity"]
-    audition["3. Audition<br/>Listen, label + select"]
-    curate["4. Curate<br/>Hash-verified favourite copies"]
-    export["5. Export<br/>Device checks + FFmpeg"]
+## Architecture
 
-    index --> search --> audition --> curate --> export
-```
+![Architecture: sample audio enters library-tools for indexing, search and human curation, with optional local AI suggestions. Approved copies and TSV crates pass to sample-tools for validation and WAV export to Octatrack, Digitakt and TR-8S. Separately, ableton-tools reads saved Live Sets into project and sample-reference reports. Library state travels with the sample drive.](docs/images/architecture.svg)
 
-- **Identity follows the file:** hashes connect locations, measurements and
-  listening history. Exact copies and renames keep the same identity.
-- **Search works without AI:** editable tag rules and measured attack, decay,
-  spectrum and dynamics narrow the candidates.
-- **AI is optional:** experimental local models can group a listening packet;
-  a review page lets you check suggestions. Saved analysis can be reused.
-- **Listening controls curation:** your labels approve favourites; promotion and
-  export recheck the original bytes.
+[Architecture details](docs/TECHNOLOGY.md) · [Open full-size diagram](docs/images/architecture.svg)
 
-See the [architecture guide](docs/TECHNOLOGY.md) for algorithms and data formats.
+## Try it
 
-## Start here
-
-[Install the tools](docs/GETTING-STARTED.md), then inspect a sample folder:
+Follow [setup](docs/GETTING-STARTED.md) for Python 3.12 on macOS or Linux, then
+inspect a sample folder:
 
 ```bash
 sample-review --root /path/to/SAMPLES --no-probe --summary
 ```
 
-This prints a summary without writing files or changing audio. Continue with the
-[workflow guide](docs/WORKFLOWS.md) to search, audition and export.
+This prints a summary without writing files. Continue with
+[search and listening](docs/GETTING-STARTED.md#search-and-listen),
+[curation](docs/WORKFLOWS.md#3-curate-by-ear), or
+[device export](sample-tools/README.md#preview-then-export).
 
-| Package | Focus | Reference |
-|---|---|---|
-| `library-tools` | Inventory, search, analysis and curation | [Commands](library-tools/README.md) |
-| `sample-tools` | Validated WAV export and card transfer | [Devices and formats](sample-tools/README.md) |
-| `ableton-tools` | Read-only Live Set inspection | [Reports](ableton-tools/README.md) |
+## Before changing audio
 
-### Keep your library recoverable
+Organisation previews moves and requires `--apply`; applied moves retain undo
+records. Curation and export create copies. Export writes those copies unless
+you pass `--list` or `--dry-run`. Keep a backup and follow the
+[safety model](docs/SAFETY.md). For setup on another Mac or recovery, use the
+[library lifecycle guide](docs/LIFECYCLE.md).
 
-- File moves preview by default, require `--apply` and retain undo records.
-- Curation and export create copies. Read the [safety model](docs/SAFETY.md) before
-  applying changes or syncing media.
-- Onboard each Mac independently using the [lifecycle guide](docs/LIFECYCLE.md).
-  An unavailable Mac's history can remain pending.
-- The shared SSD carries the database, decisions and recovery records in
-  `.eidetic/`; returning machines preserve older history without replacing newer work.
+## Status
 
-## Optional local AI
+Core review, organisation, conversion and Ableton inspection are established.
+Search and curation are beta; browser audition, AI grouping and near-duplicate
+detection are experimental. Broader library and hardware validation remains open.
+No software licence has been selected.
 
-**Search first; classify a shortlist.** For a library of 22,000 samples or more,
-use tags and acoustic search to narrow the work before running models.
-
-- After the initial download, inference can run offline: no audio uploads or
-  paid API calls.
-- Models run one at a time and release their memory when finished.
-- Saved analysis can be reused across listening packets.
-
-| Resource | Observed in setup checks |
-|---|---|
-| Installation | About **2.2 GB** for the AI environment and both models |
-| Peak memory | About **1.2 GiB** per model worker |
-| First analysis | **18–37 seconds**, including startup |
-| Reusing saved analysis | **Under 0.3 seconds** |
-
-Measured with **one synthetic sound on an Apple Silicon Mac**. Larger packets
-and different hardware will have different costs. The [AI setup guide](docs/AI-SETUP.md)
-covers reproducible installation, resource controls and the full measurements.
-
-## Development status
-
-- **Established:** core review, organisation, conversion and Ableton inspection.
-- **Beta:** search, curation and profile-based crates.
-- **Experimental:** AI grouping and near-duplicate detection.
-- **Still to validate:** broader library compatibility and hardware round trips.
-- **Licence:** no software licence selected.
-
-[Release notes](CHANGELOG.md) · [Development guide](docs/DEVELOPMENT.md) ·
-[Roadmap](docs/ROADMAP.md) · [Decision records](decisions/)
+[Roadmap](docs/ROADMAP.md) · [Release notes](CHANGELOG.md) ·
+[Development](docs/DEVELOPMENT.md) · [Optional AI setup](docs/AI-SETUP.md)

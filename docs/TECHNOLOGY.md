@@ -3,7 +3,7 @@
 Discovery, listening and export share a content identity. Each stage produces
 inspectable data so the commands can work independently.
 
-[Workflow diagram](../README.md#how-it-works) · [Command workflow](WORKFLOWS.md) ·
+[Architecture diagram](../README.md#architecture) · [Command workflow](WORKFLOWS.md) ·
 [Safety model](SAFETY.md)
 
 ## Three packages, explicit boundaries
@@ -162,7 +162,7 @@ let a small kit use its own targets without changing hardware profiles.
   existing staged conversions.
 - Digitakt uses Elektron Transfer; Octatrack and TR-8S support mounted-media copying.
 
-See the [export reference](../sample-tools/README.md) for formats and limits.
+See the [export reference](../sample-tools/REFERENCE.md) for formats and limits.
 Playback, assignment and save/reload still need an
 [instrument test](WORKFLOWS.md#first-device-smoke-test).
 

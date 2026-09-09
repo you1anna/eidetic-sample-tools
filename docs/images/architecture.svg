@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="824" viewBox="0 0 1120 824" role="img" aria-labelledby="title description">
+  <title id="title">Eidetic Sample Tools architecture</title>
+  <desc id="description">Sample audio feeds library-tools for content-hash indexing, tag and acoustic search, and listening. Optional local AI suggests groups for review. Human decisions approve favourites, copied into CURATED with TSV crates. sample-tools validates crates and uses FFmpeg to create device WAV exports. Separately, ableton-tools reads saved Live Sets and reports their structure and sample references without editing them. The sample drive carries the index, listening decisions and recovery records under .eidetic.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L8 4L0 8Z" fill="#565b58"/>
+    </marker>
+    <style>
+      text { font-family: Inter, Arial, sans-serif; fill: #171918; }
+      .label { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 14px; letter-spacing: 1.5px; fill: #565b58; }
+      .name { font-size: 20px; font-weight: 500; }
+      .detail { font-size: 16px; fill: #565b58; }
+      .box, .boundary { fill: #f2f3f1; stroke: #565b58; stroke-width: 1; }
+      .flow { fill: none; stroke: #565b58; stroke-width: 1; marker-end: url(#arrow); }
+      .optional { stroke-dasharray: 4 4; }
+    </style>
+  </defs>
+  <rect width="1120" height="824" fill="#f2f3f1"/>
+  <text class="label" x="32" y="38">EIDETIC SAMPLE TOOLS</text>
+  <text class="label" x="1088" y="38" text-anchor="end">LOCAL AUDIO · LOCAL TOOLS</text>
+
+  <!-- Inputs -->
+  <rect class="box" x="32" y="72" width="664" height="82"/>
+  <text class="name" x="56" y="105">Sample library</text>
+  <text class="detail" x="56" y="132">Source packs and catalogue audio</text>
+  <rect class="box" x="752" y="72" width="336" height="82"/>
+  <text class="name" x="776" y="105">Saved Ableton Live Sets</text>
+  <text class="detail" x="776" y="132">.als project files</text>
+
+  <!-- Package boundaries -->
+  <rect class="boundary" x="32" y="202" width="664" height="318"/>
+  <text class="label" x="56" y="230">LIBRARY-TOOLS</text>
+  <rect class="boundary" x="752" y="202" width="336" height="318"/>
+  <text class="label" x="776" y="230">ABLETON-TOOLS</text>
+  <rect class="boundary" x="32" y="576" width="664" height="140"/>
+  <text class="label" x="56" y="604">SAMPLE-TOOLS</text>
+
+  <!-- Data flow; orthogonal routes keep connections separate from labels. -->
+  <path class="flow" d="M196 154V250"/>
+  <path class="flow" d="M336 294H392"/>
+  <path class="flow optional" d="M336 436H364V314H392"/>
+  <path class="flow" d="M532 338V392"/>
+  <text class="detail" x="546" y="370">Your approval</text>
+  <path class="flow" d="M532 480V548H196V624"/>
+  <path class="flow" d="M336 656H392"/>
+  <path class="flow" d="M672 656H752"/>
+  <path class="flow" d="M920 154V250"/>
+  <path class="flow" d="M920 338V392"/>
+
+  <!-- Library components -->
+  <rect class="box" x="56" y="250" width="280" height="88"/>
+  <text class="name" x="76" y="285">Index + search</text>
+  <text class="detail" x="76" y="313">Hashes · tags · audio features</text>
+  <rect class="box" x="392" y="250" width="280" height="88"/>
+  <text class="name" x="412" y="285">Audition + curate</text>
+  <text class="detail" x="412" y="313">Playlists · browser · your labels</text>
+  <rect class="box optional" x="56" y="392" width="280" height="88"/>
+  <text class="name" x="76" y="427">Optional local AI</text>
+  <text class="detail" x="76" y="455">Experimental group suggestions</text>
+  <rect class="box" x="392" y="392" width="280" height="88"/>
+  <text class="name" x="412" y="427">Approved favourites</text>
+  <text class="detail" x="412" y="455">CURATED/ copies + crate TSVs</text>
+
+  <!-- Independent read-only project inspection -->
+  <rect class="box" x="776" y="250" width="288" height="88"/>
+  <text class="name" x="796" y="285">Read saved Sets</text>
+  <text class="detail" x="796" y="313">gzip / XML · read-only</text>
+  <rect class="box" x="776" y="392" width="288" height="88"/>
+  <text class="name" x="796" y="427">Project + sample reports</text>
+  <text class="detail" x="796" y="455">Tracks · devices · missing media</text>
+
+  <!-- Export components and device output -->
+  <rect class="box" x="56" y="624" width="280" height="64"/>
+  <text class="name" x="76" y="650">Validate crate</text>
+  <text class="detail" x="76" y="674">Hashes · paths · device limits</text>
+  <rect class="box" x="392" y="624" width="280" height="64"/>
+  <text class="name" x="412" y="650">Convert WAV copies</text>
+  <text class="detail" x="412" y="674">FFprobe + FFmpeg</text>
+  <rect class="box" x="752" y="576" width="336" height="140"/>
+  <text class="label" x="776" y="604">DEVICE EXPORTS</text>
+  <text class="name" x="776" y="634">Octatrack · Digitakt · TR-8S</text>
+  <text class="detail" x="776" y="666">_EXPORT/ staged WAVs</text>
+  <text class="detail" x="776" y="690">Card copy / Elektron Transfer</text>
+
+  <!-- Shared storage is a foundation, not a mandatory database dependency for export. -->
+  <rect class="boundary" x="32" y="756" width="1056" height="44"/>
+  <text class="label" x="56" y="784">.eidetic/</text>
+  <text class="detail" x="196" y="784">Portable library state: SQLite index · listening decisions · history + recovery records</text>
+</svg>

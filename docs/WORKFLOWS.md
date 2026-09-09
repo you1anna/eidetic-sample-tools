@@ -55,7 +55,7 @@ unique path fragment:
 sample-find --root "$SAMPLES_ROOT" --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
-See the [search reference](../library-tools/README.md#sample-find) for vocabulary,
+See the [search reference](../library-tools/REFERENCE.md#sample-find) for vocabulary,
 filters and recording kit selections. For a new collection, continue below.
 
 ## 1. Inspect without changing audio
@@ -138,7 +138,7 @@ new output directory for each packet; preparation refuses to overwrite an existi
 packet. `sample-curate` global options, including `--root`, go before the subcommand.
 
 For optional audio-derived groups, follow
-[packet classification and review](../library-tools/README.md#packet-classification).
+[packet classification and review](../library-tools/REFERENCE.md#packet-classification).
 The browser resolves classification; musical favourite decisions still belong
 in `labels.tsv`. Grouped playlists require completed review and a passing
 benchmark before publication.
@@ -186,7 +186,7 @@ command without either preview flag writes converted copies under `_EXPORT/`.
 The exporter rechecks hashes, curated paths, roles, names and device limits.
 
 Octatrack and TR-8S exports can be copied to mounted media with `--sync`; Digitakt
-uses Elektron Transfer. See the [export reference](../sample-tools/README.md)
+uses Elektron Transfer. See the [export reference](../sample-tools/REFERENCE.md)
 for formats and transfer scope.
 
 ### First-device smoke test
