@@ -41,3 +41,11 @@ Python 3.12 at `/opt/homebrew/bin/python3.12`). Run its tests:
 
 - `profiles/` (studio + device TOML) — these mirror real hardware constraints.
 - The safety defaults in `docs/SAFETY.md` and the preview/`--apply` gating in move/export code.
+
+## Personal repository Git workflow
+
+Work directly on `main` and push to the configured remote for Robin’s personal
+repositories unless he explicitly asks otherwise. Do not create feature branches
+or pull requests by default. If work is already on a branch, integrate the completed
+work into `main` and push it rather than leaving it on that branch. Never force-push
+or discard unrelated work to satisfy this preference.
