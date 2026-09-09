@@ -141,6 +141,9 @@ and automatic packet preparation do not expose those controls.
 
 ## Direction for larger collections
 
+The [design and performance assessment](COLLECTION-PLANNING-ASSESSMENT.md) identifies
+the safeguards, measured planning costs and acceptance checks needed before scaling.
+
 Use a collection plan that shows the brief, tempo policy, role balance, target
 devices, new-versus-previously-exported counts and estimated converted size
 before listening. A sound should carry a short selection reason and its known
