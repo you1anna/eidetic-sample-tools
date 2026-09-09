@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="824" viewBox="0 0 1120 824" role="img" aria-labelledby="title description">
   <title id="title">Eidetic Sample Tools architecture</title>
-  <desc id="description">Sample audio feeds library-tools for content-hash indexing, tag and acoustic search, and listening. Optional local AI suggests groups for review. Human decisions approve favourites, copied into CURATED with TSV crates. sample-tools validates crates and uses FFmpeg to create device WAV exports. Separately, ableton-tools reads saved Live Sets and reports their structure and sample references without editing them. The sample drive carries the index, listening decisions and recovery records under .eidetic.</desc>
+  <desc id="description">Sample audio feeds library-tools for content-hash indexing, tag and acoustic search, and listening. Local AI suggests groups for review. Human decisions approve favourites, copied into CURATED with TSV crates. sample-tools validates crates and uses FFmpeg to create device WAV exports. Separately, ableton-tools reads saved Live Sets and reports their structure and sample references without editing them. The sample drive carries the index, listening decisions and recovery records under .eidetic.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L8 4L0 8Z" fill="#565b58"/>
@@ -12,7 +12,7 @@
       .detail { font-size: 16px; fill: #565b58; }
       .box, .boundary { fill: #f2f3f1; stroke: #565b58; stroke-width: 1; }
       .flow { fill: none; stroke: #565b58; stroke-width: 1; marker-end: url(#arrow); }
-      .optional { stroke-dasharray: 4 4; }
+      .experimental { stroke-dasharray: 4 4; }
     </style>
   </defs>
   <rect width="1120" height="824" fill="#f2f3f1"/>
@@ -38,7 +38,7 @@
   <!-- Data flow; orthogonal routes keep connections separate from labels. -->
   <path class="flow" d="M196 154V250"/>
   <path class="flow" d="M336 294H392"/>
-  <path class="flow optional" d="M336 436H364V314H392"/>
+  <path class="flow experimental" d="M336 436H364V314H392"/>
   <path class="flow" d="M532 338V392"/>
   <text class="detail" x="546" y="370">Your approval</text>
   <path class="flow" d="M532 480V548H196V624"/>
@@ -54,8 +54,8 @@
   <rect class="box" x="392" y="250" width="280" height="88"/>
   <text class="name" x="412" y="285">Audition + curate</text>
   <text class="detail" x="412" y="313">Playlists · browser · your labels</text>
-  <rect class="box optional" x="56" y="392" width="280" height="88"/>
-  <text class="name" x="76" y="427">Optional local AI</text>
+  <rect class="box experimental" x="56" y="392" width="280" height="88"/>
+  <text class="name" x="76" y="427">Local AI</text>
   <text class="detail" x="76" y="455">Experimental group suggestions</text>
   <rect class="box" x="392" y="392" width="280" height="88"/>
   <text class="name" x="412" y="427">Approved favourites</text>

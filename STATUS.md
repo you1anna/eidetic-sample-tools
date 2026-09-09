@@ -30,7 +30,7 @@ Robin chooses favourites and `sample-curate promote` creates hash-verified copie
 
 ## Working software
 
-Release 0.2 lifecycle support is implemented on `codex/portable-library-lifecycle`:
+Release 0.2 lifecycle support is integrated on `main`:
 portable library identity, explicit historical database migration, one-writer
 locking, recoverable operations, backup/restore, versioned caches, verified export
 receipts and maintenance previews. Local verification passed 566 tests; two
@@ -43,9 +43,19 @@ Machine setup is independent: the MacBook can onboard now with the Mac mini's
 unavailable history recorded as deferred. When the mini returns, its older database
 and listening files can be preserved without replacing the active SSD decisions.
 Historical reconciliation remains a visible follow-up, not a prerequisite for normal
-use. The attached SSD was inspected read-only and has not been initialised or
-migrated. This software work does not resolve or supersede the historical live-library
-discrepancies below.
+use. On 2026-09-09, the attached SSD was onboarded with the available September
+selection records preserved and the Mac mini's database history deferred. Its new
+index initially contained 23,927 locations and 21,689 distinct file identities. Source audio
+was left in place. This does not resolve or supersede the historical discrepancies
+below or import old folder placement as listening approval.
+
+A [measured set-generation trial](docs/SET-GENERATION-TRIAL.md) has reached its
+first human listening checkpoint: 19 of 24 candidates were kept, comparing
+contextual selection with local-model ranking. The user approved those 19 as
+favourites; promotion hashes and the resulting Octatrack WAV export passed
+software checks. Five approved sounds repeat the September 7 collection.
+Larger collections need explicit freshness, variety and device-budget controls.
+Card transfer and the hardware round trip remain pending.
 
 **Stable**
 
@@ -92,13 +102,15 @@ and report unreadable journal evidence rather than repairing or checkpointing it
   `undo-promotion --run-id <id>` moves copies to `_QUARANTINE/promotion-undo/`.
   **This is not a backup:** promotion writes a second copy on the same physical disk, and a
   drive failure still loses both. Robin declined a backup on 2026-08-04 with this stated.
-  Hardware export and card sync remain untested against the live library.
+  A separate September 7 collection subsequently passed recorded Octatrack
+  copy/readback checks and received positive September 8 playback feedback.
+  That evidence does not resolve the older missing-promotion discrepancy.
 - A 2026-07-18 local audit verified 18 authorised catalogue moves. Reconcile
   those recorded moves with the 2026-07-23 read-only inventory before planning
   further organisation. All 18 audited destinations match their recorded
   SHA-256 identities, and all 18 former source paths are absent.
-- The inventory contains 22,952 audio files. Of 7,689 protected `PACKS/`
-  snapshot entries, 130 are absent from the current inventory and were not
+- The July 23 inventory contained 22,952 audio files. Of 7,689 protected `PACKS/`
+  snapshot entries, 130 were absent from that inventory and were not
   found relocated or changed in place. PACKS preservation is therefore not
   fully verified; do not infer why those entries are absent. **As of 2026-08-04 this is an
   open integrity risk rather than a block** — it stays unexplained and may never be

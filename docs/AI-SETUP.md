@@ -3,7 +3,7 @@
 Keep the two existing CLAP models. They classify existing audio; they do not
 generate samples or train on your library. Inference runs on your CPU, uses RAM
 and takes time. No paid token API is involved and sample audio is not uploaded.
-Installing the optional environment does not start a background service.
+Installing this environment does not start a background service.
 
 ## Install once per Apple Silicon Mac
 
@@ -55,6 +55,11 @@ database. See [Hugging Face caching](https://huggingface.co/docs/huggingface_hub
 and [offline configuration](https://huggingface.co/docs/transformers/installation#offline-mode).
 
 ## Use with 22,000 samples
+
+See the [real-library trial](SET-GENERATION-TRIAL.md) for measured indexing,
+256-file inference and cache timings, the conditional whole-library estimate,
+and the listening results and remaining hardware checks. The steps below describe
+current supported commands; they do not automate selection from a musical brief.
 
 1. Build/reuse the ordinary index and acoustic features with `sample-tag`.
    These do not require CLAP. Avoid `--rescan` when no fresh inventory is needed.

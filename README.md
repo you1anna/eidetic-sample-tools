@@ -14,12 +14,13 @@ projects and missing samples without opening Live.
 | [Sample export](sample-tools/README.md) | Check a selected collection against device limits, create WAV copies with compact names, and transfer supported exports to cards. |
 | [Ableton tools](ableton-tools/README.md) | Report Set tempo, tracks and devices; list sample references and flag missing media. |
 
-Search uses filenames, pack origins and measured audio features. Optional local
-AI suggests groups for listening; your decisions approve the favourites.
+Search uses filenames, pack origins and measured audio features. Local AI groups
+candidates for listening; selection from a musical brief is being tested in the
+[set-generation trial](docs/SET-GENERATION-TRIAL.md).
 
 ## Architecture
 
-![Architecture: sample audio enters library-tools for indexing, search and human curation, with optional local AI suggestions. Approved copies and TSV crates pass to sample-tools for validation and WAV export to Octatrack, Digitakt and TR-8S. Separately, ableton-tools reads saved Live Sets into project and sample-reference reports. Library state travels with the sample drive.](docs/images/architecture.svg)
+![Architecture: sample audio enters library-tools for indexing, search, local AI suggestions and human curation. Approved copies and TSV crates pass to sample-tools for validation and WAV export to Octatrack, Digitakt and TR-8S. Separately, ableton-tools reads saved Live Sets into project and sample-reference reports. Library state travels with the sample drive.](docs/images/architecture.svg)
 
 [Architecture details](docs/TECHNOLOGY.md) · [Open full-size diagram](docs/images/architecture.svg)
 
@@ -53,4 +54,4 @@ detection are experimental. Broader library and hardware validation remains open
 No software licence has been selected.
 
 [Roadmap](docs/ROADMAP.md) · [Release notes](CHANGELOG.md) ·
-[Development](docs/DEVELOPMENT.md) · [Optional AI setup](docs/AI-SETUP.md)
+[Development](docs/DEVELOPMENT.md) · [Local AI setup](docs/AI-SETUP.md)

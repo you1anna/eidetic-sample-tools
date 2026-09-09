@@ -15,7 +15,7 @@ copy your favourites into a collection ready for export.
 | Preview sorting, exact deduplication and pack intake | [`sample-sort`, `sample-dedupe`, `sample-intake`](REFERENCE.md#sample-sort-sample-dedupe-sample-intake) |
 | Audition explicit candidates in a browser and save a shortlist | [`sample-vibe`](REFERENCE.md#sample-vibe) |
 | Record listening decisions, promote favourites and check copies | [`sample-curate`](REFERENCE.md#sample-curate) |
-| Suggest listening groups with optional local AI | [Packet classification](REFERENCE.md#packet-classification) |
+| Suggest listening groups with local AI | [Packet classification](REFERENCE.md#packet-classification) |
 | Measure audio and evaluate similar loops or model suggestions | [Analysis and experiments](REFERENCE.md#analysis-and-experiments) |
 | Onboard a library, back up its state and recover interrupted work | [`sample-library`](REFERENCE.md#long-lived-and-shared-drive-installations) |
 | Inspect resolved device capabilities | [`sample-profile`](REFERENCE.md#sample-profile) |
@@ -67,4 +67,4 @@ Approved collections pass to [sample-tools](../sample-tools/README.md) for expor
 - Back up source audio and retain labels, manifests and undo records together.
   Follow the [safety model](../docs/SAFETY.md) and [lifecycle guide](../docs/LIFECYCLE.md).
 
-[Full command reference](REFERENCE.md) · [Optional AI setup](../docs/AI-SETUP.md)
+[Full command reference](REFERENCE.md) · [Local AI setup](../docs/AI-SETUP.md)
