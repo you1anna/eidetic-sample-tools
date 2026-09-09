@@ -54,6 +54,7 @@ retries failed measurements; successful results retain versioned provenance.
 | Inspect configuration | `sample-profile` | Beta |
 | Measure audio and build inventory | `sample-analyze` | Beta; interpretation experimental |
 | Evaluate model suggestions and similar loops | `sample-benchmark`, `sample-role-cleanup`, `sample-near-dupes` | Experimental |
+| Audition samples and keep a shortlist for curation | `sample-vibe` | Experimental; explicit candidates |
 
 See the [roadmap](../docs/ROADMAP.md) for maturity definitions. Each command has
 `--help`; the [workflow guide](../docs/WORKFLOWS.md) joins them into a session.
@@ -273,6 +274,41 @@ by the owning tool. This checks recorded paths only, without rescanning,
 repairing or restoring files, and does not certify the whole library.
 
 ## Analysis and experiments
+
+### `sample-vibe`
+
+Hear explicit candidates in a local browser, Keep or Skip them, then compare the
+saved shortlist. The main screen has one player with seek, looping and Undo.
+This is an audition and curation tool; it does not generate candidates from a vibe
+or learn from your choices. The existing search and classification methods are
+unchanged.
+
+```bash
+sample-vibe prepare --root "$SAMPLES_ROOT" \
+  --anchor "PACKS/example/percussion-loop.wav" \
+  --vocal "CATALOGUE/VOCALS/example-phrase.wav" \
+  --output-dir "$HOME/Library/Application Support/Eidetic Sample Tools/auditions/session-01" \
+  --bpm 140
+sample-vibe serve \
+  --session-dir "$HOME/Library/Application Support/Eidetic Sample Tools/auditions/session-01" \
+  --open
+```
+
+Install the `review-ui` extra and FFmpeg. Preparation creates previews in a new
+session outside the source library; listening and saving do not require an index.
+`shortlist.json` records the latest per-source decisions, independently of
+`sample-find --preferred` kit picks. It is not a complete training history.
+
+The Kept view can download a playlist or prepare a normal curation packet from the
+exact selected originals. Packet preparation requires a bound index and complete
+scan. It creates `keep` rows; explicit favourites, roles and descriptors remain
+necessary before promotion and device export. The equivalent CLI commands are
+`sample-vibe playlist` and `sample-vibe packet`.
+
+The [audition guide](../docs/GROOVE-AUDITION-PILOT.md) covers input limits, saved
+choices, export handoff and the separate optional `/vocal-lab` experiment.
+The server binds only to the Mac's `127.0.0.1`; iPhone audio forwarding is unverified.
+Stop it with Ctrl-C and rerun `serve` to resume.
 
 ### `sample-analyze`
 

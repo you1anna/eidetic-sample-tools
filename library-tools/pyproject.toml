@@ -35,9 +35,10 @@ sample-curate = "librarytools.curate_cli:main"
 sample-tag = "librarytools.tag_cli:main"
 sample-find = "librarytools.find_cli:main"
 sample-library = "librarytools.library_cli:main"
+sample-vibe = "librarytools.vibe_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-librarytools = ["resources/*.toml", "resources/profiles/devices/*.toml", "resources/profiles/studios/*.toml"]
+librarytools = ["resources/*.toml", "resources/*.html", "resources/*.js", "resources/*.css", "resources/profiles/devices/*.toml", "resources/profiles/studios/*.toml"]

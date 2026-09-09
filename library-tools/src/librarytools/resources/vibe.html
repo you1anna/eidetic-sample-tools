@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="vibe-token" content="{{ token }}">
+  <title>Groove audition · Eidetic</title>
+  <link rel="stylesheet" href="/static/vibe.css">
+  <script src="/static/vibe.js" defer></script>
+</head>
+<body>
+  <main class="workspace">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Eidetic Sample Tools <span class="badge">Experimental</span></p>
+        <h1>Find it by ear.</h1>
+        <p class="intro">Choose a groove. Cut a vocal. Hear them together.</p>
+      </div>
+      <div class="session-tag"><span class="status-dot"></span> Local audition <span class="muted">/ 4/4 · 8 bars</span></div>
+    </header>
+
+    <p class="scope-note">These candidates were supplied manually and are unranked. Automatic vibe matching is not available yet.</p>
+    <noscript><p class="notice error">Enable JavaScript to use the local audition controls.</p></noscript>
+    <div id="status" class="notice" role="status" aria-live="polite">Loading the session…</div>
+    <button id="retry-load" class="secondary" type="button" hidden>Retry loading session</button>
+
+    <form id="recipe-form">
+      <fieldset id="recipe-controls" disabled>
+        <legend class="sr-only">Audition recipe</legend>
+        <div class="source-grid">
+          <section class="source-panel anchor-panel" aria-labelledby="anchor-heading">
+            <div class="panel-heading"><span class="track-number">01</span><h2 id="anchor-heading">Groove foundation</h2><span class="track-label">Anchor</span></div>
+            <label for="anchor-select">Unranked groove candidates</label>
+            <select id="anchor-select" name="anchor_id" required></select>
+            <figure class="waveform-figure">
+              <canvas id="anchor-waveform" height="100" role="img" aria-label="Groove waveform and selected region"></canvas>
+              <figcaption><span id="anchor-region">—</span><span id="anchor-duration">—</span></figcaption>
+            </figure>
+            <audio id="anchor-source" controls preload="none" aria-label="Preview complete groove source"></audio>
+            <div class="cut-grid">
+              <label>Start <span class="unit">seconds</span><input id="anchor-start" name="anchor_start_s" type="number" min="0" step="any" required></label>
+              <label>End <span class="unit">seconds</span><input id="anchor-end" name="anchor_end_s" type="number" min="0" step="any" required></label>
+              <button class="small secondary" id="anchor-mark-start" type="button">Start at playhead</button>
+              <button class="small secondary" id="anchor-mark-end" type="button">End at playhead</button>
+            </div>
+            <div class="pair-grid">
+              <label>Fit region to
+                <select id="anchor-bars" name="anchor_bars"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option><option value="8">8 bars</option></select>
+              </label>
+              <label>Groove level <span class="unit">dB</span><input id="anchor-gain" name="anchor_gain_db" type="number" min="-36" max="0" step="1" value="-6" required></label>
+            </div>
+            <p id="anchor-hint" class="hint">Bar count is a duration-based starting point. Check the groove by listening.</p>
+          </section>
+
+          <section class="source-panel vocal-panel" aria-labelledby="vocal-heading">
+            <div class="panel-heading"><span class="track-number">02</span><h2 id="vocal-heading">Vocal cut</h2><span class="track-label">Vocal</span></div>
+            <label for="vocal-select">Unranked vocal candidates</label>
+            <select id="vocal-select" name="vocal_id" required></select>
+            <figure class="waveform-figure">
+              <canvas id="vocal-waveform" height="100" role="img" aria-label="Vocal waveform and selected region"></canvas>
+              <figcaption><span id="vocal-region">—</span><span id="vocal-duration">—</span></figcaption>
+            </figure>
+            <audio id="vocal-source" controls preload="none" aria-label="Preview complete vocal source"></audio>
+            <div class="cut-grid">
+              <label>Start <span class="unit">seconds</span><input id="vocal-start" name="vocal_start_s" type="number" min="0" step="any" required></label>
+              <label>End <span class="unit">seconds</span><input id="vocal-end" name="vocal_end_s" type="number" min="0" step="any" required></label>
+              <button class="small secondary" id="vocal-mark-start" type="button">Start at playhead</button>
+              <button class="small secondary" id="vocal-mark-end" type="button">End at playhead</button>
+            </div>
+            <div class="pair-grid">
+              <label>Vocal timing
+                <select id="vocal-fit" name="vocal_fit_beats"><option value="0">Natural speed</option><option value="0.25">Fit to ¼ beat</option><option value="0.5">Fit to ½ beat</option><option value="1">Fit to 1 beat</option><option value="2">Fit to 2 beats</option><option value="4">Fit to 4 beats</option><option value="8">Fit to 8 beats</option><option value="16">Fit to 16 beats</option><option value="32">Fit to 32 beats</option></select>
+              </label>
+              <label>Vocal level <span class="unit">dB</span><input id="vocal-gain" name="vocal_gain_db" type="number" min="-36" max="0" step="1" value="-6" required></label>
+            </div>
+            <p class="hint">Preview the source to find a cut. Tempo fitting changes duration; listen for artifacts.</p>
+          </section>
+        </div>
+
+        <section class="scene-panel" aria-labelledby="scene-heading">
+          <div class="panel-heading"><span class="track-number">03</span><h2 id="scene-heading">Place it in the groove</h2><span class="track-label">8 bars</span></div>
+          <div class="scene-controls">
+            <label>Tempo <span class="unit">BPM</span><input id="bpm" name="bpm" type="number" min="60" max="180" step="any" value="140" required></label>
+            <label>Vocal starts after <span class="unit">beats</span><input id="offset-beats" name="offset_beats" type="number" min="0" max="32" step="any" value="0" required></label>
+            <label>Repeat every <span class="unit">beats · 0 = once</span><input id="repeat-beats" name="repeat_beats" type="number" min="0" max="32" step="any" value="8" required></label>
+          </div>
+          <div id="scene-timeline" class="scene-timeline" role="img" aria-label="Eight-bar vocal placement preview"><div class="bar-grid" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div><div id="vocal-events" aria-hidden="true"></div><div id="playhead" hidden></div></div>
+          <p id="scene-summary" class="hint">The groove repeats through an eight-bar scene.</p>
+        </section>
+      </fieldset>
+      <div class="transport">
+        <div class="transport-actions">
+          <button id="render" class="primary" type="submit" disabled>Render audition</button>
+          <button id="play" class="secondary play-button" type="button" disabled><span aria-hidden="true">▶</span> Play scene</button>
+          <button id="stop" class="secondary" type="button" disabled>Stop</button>
+        </div>
+        <div class="layer-controls" role="group" aria-label="Audition layers">
+          <button id="mute-anchor" class="mute-button" type="button" aria-pressed="false" disabled>Mute groove</button>
+          <button id="mute-vocal" class="mute-button" type="button" aria-pressed="false" disabled>Mute vocal</button>
+        </div>
+        <div class="transport-details"><span id="position">Not rendered</span><span id="render-info" class="muted">Edits need a fresh render.</span></div>
+      </div>
+    </form>
+
+    <div class="feedback-grid">
+      <section class="feedback-panel" aria-labelledby="feedback-heading">
+        <div class="panel-heading"><h2 id="feedback-heading">Does this combination work?</h2></div>
+        <form id="feedback-form">
+          <fieldset id="feedback-controls" disabled>
+            <legend class="sr-only">Listening feedback</legend>
+            <div class="decisions">
+              <label><input type="radio" name="decision" value="works" required><span>Works</span></label>
+              <label><input type="radio" name="decision" value="does_not_work"><span>Doesn’t work</span></label>
+              <label><input type="radio" name="decision" value="unsure"><span>Unsure</span></label>
+            </div>
+            <label for="feedback-note">Listening note <span class="unit">optional</span></label>
+            <textarea id="feedback-note" name="note" rows="3" maxlength="2000" placeholder="Pocket, phrasing, cut points, stretch quality…"></textarea>
+          </fieldset>
+          <button id="save-feedback" class="secondary" type="submit" disabled>Save listening feedback</button>
+        </form>
+        <p class="hint">Saves this rendered recipe and your judgment for the experiment. Feedback does not promote or export samples.</p>
+      </section>
+      <section class="history-panel" aria-labelledby="history-heading">
+        <div class="panel-heading"><h2 id="history-heading">Listening history</h2><span id="history-count" class="track-label">0 saved</span></div>
+        <p id="history-empty" class="empty-state">Your saved combinations will appear here. Load a recipe to revisit a listening decision.</p>
+        <ol id="history-list" class="history-list"></ol>
+      </section>
+    </div>
+    <footer>Local audio, human decisions. This pilot needs your ear.</footer>
+  </main>
+</body>
+</html>

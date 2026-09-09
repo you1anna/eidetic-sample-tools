@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Added an experimental `sample-vibe` chooser for explicit audio candidates:
+  single-source playback, Keep/Skip, Undo and a resumable shortlist.
+- Kept originals can be handed to a playlist or a standard curation packet with
+  their exact identities and paths. Packet creation requires a bound index and
+  complete scan; favourite approval, promotion and export checks still apply.
+- Preserved the optional vocal-cut audition at `/vocal-lab`, separate from the
+  main chooser and its decisions.
+- Documented the current limits: saved choices do not train a model or alter
+  search rankings, and candidate quality has not been shown to improve. See the
+  [audition guide](docs/GROOVE-AUDITION-PILOT.md).
+
 ## 0.2.0 — 2026-09-09
 
 Libraries can now travel between independently configured Macs while retaining

@@ -410,10 +410,17 @@ def _regenerate_packet_playlists(labels_path: Path, *, root: Path | None = None)
 
 
 def prepare_packet(root: Path, database: LibraryDatabase, output_dir: Path, *,
-                   quotas: dict[str, int] | None = None, multiplier: int = 2) -> int:
+                   quotas: dict[str, int] | None = None, multiplier: int = 2,
+                   explicit_candidates: list[tuple[str, Path]] | None = None) -> int:
+    """Prepare candidates from quotas, or preserve an explicitly heard shortlist.
+
+    Explicit candidates are (original SHA-256, library-relative path) pairs in
+    listening order. They become keep rows, never favourites or approved roles.
+    """
     with library_lock(root, purpose='prepare listening packet'):
         database.bind_root(root)
-        return _prepare_packet(root, database, output_dir, quotas=quotas, multiplier=multiplier)
+        return _prepare_packet(root, database, output_dir, quotas=quotas, multiplier=multiplier,
+                               explicit_candidates=explicit_candidates)
 
 
 def _prepare_packet(
@@ -423,6 +430,7 @@ def _prepare_packet(
     *,
     quotas: dict[str, int] | None = None,
     multiplier: int = 2,
+    explicit_candidates: list[tuple[str, Path]] | None = None,
 ) -> int:
     scan_id = database.latest_complete_scan()
     if scan_id is None:
@@ -431,17 +439,43 @@ def _prepare_packet(
         raise CurationError(f"packet output directory must be new or empty: {output_dir}")
     if output_dir.is_symlink():
         raise CurationError(f"packet output directory exists as a symlink: {output_dir}")
-    quotas = quotas or PILOT_QUOTAS
-    grouped: dict[str, list[InventoryLocation]] = {role: [] for role in quotas}
-    for item in database.current_locations():
-        if item.zone == "CURATED":
-            continue
-        role = _suggested_role(item.path)
-        if role in grouped:
-            grouped[role].append(item)
     selected: list[tuple[str, InventoryLocation]] = []
-    for role, quota in quotas.items():
-        selected.extend((role, item) for item in _diverse(grouped[role], quota * multiplier))
+    if explicit_candidates is not None:
+        if not explicit_candidates:
+            raise CurationError('explicit listening shortlist must not be empty')
+        root = Path(root).resolve()
+        seen: set[str] = set()
+        for sample_id, raw_path in explicit_candidates:
+            relative = Path(raw_path)
+            source = root / relative
+            if (relative.is_absolute() or '..' in relative.parts or source.is_symlink()
+                    or not source.resolve().is_relative_to(root)
+                    or source.resolve() != source or '\n' in str(source) or '\r' in str(source)):
+                raise CurationError('explicit candidate must have a contained, unambiguous library path')
+            if sample_id in seen:
+                raise CurationError('explicit listening shortlist contains duplicate sample identities')
+            seen.add(sample_id)
+            try:
+                item = database.location(relative)
+            except KeyError as exc:
+                raise CurationError(f'explicit candidate is missing from the inventory: {relative}') from exc
+            if not item.exists or item.sample_id != sample_id or item.scan_id != scan_id:
+                raise CurationError(f'explicit candidate does not match the complete inventory scan: {relative}')
+            if not source.is_file() or sha256_file(source) != sample_id:
+                raise CurationError(f'hash changed since inventory scan: {relative}')
+            selected.append((_suggested_role(relative), item))
+        quotas = {}
+    else:
+        quotas = quotas or PILOT_QUOTAS
+        grouped: dict[str, list[InventoryLocation]] = {role: [] for role in quotas}
+        for item in database.current_locations():
+            if item.zone == "CURATED":
+                continue
+            role = _suggested_role(item.path)
+            if role in grouped:
+                grouped[role].append(item)
+        for role, quota in quotas.items():
+            selected.extend((role, item) for item in _diverse(grouped[role], quota * multiplier))
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / "labels.tsv").open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=LABEL_FIELDS, delimiter="\t")
@@ -449,7 +483,7 @@ def _prepare_packet(
         for role, item in selected:
             writer.writerow({
                 "sample_id": item.sample_id, "current_path": item.path.as_posix(),
-                "suggested_role": role, "decision": "", "true_role": "",
+                "suggested_role": role, "decision": "keep" if explicit_candidates is not None else "", "true_role": "",
                 "descriptor": "", "tags": "", "notes": "",
             })
     (output_dir / "packet-meta.json").write_text(

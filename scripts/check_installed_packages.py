@@ -27,6 +27,38 @@ def invoke(function, arguments, expected=0):
         raise AssertionError(f'{arguments}: expected exit {expected}, got {result}\n{output.getvalue()}')
 
 
+def check_audition(root: Path, scratch: Path, source: Path):
+    """Exercise installed chooser assets and the exact-source curation handoff."""
+    from librarytools.vibe_cli import main as audition_main
+    from librarytools.vibe_server import create_vibe_app
+    from librarytools.curate import read_labels, validate_labels
+
+    session = scratch / 'audition'
+    invoke(audition_main, ['prepare', '--root', str(root), '--anchor', str(source),
+                          '--vocal', str(source), '--output-dir', str(session)])
+    client = create_vibe_app(session, write_token='wheel-test').test_client()
+    assert b'Choose samples.' in client.get('/').data
+    for asset in ('audition.js', 'audition.css', 'vibe.js', 'vibe.css'):
+        assert client.get(f'/static/{asset}').status_code == 200
+    sources = client.get('/api/sources').get_json()['sources']
+    assert len(sources) == 1  # The same original in both groups is one choice.
+    sample_id = hashlib.sha256(source.read_bytes()).hexdigest()
+    assert sources[0]['id'] == sample_id
+    choice = {'source_id': sample_id, 'decision': 'keep'}
+    assert client.post('/api/shortlist', json=choice).status_code == 403
+    assert client.post('/api/shortlist', json=choice,
+                       headers={'X-Vibe-Token': 'wheel-test'}).status_code == 200
+    playlist = client.get('/api/shortlist/playlist')
+    assert playlist.status_code == 200
+    assert playlist.text.splitlines()[1:] == [str(source.resolve())]
+    packet = scratch / 'audition-packet'
+    invoke(audition_main, ['packet', '--session-dir', str(session), '--output-dir', str(packet)])
+    rows = read_labels(packet / 'labels.tsv')
+    validate_labels(rows)
+    assert len(rows) == 1 and rows[0].sample_id == sample_id
+    assert rows[0].decision == 'keep' and not rows[0].true_role and not rows[0].descriptor
+
+
 def main():
     installed = Path(sysconfig.get_path('purelib')).resolve()
     for name in ('librarytools', 'sampletools', 'abletontools'):
@@ -73,6 +105,7 @@ def main():
         assert not (root / '.eidetic').exists()
         invoke(library_main, [*setup, '--apply'])
         invoke(tag_cli.main, ['--root', str(root), '--rescan', '--skip-features', '--apply'])
+        check_audition(root, scratch, source)
 
         unverified = scratch / 'unverified.tsv'
         invoke(find_cli.main, ['--root', str(root), '--curated-only', '--crate', str(unverified)])
@@ -111,7 +144,7 @@ def main():
         backup_bundle(remounted / '.eidetic/library.sqlite', scratch / 'backup', root=remounted)
         restore_bundle(scratch / 'backup', scratch / 'restored')
         assert next((scratch / 'restored').rglob('labels.tsv')).read_bytes() == (evidence / 'labels.tsv').read_bytes()
-    print('Installed-package checks passed: commands, resources, onboarding, approval, export, handoff and restore.')
+    print('Installed-package checks passed: commands, resources, audition, onboarding, approval, export, handoff and restore.')
 
 
 if __name__ == '__main__':
