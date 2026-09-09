@@ -36,14 +36,16 @@ BUCKETS: tuple[str, ...] = ("LOOPS", "ONE-SHOTS", "PADS-DRONES", "OTHER")
 
 TO_DELETE_ROOT: Path = SAMPLES_ROOT / "_TO-DELETE"
 
-# Generated .tsv manifests live next to the package, in the repo (gitignored).
-MANIFEST_DIR: Path = Path(__file__).resolve().parents[2] / "manifests"  # parents[2] assumes src/librarytools/ layout
+# Historical state is discovered explicitly; it must never silently compete with
+# portable state on the sample drive.
+LEGACY_MANIFEST_DIR: Path = Path(__file__).resolve().parents[2] / "manifests"
+MANIFEST_DIR: Path = SAMPLES_ROOT / '.eidetic' / 'runs'
 
 # Optional drum-role classifier weights. USER-SUPPLIED and gitignored: the upstream
 # weights carry no license, so they are never committed or redistributed — the package
 # only ships the integration and loads the file if present. Override with DRUM_MODEL_PATH.
 DRUM_MODEL_PATH: Path = Path(
-    os.environ.get("DRUM_MODEL_PATH", str(MANIFEST_DIR.parent / "models" / "drum-cnn-lstm.model"))
+    os.environ.get("DRUM_MODEL_PATH", str(LEGACY_MANIFEST_DIR.parent / "models" / "drum-cnn-lstm.model"))
 )
 
 # Files shorter than this (seconds) classify as one-shots when no keyword matched.
@@ -59,7 +61,8 @@ PAD_KEYWORDS: tuple[str, ...] = (
 )
 
 
-def manifest_path(prefix: str) -> Path:
-    """Timestamped manifest path like manifests/classify-20260617-142530.tsv."""
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return MANIFEST_DIR / f"{prefix}-{stamp}.tsv"
+def manifest_path(prefix: str, root: Path | None = None) -> Path:
+    """Timestamped manifest path under the selected library's .eidetic/runs/."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    directory = root / '.eidetic' / 'runs' if root is not None else MANIFEST_DIR
+    return directory / f"{prefix}-{stamp}.tsv"

@@ -1,0 +1,10 @@
+# TR-8S starter set — drum one-shots to load onto the 11 instrument slots (mono/stereo ok).
+# Map by hand on the device: kicks, snares/claps, hats, toms/perc, rides, FX.
+# HATS-CYM/ is still empty — curate hats first, then add a line here.
+# Run `sample-export tr8s --list` then trim.
+
+KICKS/GR8_001_TUNED_KICKS
+CLAP-SNARE/One Shot gr8 Claps
+DRUM-KITS/Goldbaby.Super.Analog.909
+DRUM-KITS/Goldbaby.SP-1200.Vol.2
+PERC/VETH1 Percussion

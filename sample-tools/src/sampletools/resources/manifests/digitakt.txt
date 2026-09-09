@@ -1,0 +1,12 @@
+# Digitakt MK1 starter kit — MONO one-shots (the tool folds everything to mono).
+# Digitakt has limited slots: keep this TIGHT. These dir entries pull whole packs;
+# run `sample-export digitakt --list`, then trim to the exact hits you want.
+#
+# Format of each line: a path under SAMPLES_ROOT (file, folder, or glob).
+# Optional rename:  some/long name.wav => kick-rumble
+
+KICKS/GR8_001_TUNED_KICKS
+CLAP-SNARE/One Shot gr8 Claps
+DRUM-KITS/Goldbaby.Super.Analog.909
+DRUM-KITS/Goldbaby.SP-1200.Vol.2
+PERC/VETH1 Percussion

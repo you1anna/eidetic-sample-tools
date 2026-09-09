@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+import pytest
+
 from librarytools import neardupe
 
 
@@ -244,6 +246,30 @@ def test_main_apply_stages_only_approved_rows(tmp_path: Path, monkeypatch):
     assert keep.exists()
     assert not remove.exists()
     assert (root / "_TO-DELETE" / "near-dupes" / "CURATED" / "DRONE-ATMOS" / "Echospace [FLAC]" / "loop-1.flac").exists()
-    undo_files = list((tmp_path / "manifests").glob("undo-near-dupes-*.tsv"))
+    undo_files = list((root / '.eidetic' / 'runs').glob("undo-near-dupes-*.tsv"))
     assert len(undo_files) == 1
     assert "_TO-DELETE/near-dupes/CURATED/DRONE-ATMOS/Echospace [FLAC]/loop-1.flac" in undo_files[0].read_text()
+
+
+@pytest.mark.parametrize('selection', ['root', 'environment', 'explicit-paths'])
+def test_main_resolves_pilot_paths_from_selected_library(tmp_path, monkeypatch, selection):
+    environment_root = tmp_path / 'old-mount' / 'SAMPLES'
+    selected_root = environment_root if selection == 'environment' else tmp_path / 'attached-ssd' / 'SAMPLES'
+    selected_root.mkdir(parents=True)
+    monkeypatch.setattr(neardupe.config, 'SAMPLES_ROOT', environment_root)
+    monkeypatch.setattr(neardupe.config, 'MANIFEST_DIR', environment_root / '.eidetic/runs')
+    features = selected_root / '.eidetic/runs/sample-intelligence-pilot/sample-features-latest.tsv'
+    output = selected_root / '.eidetic/runs/near-dupes-pilot'
+    args = [] if selection == 'environment' else ['--root', str(selected_root)]
+    if selection == 'explicit-paths':
+        features = tmp_path / 'legacy/features.tsv'
+        output = tmp_path / 'custom-pilot'
+        args += ['--features', str(features), '--output-dir', str(output)]
+    features.parent.mkdir(parents=True)
+    _write_features(features, [])
+
+    assert neardupe.main(args) == 0
+    assert (output / 'near-dupes-latest.tsv').read_text().startswith('decision\t')
+    assert (output / 'audition/near-dupes.m3u').is_file()
+    if selection != 'environment':
+        assert not environment_root.exists()

@@ -1,0 +1,10 @@
+# Octatrack MKII starter set — loops + textures + kicks (mono OR stereo kept as-is).
+# The OT is your clock master / loop mangler, so this leans on loops and atmospheres.
+# Run `sample-export octatrack --list` then trim to taste.
+
+DRUM-LOOPS/Riemann Kollektion Riemann Tribal Techno 1
+DRUM-LOOPS/TR-8 Grooves
+DRUM-LOOPS/RAW LOOPS - 707
+DRONE-ATMOS/DeepChord.Echospace.Echoes.In.Space
+DRONE-ATMOS/Analogue Noise
+KICKS/GR8_001_TUNED_KICKS

@@ -18,7 +18,10 @@ from pathlib import Path
 
 from . import audiofeatures
 from .featurecache import FEATURE_COLUMNS
-from .inventory import LibraryDatabase
+from .inventory import LibraryDatabase, sha256_file
+
+# Increment when decoding, measurement algorithms or their parameters change.
+FEATURE_VERSION = "acoustic-v1"
 
 Payload = dict[str, float | None]
 
@@ -46,15 +49,27 @@ class LegacyFeatureIndex:
     """
 
     def __init__(self, cache_path: Path):
-        self._by_triple: dict[tuple[int, float, str], Payload] = {}
+        self._by_triple: dict[tuple[int, float, str], Payload | None] = {}
         self._by_pair: dict[tuple[int, float], Payload | None] = {}
+        self.warnings: list[str] = []
         if cache_path.is_file():
-            self._load(cache_path)
+            try:
+                self._load(cache_path)
+            except (sqlite3.Error, ValueError, TypeError, OSError) as exc:
+                self._by_triple.clear()
+                self._by_pair.clear()
+                self.warnings.append(f"legacy cache not imported: {exc}")
 
     def _load(self, cache_path: Path) -> None:
-        conn = sqlite3.connect(cache_path)
+        # Never recover or modify a legacy cache as a side effect of importing it.
+        if any(Path(str(cache_path) + suffix).exists() for suffix in ('-wal', '-journal')):
+            raise ValueError('legacy cache has pending journal evidence')
+        conn = sqlite3.connect(cache_path.resolve().as_uri() + '?mode=ro&immutable=1', uri=True)
         conn.row_factory = sqlite3.Row
         try:
+            columns = {row['name'] for row in conn.execute('pragma table_info(features)')}
+            if not columns >= {'path', 'size', 'mtime', 'error', *FEATURE_COLUMNS}:
+                raise ValueError('unsupported legacy feature schema')
             rows = conn.execute(
                 "select * from features where error is null or error = ''"
             ).fetchall()
@@ -65,7 +80,11 @@ class LegacyFeatureIndex:
             payload: Payload = {column: row[column] for column in FEATURE_COLUMNS}
             pair = (int(row["size"]), round(float(row["mtime"]), 3))
             name = str(row["path"]).rsplit("/", 1)[-1]
-            self._by_triple[(*pair, name)] = payload
+            triple = (*pair, name)
+            if triple not in self._by_triple:
+                self._by_triple[triple] = payload
+            elif self._by_triple[triple] != payload:
+                self._by_triple[triple] = None
             if pair not in self._by_pair:
                 self._by_pair[pair] = payload
             elif self._by_pair[pair] != payload:
@@ -73,9 +92,8 @@ class LegacyFeatureIndex:
 
     def get(self, size: int, mtime_ns: int, name: str) -> Payload | None:
         pair = (size, round(mtime_ns / 1e9, 3))
-        found = self._by_triple.get((*pair, name))
-        if found is not None:
-            return found
+        if (*pair, name) in self._by_triple:
+            return self._by_triple[(*pair, name)]
         return self._by_pair.get(pair)
 
     def __len__(self) -> int:
@@ -96,6 +114,7 @@ def sync_features(
     locations: list[tuple[str, Path, int, int]],
     legacy_cache: Path | None = None,
     resume: bool = True,
+    retry_failed: bool = False,
 ) -> SyncResult:
     """Fill ``asset_features`` for every sample, migrating measurements where possible.
 
@@ -103,7 +122,12 @@ def sync_features(
     resumable: samples already measured are skipped, so an interrupted run costs nothing.
     """
     index = LegacyFeatureIndex(legacy_cache) if legacy_cache else None
-    done = database.feature_ids() if resume else set()
+    metadata = database.feature_metadata() if resume else {}
+    done = {
+        sample_id for sample_id, item in metadata.items()
+        if item['extractor_version'] == FEATURE_VERSION
+        and (not item['audio_error'] or not retry_failed)
+    }
 
     migrated = extracted = failed = skipped = 0
     seen: set[str] = set()
@@ -116,21 +140,29 @@ def sync_features(
             skipped += 1
             continue
 
-        payload = index.get(size, mtime_ns, rel.name) if index else None
+        source = root / rel
+        if not source.resolve().is_relative_to(root.resolve()) or sha256_file(source) != sample_id:
+            raise ValueError(f'source changed since inventory scan: {rel}')
+        # An obsolete measured result must be remeasured, not replaced with an
+        # unversioned legacy estimate. Legacy import is for previously unseen assets.
+        payload = index.get(size, mtime_ns, rel.name) if index and sample_id not in metadata else None
         if payload is not None:
-            database.record_features(sample_id, json.dumps(payload))
+            database.record_features(sample_id, json.dumps(payload),
+                                     extractor_version=FEATURE_VERSION, provenance='legacy-stat-match')
             seen.add(sample_id)
             migrated += 1
             continue
 
         record = audiofeatures.extract(root / rel, cache_path=rel)
+        if sha256_file(source) != sample_id:
+            raise ValueError(f'source changed during measurement: {rel}')
         if getattr(record, "error", None):
-            database.record_features(sample_id, "{}", str(record.error))
+            database.record_features(sample_id, "{}", str(record.error), extractor_version=FEATURE_VERSION)
             seen.add(sample_id)
             failed += 1
             continue
 
-        database.record_features(sample_id, json.dumps(_payload_from_record(record)))
+        database.record_features(sample_id, json.dumps(_payload_from_record(record)), extractor_version=FEATURE_VERSION)
         seen.add(sample_id)
         extracted += 1
 

@@ -308,27 +308,26 @@ def build_apply_plan(root: Path, reviewed_manifest: Path) -> list[moves.Move]:
     return plan
 
 
-def _default_features_path() -> Path:
-    return config.MANIFEST_DIR / "sample-intelligence-pilot" / "sample-features-latest.tsv"
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="sample-near-dupes",
         description="Write near-dupe review/audition manifests, then stage only reviewed rows marked decision=remove.",
     )
-    ap.add_argument("--features", type=Path, default=_default_features_path(), help="sample-analyze feature TSV")
-    ap.add_argument("--output-dir", type=Path, default=config.MANIFEST_DIR / "near-dupes-pilot", help="pilot output dir")
+    ap.add_argument("--features", type=Path, help="sample-analyze feature TSV (default: ROOT/.eidetic/runs/sample-intelligence-pilot/sample-features-latest.tsv)")
+    ap.add_argument("--output-dir", type=Path, help="pilot output dir (default: ROOT/.eidetic/runs/near-dupes-pilot)")
     ap.add_argument("--root", type=Path, default=config.SAMPLES_ROOT, help="sample library root")
     ap.add_argument("--family", help="only emit groups whose normalized family contains this text")
     ap.add_argument("--limit-groups", type=int, help="only emit the first N groups after filtering")
     ap.add_argument("--apply-manifest", type=Path, help="reviewed near-dupes TSV to stage from")
     ap.add_argument("--apply", action="store_true", help="perform approved moves from --apply-manifest (default: dry-run)")
     args = ap.parse_args(argv)
+    runs = args.root / '.eidetic' / 'runs'
+    args.features = args.features or runs / 'sample-intelligence-pilot' / 'sample-features-latest.tsv'
+    args.output_dir = args.output_dir or runs / 'near-dupes-pilot'
 
     if args.apply_manifest:
         plan = build_apply_plan(args.root, args.apply_manifest)
-        manifest = config.manifest_path("near-dupes-apply")
+        manifest = config.manifest_path("near-dupes-apply", root=args.root)
         moves.write_plan(manifest, plan)
         staged_bytes = sum(move.src.stat().st_size for move in plan if move.src.exists())
         print(f"[{'APPLY' if args.apply else 'DRY-RUN'}] near-dupes apply {args.apply_manifest}")
@@ -337,8 +336,8 @@ def main(argv: list[str] | None = None) -> int:
         if not args.apply:
             print("  (dry-run — mark TSV rows decision=remove, then re-run with --apply to stage)")
             return 0
-        undo = config.manifest_path("undo-near-dupes")
-        counts = moves.apply_plan(plan, undo)
+        undo = config.manifest_path("undo-near-dupes", root=args.root)
+        counts = moves.apply_plan(plan, undo, root=args.root)
         print(f"  moved: {counts['moved']}; skipped(exists): {counts['exists']}; missing: {counts['missing']}")
         print(f"  undo written: {undo}")
         return 0

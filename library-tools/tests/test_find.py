@@ -132,3 +132,25 @@ def test_playlist_lists_absolute_paths(tmp_path):
     playlist = tmp_path / "audition.m3u8"
     write_m3u8(Path("/library"), [_match("a")], playlist)
     assert playlist.read_text().strip() == "/library/CATALOGUE/PERC/a.wav"
+
+
+def test_loading_large_index_batches_tag_reads(tmp_path, monkeypatch):
+    from librarytools.inventory import LibraryDatabase, scan_library
+    from librarytools.find import load_index
+    root = tmp_path / 'samples'
+    root.mkdir()
+    for index in range(30):
+        (root / f'kick-{index}.wav').write_bytes(str(index).encode())
+    db = LibraryDatabase(tmp_path / 'library.sqlite')
+    scan_library(root, db)
+    for sample_id in db.assets():
+        db.record_tags(sample_id, [('character', 'bright')])
+    connect = db._connect
+    connections = []
+    def counted():
+        connections.append(1)
+        return connect()
+    monkeypatch.setattr(db, '_connect', counted)
+    matches = load_index(db)
+    assert len(matches) == 30 and all('bright' in m.tags for m in matches)
+    assert len(connections) <= 6

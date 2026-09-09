@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "librarytools"
-version = "0.1.0"
+version = "0.2.0"
 description = "Safely review, organise, curate, and analyse large sample libraries."
 requires-python = ">=3.12"
 dependencies = [
@@ -34,6 +34,10 @@ sample-profile = "librarytools.profile_cli:main"
 sample-curate = "librarytools.curate_cli:main"
 sample-tag = "librarytools.tag_cli:main"
 sample-find = "librarytools.find_cli:main"
+sample-library = "librarytools.library_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+librarytools = ["resources/*.toml", "resources/profiles/devices/*.toml", "resources/profiles/studios/*.toml"]

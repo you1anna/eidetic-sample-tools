@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import sqlite3
 from pathlib import Path
 
 from . import config, moves
@@ -14,6 +15,9 @@ from .curate import (
     undo_promotions, write_consumer_views,
 )
 from .inventory import LibraryDatabase
+from .artifacts import packet_root
+from .locking import library_lock
+from .state import resolve_library_db
 from .curation_policy import CurationPolicyError, load_quotas, validate_crate_name
 from .promotion_health import HealthCheckError, check_promotions
 from .packet_classifier import PacketClassifierError, classify_packet
@@ -22,10 +26,10 @@ from .classification.review_server import load_review_packet, serve_review
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sample-curate")
-    parser.add_argument("--root", type=Path, default=config.SAMPLES_ROOT)
+    parser.add_argument("--root", type=Path, default=None)
     parser.add_argument(
         "--library-db", type=Path,
-        default=config.MANIFEST_DIR / "sample-library.sqlite",
+        default=None,
     )
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="read-only verification of recorded promotions")
@@ -64,6 +68,16 @@ def main(argv: list[str] | None = None) -> int:
     undo_promotion = sub.add_parser("undo-promotion")
     undo_promotion.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
+    packet_root_override = args.root
+    args.root = args.root or config.SAMPLES_ROOT
+    try:
+        args.library_db = resolve_library_db(args.root, args.library_db)
+    except (ValueError, OSError) as exc:
+        if args.command == 'check' and args.json_output:
+            print(json.dumps({'error': str(exc)}))
+        else:
+            print(str(exc), file=sys.stderr)
+        return 2
     if args.command == "check":
         try:
             report = check_promotions(args.root, args.library_db, args.run_id)
@@ -80,27 +94,28 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "views":
             validate_crate_name(args.name)
         if args.command == "playlists":
-            paths = regenerate_packet_playlists(args.labels)
+            paths = regenerate_packet_playlists(args.labels, **({"root": packet_root_override} if packet_root_override is not None else {}))
             categories = len(paths) - 2  # combined playlist and index are not categories
             print(f"category playlists: {categories} -> {args.labels.parent / 'playlists'}")
             return 0
         if args.command == "review-packet":
-            root, session, candidates = load_review_packet(args.labels)
-            serve_review(
-                root,
-                session,
-                candidates,
-                port=args.port,
-                open_browser=args.open_browser,
-            )
+            metadata = json.loads((args.labels.parent / "packet-meta.json").read_text(encoding="utf-8"))
+            session_root = packet_root(metadata, packet_root_override)
+            with library_lock(session_root, purpose="review listening packet"):
+                root, session, candidates = load_review_packet(args.labels, root=session_root)
+                serve_review(root, session, candidates, port=args.port, open_browser=args.open_browser)
             return 0
+        if not args.library_db.is_file():
+            raise ValueError('no library index; initialise or migrate existing history first')
         db = LibraryDatabase(args.library_db)
+        db.bind_root(args.root, create=False)
         if args.command == "classify-packet":
-            classifications, score = classify_packet(
-                args.root, db, args.labels, args.benchmark,
-                restart_review=args.restart_review,
-                carry_review=args.carry_review,
-            )
+            with library_lock(args.root, purpose="classify listening packet"):
+                classifications, score = classify_packet(
+                    args.root, db, args.labels, args.benchmark,
+                    restart_review=args.restart_review,
+                    carry_review=args.carry_review,
+                )
             print(f"classified: {len(classifications)} -> {args.labels.parent / 'classification.tsv'}")
             metadata_path = args.labels.parent / "packet-meta.json"
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -144,13 +159,14 @@ def main(argv: list[str] | None = None) -> int:
             paths = promote_favourites(args.root, db, args.labels, run_id=args.run_id)
             print(f"promoted: {len(paths)}")
         elif args.command == "views":
-            paths = write_consumer_views(db, args.labels, args.output_dir, quotas=quotas, name=args.name)
+            with library_lock(args.root, purpose="write consumer views"):
+                paths = write_consumer_views(db, args.labels, args.output_dir, quotas=quotas, name=args.name)
             print(f"consumer views: {len(paths)} -> {args.output_dir}")
         elif args.command == "undo-promotion":
             count = undo_promotions(args.root, db, args.run_id)
             print(f"quarantined promoted copies: {count}")
         return 0
-    except (CurationError, CurationPolicyError, PacketClassifierError, OSError) as exc:
+    except (CurationError, CurationPolicyError, PacketClassifierError, ValueError, sqlite3.Error, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 

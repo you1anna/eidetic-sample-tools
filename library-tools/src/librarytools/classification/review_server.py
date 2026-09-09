@@ -28,6 +28,7 @@ def validate_bind_host(host: str) -> str:
 
 def load_review_packet(
     labels_path: Path,
+    *, root: Path | None = None,
 ) -> tuple[Path, ReviewSession, list[CandidateClassification]]:
     packet_dir = labels_path.parent
     metadata_path = packet_dir / "packet-meta.json"
@@ -42,9 +43,11 @@ def load_review_packet(
         raise ClassificationError("packet must be classified with ensemble-v2 before review")
     if not isinstance(root_raw, str) or not isinstance(digest, str) or not isinstance(context, dict):
         raise ClassificationError("packet classification digest metadata is incomplete")
-    root = Path(root_raw).resolve()
-    if not root.is_dir():
-        raise ClassificationError(f"sample root is unavailable: {root}")
+    from ..artifacts import packet_root
+    try:
+        root = packet_root(metadata, root)
+    except ValueError as exc:
+        raise ClassificationError(str(exc)) from exc
     candidates = read_classification_audit(packet_dir / "classification-audit.jsonl")
     if classification_digest(candidates, context) != digest:
         raise ClassificationError("classification audit digest does not match packet metadata")

@@ -179,12 +179,16 @@ class EmbeddingWorker:
         threads: int,
         prompts: Mapping[str, tuple[str, ...]] | None,
     ) -> WorkerReport:
+        from ..locking import inherited_lock_fd
+        library_root = cache.database._root
+        lock_fd = inherited_lock_fd(library_root) if library_root is not None else None
         job = {
             "spec": asdict(spec),
             "samples": [
                 {"sample_id": sample.sample_id, "path": str(sample.path)} for sample in samples
             ],
             "cache_path": str(cache.path),
+            "library_root": str(library_root) if lock_fd is not None else None,
             "batch_size": batch_size,
             "threads": threads,
             "prompts": prompts,
@@ -204,11 +208,13 @@ class EmbeddingWorker:
                     "librarytools.classification.worker_entry",
                     str(job_path),
                     str(report_path),
+                    *(["--library-lock-fd", str(lock_fd)] if lock_fd is not None else []),
                 ],
                 check=False,
                 capture_output=True,
                 text=True,
                 env=environment,
+                pass_fds=(lock_fd,) if lock_fd is not None else (),
             )
             wall_time_s = time.perf_counter() - started
             if completed.returncode:

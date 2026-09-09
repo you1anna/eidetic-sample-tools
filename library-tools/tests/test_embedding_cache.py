@@ -10,6 +10,17 @@ from librarytools.classification.domain import ClassificationError
 from librarytools.inventory import LibraryDatabase
 
 
+def test_embedding_cache_rejects_future_database_without_writing(tmp_path):
+    path = tmp_path / 'future.sqlite'
+    LibraryDatabase(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute('pragma user_version=999')
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match='newer|future|unsupported'):
+        EmbeddingCache(path)
+    assert path.read_bytes() == before
+
+
 def test_embedding_cache_is_additive_and_revision_keyed(tmp_path) -> None:
     database_path = tmp_path / "library.sqlite"
     LibraryDatabase(database_path)

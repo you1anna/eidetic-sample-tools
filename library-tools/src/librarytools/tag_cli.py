@@ -9,10 +9,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import hashlib
+import sqlite3
 from pathlib import Path
 
 from . import config, features as features_mod, origin as origin_mod, tagging
 from .inventory import LibraryDatabase, scan_library
+from .state import resolve_library_db
+from .locking import library_lock
 
 
 def _load_locations(database: LibraryDatabase) -> list:
@@ -51,6 +55,14 @@ def _write_proposal(
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+def _main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="sample-tag",
         description="Recover origin, measure acoustics and regenerate search tags. "
@@ -60,14 +72,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--library-db",
         type=Path,
-        default=config.MANIFEST_DIR / "sample-library.sqlite",
+        default=None,
         help="library index to read and update",
     )
     ap.add_argument("--vocabulary", type=Path, help="rule file (default: vocabulary.toml)")
     ap.add_argument(
         "--legacy-cache",
         type=Path,
-        default=config.MANIFEST_DIR / "sample-intelligence.sqlite",
+        default=config.LEGACY_MANIFEST_DIR / "sample-intelligence.sqlite",
         help="path-keyed feature cache to migrate measurements from",
     )
     ap.add_argument("--rescan", action="store_true", help="walk the library before tagging")
@@ -78,22 +90,36 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--proposal",
         type=Path,
-        default=config.MANIFEST_DIR / "vocabulary-proposal.txt",
+        default=None,
         help="where to write the coverage proposal",
     )
+    ap.add_argument('--retry-failed', action='store_true', help='retry failed acoustic measurements')
     args = ap.parse_args(argv)
+    explicit = args.library_db is not None
+    args.library_db = resolve_library_db(args.root, args.library_db)
+    if not explicit and not args.library_db.is_file():
+        raise ValueError('no portable index; use sample-library init for a new library or migrate existing history first')
+    args.proposal = args.proposal or args.root / '.eidetic' / 'runs' / 'vocabulary-proposal.txt'
+    with library_lock(args.root, purpose='tag library'):
+        return _run(args)
+
+
+def _run(args) -> int:
+    args.vocabulary = args.vocabulary or tagging.DEFAULT_VOCABULARY
 
     if args.rescan and not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)
         return 2
 
     try:
-        rules = tagging.load_vocabulary(args.vocabulary)
+        vocabulary = args.vocabulary.read_bytes()
+        rules = tagging.load_vocabulary(args.vocabulary, payload=vocabulary)
     except tagging.VocabularyError as exc:
         print(f"vocabulary error: {exc}", file=sys.stderr)
         return 2
 
     database = LibraryDatabase(args.library_db)
+    database.bind_root(args.root)
     if args.rescan:
         result = scan_library(args.root, database)
         print(f"  scanned: {result.file_count} files")
@@ -105,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    print(f"[READ-ONLY] {len(locations)} locations from {args.library_db}")
+    print(f"[INDEX] {len(locations)} locations from {args.library_db}")
 
     resolved = _resolve_origins(database, locations)
     known = sum(1 for found in resolved.values() if found.origin != origin_mod.UNKNOWN)
@@ -117,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             database,
             [(loc.sample_id, loc.path, loc.size, loc.mtime_ns) for loc in locations],
             legacy_cache=args.legacy_cache if args.legacy_cache.is_file() else None,
+            retry_failed=args.retry_failed,
         )
         print(
             f"  features: {sync.migrated} migrated, {sync.extracted} measured, "
@@ -152,13 +179,22 @@ def main(argv: list[str] | None = None) -> int:
         print("  (no tags written; re-run with --apply once the proposal looks right)")
         return 0
 
-    database.clear_tags()
+    generated = {}
     written = 0
     for sample in samples:
         tags = tagging.tags_for(sample, rules)
         if tags:
-            database.record_tags(sample.sample_id, tags)
+            generated[sample.sample_id] = tags
             written += len(tags)
+    digest = hashlib.sha256(vocabulary).hexdigest()
+    snapshot = args.root / '.eidetic' / 'configurations' / f'vocabulary-{digest}.toml'
+    snapshot.parent.mkdir(parents=True, exist_ok=True)
+    if not snapshot.exists():
+        with snapshot.open('xb') as out:
+            out.write(vocabulary)
+    elif snapshot.read_bytes() != vocabulary:
+        raise ValueError(f'configuration snapshot has changed: {snapshot}')
+    database.replace_generated_tags(generated, vocabulary_digest=digest)
     print(f"  tags written: {written} across {len(samples)} samples")
     return 0
 

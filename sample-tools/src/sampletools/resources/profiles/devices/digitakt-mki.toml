@@ -1,0 +1,15 @@
+schema_version = 1
+id = "digitakt-mki"
+display_name = "Elektron Digitakt MK1"
+sample_rate = 48000
+bits = 16
+channels = "mono"
+transfer = "elektron-transfer"
+import_root = ""
+max_project_samples = 127
+max_folder_depth = 8
+preserves_stereo = false
+timestretch = false
+probationary = true
+usb_audio = true
+usb_midi = true

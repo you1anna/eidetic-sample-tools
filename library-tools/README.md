@@ -15,13 +15,38 @@ python -m pip install -e './library-tools[dev]'
 
 See [Getting started](../docs/GETTING-STARTED.md) for environment setup, FFmpeg
 and library paths. Set `SAMPLES_ROOT` or pass `--root` explicitly. Index commands
-share `library-tools/manifests/sample-library.sqlite` by default; use the same
+share `$SAMPLES_ROOT/.eidetic/library.sqlite` by default; use the same
 `--library-db` wherever you override it.
+
+The examples keep generated reports, packets and crates on the library drive:
+
+```bash
+export SAMPLES_ROOT=/path/to/SAMPLES
+export RUNS="$SAMPLES_ROOT/.eidetic/runs"
+```
+
+Recompute `RUNS` after changing the mount path. Explicit output paths remain
+supported, including older repository-local paths; preserve those separately or
+include them when onboarding and backing up.
+
+## Long-lived and shared-drive installations
+
+Use `sample-library doctor --root "$SAMPLES_ROOT" --json` before upgrading.
+`sample-library onboard --root "$SAMPLES_ROOT" --machine NAME` previews repeatable
+setup on the current Mac; repeat with `--apply`. Use `--defer-machine NAME` for
+another Mac's unavailable history. Later onboarding captures that history without
+overwriting newer SSD decisions. No connection to the other Mac is required.
+
+`sample-library` also provides explicit init, migrate, backup, restore and recovery
+commands plus a maintenance preview. Follow the [lifecycle guide](../docs/LIFECYCLE.md)
+before adopting old machine-local state onto the SSD. `sample-tag --retry-failed`
+retries failed measurements; successful results retain versioned provenance.
 
 ## Command map
 
 | Task | Commands | Maturity |
 |---|---|---|
+| Diagnose, onboard, upgrade and recover portable state | `sample-library` | Beta |
 | Inspect names, roles and metadata | `sample-review` | Stable |
 | Plan sorting, exact deduplication and pack intake | `sample-sort`, `sample-dedupe`, `sample-intake` | Stable |
 | Recover origin, tag and search | `sample-tag`, `sample-find` | Beta |
@@ -38,9 +63,9 @@ See the [roadmap](../docs/ROADMAP.md) for maturity definitions. Each command has
 ### `sample-review`
 
 ```bash
-sample-review --root /path/to/SAMPLES --no-probe --summary
-sample-review --root /path/to/SAMPLES --no-probe \
-  --output manifests/review.tsv --index-dir manifests/index
+sample-review --root "$SAMPLES_ROOT" --no-probe --summary
+sample-review --root "$SAMPLES_ROOT" --no-probe \
+  --output "$RUNS/review.tsv" --index-dir "$RUNS/index"
 ```
 
 The summary writes nothing; the second command writes TSV review material.
@@ -67,6 +92,8 @@ sample-intake [--root PATH] [--apply]
   folder names and plans moves into `PACKS/`. Loose root audio is excluded.
 
 All three preview by default and record successful applied moves for undo.
+Default plans and undo manifests are written under `$RUNS`; durable recovery
+journals live beside them under `$SAMPLES_ROOT/.eidetic/operations/`.
 Check the backup and plan before applying; regenerate plans after library changes.
 The older `sample-classify [--root PATH] [--no-probe] [--apply]` coarse sorter is
 retired; use review and sort for new workflows.
@@ -77,7 +104,8 @@ retired; use review and sort for new workflows.
 
 ```text
 sample-tag [--root PATH] [--library-db FILE] [--vocabulary FILE]
-           [--rescan] [--skip-features] [--apply]
+           [--rescan] [--skip-features] [--retry-failed] [--apply]
+           [--legacy-cache FILE] [--proposal FILE]
 ```
 
 Recovers origins from pack folders, filename tokens and identical copies; reuses
@@ -93,8 +121,11 @@ name_matches = ["conga", "bongo", "djembe", "cowbell"]
 ```
 
 Without `--apply`, it writes a coverage proposal. Scans, origins and measurements
-can still update the derived index. `--apply` replaces stored tags from the
-vocabulary; neither mode moves, renames or converts audio.
+can still update the derived index. `--apply` replaces generated tags from the
+vocabulary while preserving human and unclassified legacy tags; neither mode
+moves, renames or converts audio. The coverage proposal defaults to
+`$RUNS/vocabulary-proposal.txt`. `--legacy-cache` can import compatible measurements
+from an older installation; it does not import listening approval.
 
 ### `sample-find`
 
@@ -111,8 +142,9 @@ alphabetically; `--like` ranks acoustic distance to an indexed ID or unique path
 fragment; `--preferred` ranks recorded kit picks.
 
 ```bash
-sample-find perc tribal analog --limit 20 --m3u8 manifests/percussion.m3u8
-sample-find --like YOUR_SAMPLE_ID --role PERC --limit 10
+sample-find --root "$SAMPLES_ROOT" perc tribal analog --limit 20 \
+  --m3u8 "$RUNS/percussion.m3u8"
+sample-find --root "$SAMPLES_ROOT" --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
 `--like` uses min-max normalised Euclidean distance over measured features.
@@ -122,7 +154,11 @@ future ranking signal; picks do not replace curation decisions.
 `--crate` writes the [export schema](../sample-tools/README.md#crate-format).
 Use `--curated-only` to restrict results to indexed `CURATED/` paths. The exporter
 rejects the entire crate if any source is outside that zone or fails its hash
-check. Search warns when a written crate contains uncurated rows.
+check. New search crates also record whether their exact copies have active
+promotion evidence; rows missing that evidence require review before export.
+This matters after onboarding with incomplete historical records: existing curated
+files remain searchable, but their folder alone cannot approve a generated crate.
+Search warns when a written crate contains uncurated or unverified rows.
 
 ## Curation
 
@@ -170,10 +206,11 @@ python -m pip install -e './library-tools[audio-classifier,review-ui]'
 After preparing a packet:
 
 ```bash
-sample-curate classify-packet \
-  --labels manifests/session-01/labels.tsv \
-  --benchmark manifests/session-01/benchmark-labels.tsv
-sample-curate review-packet --labels manifests/session-01/labels.tsv --open
+sample-curate --root "$SAMPLES_ROOT" classify-packet \
+  --labels "$RUNS/session-01/labels.tsv" \
+  --benchmark "$RUNS/session-01/benchmark-labels.tsv"
+sample-curate --root "$SAMPLES_ROOT" review-packet \
+  --labels "$RUNS/session-01/labels.tsv" --open
 ```
 
 Two pinned CLAP checkpoints run sequentially and cache embeddings. The ensemble
@@ -185,6 +222,12 @@ Review every exception and one blind sentinel per accepted group. A failed
 sentinel reopens that group. The UI supports notes, undo and resume, writes
 `review-state.json` atomically and generates the 24-row benchmark when the queue
 completes. Do not edit benchmark rows manually.
+
+The review server holds the library writer lock for its lifetime. Stop the server
+in the terminal when the session is finished; closing the browser tab alone does
+not stop it. After SSD handoff, the explicit `--root` rebinds a portable packet to
+the attached library only when its UUID matches. Regenerate playlists to refresh
+absolute audio paths for the current mount.
 
 Grouped playlists require complete review and at least 22/24 form and 19/24
 joint content/group matches. This permits shortlist publication; musical
@@ -199,7 +242,7 @@ new evidence passes. Initial name-derived playlists are retained in `archive/`.
 After removing label rows, regenerate playlists immediately:
 
 ```bash
-sample-curate playlists --labels manifests/session-01/labels.tsv
+sample-curate --root "$SAMPLES_ROOT" playlists --labels "$RUNS/session-01/labels.tsv"
 ```
 
 Missing or stale classification fails validation. Read the
@@ -209,7 +252,7 @@ for model execution and publication details.
 ### Promotion integrity checks
 
 ```bash
-sample-curate check --run-id session-01 --json
+sample-curate --root "$SAMPLES_ROOT" check --run-id session-01 --json
 ```
 
 Omit `--run-id` to check all recorded promotions. Current bytes are hashed for
@@ -239,9 +282,11 @@ sample-analyze [--root PATH] [--output-dir DIR] [--pilot]
                [--library-db FILE] [--classifier]
 ```
 
-`--pilot` writes source registries, features, reports and candidate crates.
-`--library-db` adds stable inventory; `--no-probe` skips duration and acoustic
-extraction. Candidate crates require human curation before hardware use.
+`--pilot` writes source registries, features, reports and candidate crates under
+`$RUNS/sample-intelligence-pilot` unless `--output-dir` is supplied. It refreshes
+the portable inventory when present; `--library-db` selects an explicit database.
+`--no-probe` skips duration and acoustic extraction. Candidate crates require human
+curation before hardware use.
 
 `--classifier` invokes the older CNN-LSTM drum-role experiment. Its first route
 failed ear calibration, so output remains suggestion-only. It requires the
@@ -261,6 +306,10 @@ The pilot emits long, high-certainty loop pairs; short-hit similarity proved
 unreliable. Audition and mark `decision=remove`, then pass the reviewed TSV with
 `--apply-manifest`. It still previews unless `--apply` is explicit.
 
+Features default to `$RUNS/sample-intelligence-pilot/sample-features-latest.tsv`
+and output to `$RUNS/near-dupes-pilot`, resolved from the selected `--root`.
+Pass `--features` or `--output-dir` to reuse evidence stored elsewhere.
+
 ### `sample-role-cleanup` and `sample-benchmark`
 
 ```text
@@ -275,6 +324,11 @@ calibration row must be labelled before a route can advance. Benchmark preparati
 selects feature-spanning one-shots (default duration cap: 2.5 seconds); scoring
 reports precision, recall and confusion against ear labels. Failed routes stay
 rejected. Neither tool authorises audio moves or musical selections.
+
+Benchmark features default to the selected library's
+`.eidetic/runs/sample-intelligence-pilot/sample-features-latest.tsv`. Choose a
+named portable packet directory with `--output-dir "$RUNS/benchmark-session-01"`;
+explicit feature and output paths remain supported.
 
 ## Profiles
 

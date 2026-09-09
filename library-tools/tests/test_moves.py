@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from librarytools import moves
 
 
@@ -72,3 +74,74 @@ def test_apply_plan_undo_contains_moved_lines_only(tmp_path: Path):
     # safety: the pre-existing dest was not clobbered, its src remains
     assert exists_dest.read_text() == "already here"
     assert exists_src.exists()
+
+
+def test_safe_move_preserves_dangling_destination_symlink(tmp_path):
+    src = tmp_path / 'source.wav'
+    src.write_bytes(b'audio')
+    destination = tmp_path / 'destination.wav'
+    destination.symlink_to(tmp_path / 'missing-target')
+    assert moves.safe_move(src, destination) == 'exists'
+    assert destination.is_symlink() and src.read_bytes() == b'audio'
+
+
+def test_move_directory_rejects_symlink_dependencies_before_mutation(tmp_path):
+    import pytest
+    root = tmp_path / 'SAMPLES'
+    source = root / 'PACKS' / 'pack'
+    source.mkdir(parents=True)
+    (source / 'audio.wav').write_bytes(b'audio')
+    (source / 'external.wav').symlink_to(tmp_path / 'outside.wav')
+    destination = root / 'CATALOGUE' / 'pack'
+    with pytest.raises(ValueError, match='symlink'):
+        moves.apply_plan([moves.Move(source, destination, 'test')], tmp_path / 'undo.tsv', root=root)
+    assert source.is_dir() and not destination.exists()
+
+
+def test_destination_created_after_preflight_is_not_overwritten(tmp_path, monkeypatch):
+    src = tmp_path / 'source.wav'
+    src.write_bytes(b'new audio')
+    destination = tmp_path / 'out' / 'destination.wav'
+    mkdir = Path.mkdir
+    def race_mkdir(path, *args, **kwargs):
+        mkdir(path, *args, **kwargs)
+        if path == destination.parent:
+            destination.write_bytes(b'created by another process')
+    monkeypatch.setattr(Path, 'mkdir', race_mkdir)
+    assert moves.safe_move(src, destination) == 'exists'
+    assert destination.read_bytes() == b'created by another process'
+    assert src.read_bytes() == b'new audio'
+
+
+@pytest.mark.parametrize('marker', [
+    '{"format_version": 999, "library_id": "00000000-0000-0000-0000-000000000000"}',
+    '{"format_version": 1}',
+])
+def test_portable_preview_rejects_unsupported_or_malformed_identity_without_writes(tmp_path, marker):
+    root = tmp_path / 'SAMPLES'
+    state = root / '.eidetic'
+    state.mkdir(parents=True)
+    identity = state / 'library.json'
+    identity.write_text(marker)
+    plan_path = state / 'runs' / 'preview.tsv'
+    before = {path: path.read_bytes() for path in state.rglob('*') if path.is_file()}
+    with pytest.raises(ValueError, match='identity'):
+        moves.write_plan(plan_path, [])
+    assert not plan_path.parent.exists()
+    assert before == {path: path.read_bytes() for path in state.rglob('*') if path.is_file()}
+
+
+def test_portable_preview_rejects_future_database_before_creating_plan(tmp_path):
+    import sqlite3
+    from librarytools.inventory import LibraryDatabase
+    root = tmp_path / 'SAMPLES'
+    root.mkdir()
+    database = root / '.eidetic' / 'library.sqlite'
+    LibraryDatabase(database)
+    with sqlite3.connect(database) as conn:
+        conn.execute('pragma user_version=999')
+    before = database.read_bytes()
+    output = root / '.eidetic' / 'runs' / 'preview.tsv'
+    with pytest.raises(ValueError, match='newer|unsupported|version'):
+        moves.write_plan(output, [])
+    assert not output.parent.exists() and database.read_bytes() == before

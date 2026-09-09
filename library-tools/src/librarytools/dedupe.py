@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     plan = build_plan(root=args.root)
-    manifest = config.manifest_path("dedupe")
+    manifest = config.manifest_path("dedupe", root=args.root)
     moves.write_plan(manifest, plan)
     reclaimed = sum(m.src.stat().st_size for m in plan if m.src.exists())
     print(f"[{'APPLY' if args.apply else 'DRY-RUN'}] dedupe {args.root}")
@@ -90,8 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         print("  (dry-run — re-run with --apply to move dupes to _TO-DELETE/dupes/)")
         return 0
 
-    undo = config.manifest_path("undo-dedupe")
-    counts = moves.apply_plan(plan, undo)
+    undo = config.manifest_path("undo-dedupe", root=args.root)
+    counts = moves.apply_plan(plan, undo, root=args.root)
     print(f"  moved: {counts['moved']}; skipped(exists): {counts['exists']}; "
           f"missing: {counts['missing']}")
     print(f"  undo written: {undo}")

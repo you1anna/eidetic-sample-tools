@@ -1,0 +1,16 @@
+schema_version = 1
+id = "tr8s"
+display_name = "Roland TR-8S"
+sample_rate = 48000
+bits = 16
+channels = "mono-default"
+transfer = "sd-card-import"
+import_root = "ROLAND/TR-8S/SAMPLE"
+max_total_samples = 400
+max_folder_files = 256
+max_total_seconds = 600
+max_folder_depth = 1
+preserves_stereo = true
+timestretch = false
+usb_audio = true
+usb_midi = true

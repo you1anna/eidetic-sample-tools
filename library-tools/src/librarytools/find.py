@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import csv
 import json
+import hashlib
+import io
+import os
+import tempfile
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -79,6 +83,8 @@ class Match:
     distance: float | None = None
     picks: int = 0
     descriptor: str = ""
+    approval_status: str = "requires_review"
+    approval_run_id: str = ""
 
     @property
     def name(self) -> str:
@@ -166,6 +172,13 @@ def load_index(database: LibraryDatabase) -> list[Match]:
     origins = database.origins()
     picks = database.pick_counts()
     descriptions = database.favourite_descriptions()
+    promotions = {(str(row["sample_id"]), str(row["curated_path"])): row
+                  for row in database.promotions() if row.get("status", "active") == "active"}
+    tags_by_id: dict[str, set[str]] = {}
+    with database._connect() as connection:
+        for row in connection.execute('select distinct sample_id,tag_group,tag from tags'):
+            if row['tag_group'] not in _DISPLAY_SKIP_GROUPS:
+                tags_by_id.setdefault(row['sample_id'], set()).add(row['tag'])
 
     matches: list[Match] = []
     seen: set[str] = set()
@@ -173,22 +186,23 @@ def load_index(database: LibraryDatabase) -> list[Match]:
     # Alphabetical path order alone puts CATALOGUE ahead of CURATED.
     locations = sorted(
         database.current_locations(),
-        key=lambda item: (item.zone != "CURATED", item.path.as_posix()),
+        key=lambda item: ((item.sample_id, item.path.as_posix()) not in promotions,
+                          item.zone != "CURATED", item.path.as_posix()),
     )
     for location in locations:
         if location.sample_id in seen:
             continue
         seen.add(location.sample_id)
-        tags = tuple(sorted(
-            tag for group, tag in database.tags_for(location.sample_id)
-            if group not in _DISPLAY_SKIP_GROUPS
-        ))
+        tags = tuple(sorted(tags_by_id.get(location.sample_id, ())))
         origin, _, _ = origins.get(location.sample_id, ("unknown", "none", ""))
         role = classify_role(location.path).role
         if location.zone == "CURATED" and len(location.path.parts) > 2:
             canonical = location.path.parts[1]
             if canonical in TRUSTED_ROLES:
                 role = canonical
+        promotion = promotions.get((location.sample_id, location.path.as_posix()))
+        approved = (location.zone == "CURATED" and promotion is not None
+                    and role in TRUSTED_ROLES and bool(descriptions.get((location.sample_id, role))))
         matches.append(
             Match(
                 sample_id=location.sample_id,
@@ -199,6 +213,8 @@ def load_index(database: LibraryDatabase) -> list[Match]:
                 tags=tags,
                 picks=picks.get(location.sample_id, 0),
                 descriptor=descriptions.get((location.sample_id, role), ""),
+                approval_status="approved" if approved else "requires_review",
+                approval_run_id=str(promotion["run_id"]) if approved else "",
             )
         )
     return matches
@@ -376,17 +392,36 @@ CRATE_FIELDS = ("sample_id", "source_path", "role", "descriptor", "reason")
 
 
 def write_crate(matches: list[Match], path: Path, reason: str) -> None:
-    """Write the exact crate schema ``sampletools.export.read_crate_tsv`` expects."""
+    """Write the stable five-column TSV with explicit recorded approval evidence."""
+    buffer = io.StringIO(newline='')
+    writer = csv.writer(buffer, delimiter='\t')
+    writer.writerow(CRATE_FIELDS)
+    for match in matches:
+        writer.writerow([
+            match.sample_id,
+            match.path.as_posix(),
+            match.role if match.zone == 'CURATED' and match.role in TRUSTED_ROLES
+            else export_role(match.role, match.path.as_posix()),
+            match.descriptor or descriptor_for(match.path),
+            reason,
+        ])
+    payload = buffer.getvalue().encode('utf-8')
+    approval = {'status': 'approved' if all(match.approval_status == 'approved' for match in matches) else 'requires_review',
+                'rows': [{'sample_id': match.sample_id, 'source_path': match.path.as_posix(),
+                          'status': match.approval_status, 'run_id': match.approval_run_id}
+                         for match in matches]}
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh, delimiter="\t")
-        writer.writerow(CRATE_FIELDS)
-        for match in matches:
-            writer.writerow([
-                match.sample_id,
-                match.path.as_posix(),
-                match.role if match.zone == "CURATED" and match.role in TRUSTED_ROLES
-                else export_role(match.role, match.path.as_posix()),
-                match.descriptor or descriptor_for(match.path),
-                reason,
-            ])
+    fd, name = tempfile.mkstemp(prefix=f'.{path.name}.', suffix='.tmp', dir=path.parent)
+    staging = Path(name)
+    try:
+        with os.fdopen(fd, 'wb') as output:
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+        from .artifacts import write_crate_metadata
+        # Publish the hash-bound evidence first: a crash cannot make a new
+        # unapproved search crate look like a standalone legacy human-authored TSV.
+        write_crate_metadata(path, approval=approval, content_sha256=hashlib.sha256(payload).hexdigest())
+        staging.replace(path)
+    finally:
+        staging.unlink(missing_ok=True)

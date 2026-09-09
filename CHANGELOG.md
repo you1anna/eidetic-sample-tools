@@ -1,0 +1,40 @@
+# Changelog
+
+## 0.2.0 — 2026-09-09
+
+Libraries can now travel between independently configured Macs while retaining
+their identity, current decisions and historical evidence. Each Mac runs
+`sample-library onboard`; another machine's unavailable history can be deferred
+without blocking new work.
+
+- Explicit, validated upgrades from historical database schemas, with verified
+  backups and refusal to modify unknown or newer state.
+- Single-writer coordination, complete-scan publication, durable operation
+  journals, interruption recovery, and retained decision histories.
+- Repeatable capture of older databases and human files without overwriting
+  active SSD decisions. Changed historical inputs require a new verified capture.
+- Versioned measurements and generated tags, retained analysis reports, and
+  maintenance diagnostics for caches and incomplete evidence.
+- Hash-verified export receipts and selected-file transfer records. Explicit
+  export roots support different mount paths. Search-generated crates retain
+  approval evidence; legacy curated folders alone cannot supply it.
+- Versioned Ableton report metadata records input identity and completeness,
+  with replaced reports archived for comparison.
+- Bundled profiles and vocabulary for installed packages, pinned test
+  dependencies, and macOS/Linux CI with an installed-wheel lifecycle check.
+
+### Upgrade notes
+
+The default index is now `SAMPLES/.eidetic/library.sqlite`. Keep each Mac's
+environment on its local disk and onboard that machine against the attached
+library. Historical databases and files stay preserved; contradictory decisions
+are not merged automatically. Use explicit `--library-db` and `--include` paths
+for evidence outside the current checkout.
+
+Existing unverified exports require `--force` to rebuild. Crates retain their
+five-column TSV format, with new metadata sidecars. Existing preview/apply gates
+and hardware profiles remain unchanged. State backups do not contain source audio.
+
+See [setup](docs/GETTING-STARTED.md), the [lifecycle guide](docs/LIFECYCLE.md) and
+the [operational record](STATUS.md) before applying changes to an existing library.
+This source release does not itself migrate a live library or publish packages.

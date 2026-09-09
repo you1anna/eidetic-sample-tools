@@ -8,6 +8,7 @@ from pathlib import Path
 from . import audiofeatures, config, probe, review
 from .analyze_types import FeatureRow, SourceRow
 from .featurecache import FEATURE_COLUMNS, FeatureCache, FeatureRecord
+from .inventory import sha256_file
 
 def _is_sample_source(row: SourceRow) -> bool:
     return row.source_kind in {"curated-sample", "vendor-pack-audio", "octatrack-set-audio"}
@@ -43,15 +44,18 @@ def _read_acoustic_features(
     full_path = root / source.path
     try:
         stat = full_path.stat()
+        content_hash = sha256_file(full_path)
     except OSError as exc:
         return FeatureRecord(path=source.path, size=0, mtime=0.0, error=str(exc))
     if cache is not None:
-        cached = cache.get_or_none(source.path, stat.st_size, stat.st_mtime)
+        cached = cache.get_or_none(source.path, stat.st_size, stat.st_mtime, content_hash=content_hash)
         if cached is not None:
             return cached
     record = audiofeatures.extract(full_path, cache_path=source.path)
+    if sha256_file(full_path) != content_hash:
+        raise ValueError(f'source changed during acoustic extraction: {source.path}')
     if cache is not None:
-        cache.upsert(record)
+        cache.upsert(record, content_hash=content_hash)
     return record
 
 

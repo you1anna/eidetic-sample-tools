@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+import sqlite3
+from contextlib import nullcontext
 from pathlib import Path
 
 from . import config, find as find_mod
 from .inventory import LibraryDatabase
+from .state import resolve_library_db
+from .locking import library_lock
 
 
 def _print_table(matches: list[find_mod.Match], show_paths: bool) -> None:
@@ -32,6 +36,14 @@ def _print_table(matches: list[find_mod.Match], show_paths: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+def _main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="sample-find",
         description="Search the sample index by tag and by sound. Never changes audio.",
@@ -41,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--library-db",
         type=Path,
-        default=config.MANIFEST_DIR / "sample-library.sqlite",
+        default=None,
         help="library index to search",
     )
     ap.add_argument("--role", action="append", default=[], help="restrict to a review role")
@@ -70,6 +82,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--crate", type=Path, help="write a crate TSV for sample-export")
     ap.add_argument("--kit-id", help="record these results as picks under this kit id")
     args = ap.parse_args(argv)
+    args.library_db = resolve_library_db(args.root, args.library_db)
+    purpose = 'write search crate' if args.crate else 'record picks'
+    with library_lock(args.root, purpose=purpose) if args.kit_id or args.crate else nullcontext():
+        return _run(args)
+
+
+def _run(args) -> int:
 
     if not args.library_db.is_file():
         print(
@@ -78,7 +97,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    database = LibraryDatabase(args.library_db)
+    database = LibraryDatabase(args.library_db, readonly=not bool(args.kit_id))
+    database.bind_root(args.root, create=False)
     everything = find_mod.load_index(database)
     if not everything:
         print("index is empty; run sample-tag --rescan --apply first", file=sys.stderr)
@@ -127,13 +147,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.crate:
         find_mod.write_crate(results, args.crate, query.describe())
         print(f"  crate: {args.crate}")
-        uncurated = sum(1 for match in results if match.zone != "CURATED")
-        if uncurated:
-            print(
-                f"  ⚠ {uncurated} of {len(results)} row(s) are not under CURATED/ yet; "
-                "sample-export rejects them until sample-curate promotes them"
-            )
-        print(f"  next:  sample-export octatrack --crate {args.crate} --list")
+        unapproved = sum(match.approval_status != "approved" for match in results)
+        if unapproved:
+            print(f"  crate requires review: {unapproved} of {len(results)} row(s) lack a recorded active promotion and favourite decision; "
+                  "complete listening labels and sample-curate promotion before exporting this search crate")
+        else:
+            print(f"  next:  sample-export octatrack --root '{args.root}' --crate '{args.crate}' --list")
     if args.kit_id:
         for match in results:
             database.record_pick(match.sample_id, args.kit_id, query.describe())

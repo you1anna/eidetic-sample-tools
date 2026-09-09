@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from .index import set_summary, to_tsv_row
-from .read import AlsParseError, iter_sets, load_als
+from .reports import ReportRun
 from .samples import classify, sample_refs
 
 TSV_HEADER = "path\ttempo\ttrack_count\ttracks\tscene_count\tdevices\tmtime"
@@ -37,23 +37,23 @@ def index_main(argv: list[str] | None = None) -> int:
     tsv_path = out_dir / "als-index.tsv"
 
     rows = [TSV_HEADER]
-    skipped = []
-    for root in _roots_from_args(args):
-        if not root.exists():
-            continue
-        for als_path in iter_sets(root):
-            try:
-                tree_root = load_als(als_path)
-            except AlsParseError as exc:
-                skipped.append(str(exc))
-                continue
+    run = ReportRun(_roots_from_args(args), 'als-index')
+    for als_path, tree_root, observation in run.sets():
+        try:
             info = set_summary(tree_root, als_path)
+            info.mtime = observation['mtime_ns'] / 1e9
             rows.append(to_tsv_row(info))
+        except (ValueError, TypeError, OSError) as exc:
+            run.report_error(observation, exc)
+    try:
+        run.publish(tsv_path, rows)
+    except (OSError, ValueError) as exc:
+        print(f'report publication failed: {exc}', file=sys.stderr)
+        return 2
 
-    tsv_path.write_text("\n".join(rows) + "\n")
     print(f"Wrote {len(rows) - 1} Set(s) to {tsv_path}")
-    for msg in skipped:
-        print(f"skipped (parse error): {msg}", file=sys.stderr)
+    for msg in run.data["errors"]:
+        print(f"incomplete report: {msg}", file=sys.stderr)
     return 0
 
 
@@ -70,16 +70,9 @@ def samples_main(argv: list[str] | None = None) -> int:
     rows = ["set_path\tsample_path\tstatus"]
     present_count = 0
     missing_count = 0
-    skipped = []
-    for root in _roots_from_args(args):
-        if not root.exists():
-            continue
-        for als_path in iter_sets(root):
-            try:
-                tree_root = load_als(als_path)
-            except AlsParseError as exc:
-                skipped.append(str(exc))
-                continue
+    run = ReportRun(_roots_from_args(args), 'als-samples')
+    for als_path, tree_root, observation in run.sets():
+        try:
             refs = sample_refs(tree_root, set_dir=als_path.parent)
             result = classify(refs)
             for ref in result["present"]:
@@ -88,11 +81,17 @@ def samples_main(argv: list[str] | None = None) -> int:
             for ref in result["missing"]:
                 rows.append(f"{als_path}\t{ref.resolved}\tmissing")
                 missing_count += 1
+        except (ValueError, TypeError, OSError) as exc:
+            run.report_error(observation, exc)
+    try:
+        run.publish(tsv_path, rows)
+    except (OSError, ValueError) as exc:
+        print(f'report publication failed: {exc}', file=sys.stderr)
+        return 2
 
-    tsv_path.write_text("\n".join(rows) + "\n")
     print(f"present: {present_count}, missing: {missing_count} -> {tsv_path}")
-    for msg in skipped:
-        print(f"skipped (parse error): {msg}", file=sys.stderr)
+    for msg in run.data["errors"]:
+        print(f"incomplete report: {msg}", file=sys.stderr)
     return 0
 
 

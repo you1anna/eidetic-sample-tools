@@ -110,6 +110,17 @@ def classify_packet(
     carry_review: bool = False,
 ) -> tuple[list[Classification], BenchmarkScore]:
     """Classify a packet and create/score its 24-row ear benchmark."""
+    meta_path = labels_path.parent / "packet-meta.json"
+    if meta_path.is_file():
+        from .artifacts import packet_root
+        try:
+            existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            if not isinstance(existing_meta, dict) or existing_meta.get("schema_version", 1) not in {1, 2, 3} or existing_meta.get("packet_format_version", 1) != 1:
+                raise ValueError("unsupported packet version; use compatible tools")
+            if existing_meta.get("root"):
+                packet_root(existing_meta, root)
+        except (ValueError, OSError) as exc:
+            raise PacketClassifierError(str(exc)) from exc
     with labels_path.open(encoding="utf-8", newline="") as fh:
         label_reader = csv.DictReader(fh, delimiter="\t")
         label_rows = list(label_reader)

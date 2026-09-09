@@ -3,10 +3,17 @@
 Move from a searchable archive to a collection you have heard, selected and
 prepared for an instrument. Each stage produces a reviewable output.
 
-Complete [setup](GETTING-STARTED.md) first. Examples run from the repository root
-with `SAMPLES_ROOT` set and the default index at
-`library-tools/manifests/sample-library.sqlite`. Use the same `--library-db` path
-throughout if you choose a different index.
+Complete [setup](GETTING-STARTED.md) on the current Mac first. Set the attached
+library path and a portable location for this guide's outputs:
+
+```bash
+export SAMPLES_ROOT=/path/to/SAMPLES
+export RUNS="$SAMPLES_ROOT/.eidetic/runs"
+```
+
+The default index is `$SAMPLES_ROOT/.eidetic/library.sqlite`. Use the same
+`--library-db` path throughout if you choose a different index. Recompute `RUNS`
+when the library mount path changes. No other Mac needs to be available.
 
 ## Library zones
 
@@ -24,11 +31,17 @@ For the existing reference library, consult the dated
 
 ## Find a sound now
 
+Onboard the current Mac using the [lifecycle guide](LIFECYCLE.md) before building
+the index. This preserves available older history and can record another Mac's
+history as pending. State, labels and recovery records travel with the SSD under
+`.eidetic/`.
+
 Build the index once, then write a shortlist to a playlist:
 
 ```bash
 sample-tag --root "$SAMPLES_ROOT" --rescan --apply
-sample-find perc tribal analog --limit 20 --m3u8 manifests/percussion.m3u8
+sample-find --root "$SAMPLES_ROOT" perc tribal analog --limit 20 \
+  --m3u8 "$RUNS/percussion.m3u8"
 ```
 
 These commands write derived data and leave audio in place. Terms combine with
@@ -39,7 +52,7 @@ For a measured comparison, replace `YOUR_SAMPLE_ID` with an indexed ID or a
 unique path fragment:
 
 ```bash
-sample-find --like YOUR_SAMPLE_ID --role PERC --limit 10
+sample-find --root "$SAMPLES_ROOT" --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
 See the [search reference](../library-tools/README.md#sample-find) for vocabulary,
@@ -52,7 +65,7 @@ filters and recording kit selections. For a new collection, continue below.
 ```bash
 sample-review --root "$SAMPLES_ROOT" --no-probe --summary
 sample-review --root "$SAMPLES_ROOT" --no-probe \
-  --output manifests/review.tsv --index-dir manifests/index
+  --output "$RUNS/review.tsv" --index-dir "$RUNS/index"
 ```
 
 Review proposed roles, sample types, naming warnings and uncertain rows. Add
@@ -60,7 +73,8 @@ acoustic analysis when you need detailed measurements and pilot reports:
 
 ```bash
 sample-analyze --root "$SAMPLES_ROOT" --pilot \
-  --library-db library-tools/manifests/sample-library.sqlite
+  --output-dir "$RUNS/sample-intelligence-pilot" \
+  --library-db "$SAMPLES_ROOT/.eidetic/library.sqlite"
 ```
 
 ## 2. Organise with a reviewed move plan
@@ -86,10 +100,10 @@ an undo manifest. Refresh the plan after any library change.
 For the supported legacy layout, catalogue migration has a separate preview:
 
 ```bash
-sample-curate migrate-catalogue \
+sample-curate --root "$SAMPLES_ROOT" migrate-catalogue \
   --ableton-root /path/to/ABLETON_PROJECTS \
-  --manifest manifests/catalogue-migration.tsv \
-  --undo manifests/catalogue-migration-undo.tsv
+  --manifest "$RUNS/catalogue-migration.tsv" \
+  --undo "$RUNS/catalogue-migration-undo.tsv"
 ```
 
 It requires a complete inventory and checks saved Sets for `CURATED` references.
@@ -101,7 +115,7 @@ and before preparing a new listening packet.
 
 **Action level:** Writes review files, then copies approved audio.
 
-Set collection targets in `manifests/kit-quotas.toml`:
+Set collection targets in `$RUNS/kit-quotas.toml`:
 
 ```toml
 [quotas]
@@ -112,13 +126,16 @@ PERC = 2
 Prepare a fresh, named audition packet for those roles:
 
 ```bash
-sample-curate prepare --output-dir manifests/session-01 --quotas manifests/kit-quotas.toml
+sample-curate --root "$SAMPLES_ROOT" prepare \
+  --output-dir "$RUNS/session-01" --quotas "$RUNS/kit-quotas.toml"
 ```
 
 Listen through `audition.m3u8` and fill in `labels.tsv`. Every row needs a
 `reject`, `keep` or `favourite` decision. A favourite also needs a canonical
 `true_role` and a short `descriptor`. Preparation selects up to twice each target
-for comparison. Keep the packet with its scan metadata and quota file.
+for comparison. Keep the packet with its scan metadata and quota file. Choose a
+new output directory for each packet; preparation refuses to overwrite an existing
+packet. `sample-curate` global options, including `--root`, go before the subcommand.
 
 For optional audio-derived groups, follow
 [packet classification and review](../library-tools/README.md#packet-classification).
@@ -129,8 +146,9 @@ benchmark before publication.
 Validate the complete sheet, then explicitly promote the favourites:
 
 ```bash
-sample-curate validate --labels manifests/session-01/labels.tsv
-sample-curate promote --run-id session-01 --labels manifests/session-01/labels.tsv
+sample-curate --root "$SAMPLES_ROOT" validate --labels "$RUNS/session-01/labels.tsv"
+sample-curate --root "$SAMPLES_ROOT" promote \
+  --run-id session-01 --labels "$RUNS/session-01/labels.tsv"
 ```
 
 Promotion checks the entire selection's sources and destinations before copying
@@ -141,8 +159,8 @@ counts as approval.
 Once approved favourites meet the targets, generate device and Ableton views:
 
 ```bash
-sample-curate views --labels manifests/session-01/labels.tsv \
-  --output-dir manifests/crates --quotas manifests/kit-quotas.toml --name session-01
+sample-curate --root "$SAMPLES_ROOT" views --labels "$RUNS/session-01/labels.tsv" \
+  --output-dir "$RUNS/crates" --quotas "$RUNS/kit-quotas.toml" --name session-01
 ```
 
 This writes `session-01-all.tsv`, `session-01-one-shots.tsv` and
@@ -157,8 +175,10 @@ Foundation targets, and the default crate name remains `foundation-v1`.
 Choose a crate, resolve its contents and preview conversion:
 
 ```bash
-sample-export digitakt --crate manifests/crates/session-01-one-shots.tsv --list
-sample-export digitakt --crate manifests/crates/session-01-one-shots.tsv --dry-run
+sample-export digitakt --root "$SAMPLES_ROOT" \
+  --crate "$RUNS/crates/session-01-one-shots.tsv" --list
+sample-export digitakt --root "$SAMPLES_ROOT" \
+  --crate "$RUNS/crates/session-01-one-shots.tsv" --dry-run
 ```
 
 Check that both previews contain the intended selection. Running the same
@@ -184,18 +204,24 @@ validation covers the files; this round trip checks the instrument workflow.
 Verify a recorded promotion before reuse:
 
 ```bash
-sample-curate check --run-id session-01
+sample-curate --root "$SAMPLES_ROOT" check --run-id session-01
 ```
 
 To withdraw that run's curated copies:
 
 ```bash
-sample-curate undo-promotion --run-id session-01
+sample-curate --root "$SAMPLES_ROOT" undo-promotion --run-id session-01
 ```
 
 This moves copies to `_QUARANTINE/promotion-undo/` and removes their locations
 from active search. It has no `--apply` flag: running the recovery command is
-the approval step.
+the approval step. The promotion remains in history as withdrawn. A retry of its
+old run cannot recreate it; a new listening decision needs a new promotion run.
+
+If an operation was interrupted, inspect its journal with
+`sample-library recover --root "$SAMPLES_ROOT" --json` before starting another
+mutation. Follow the [recovery procedure](LIFECYCLE.md#ongoing-work-and-interruption-recovery)
+to resume verified work.
 
 Sort, intake, deduplication and migration retain undo manifests, but there is no
 generic undo command. Review each recorded destination-to-source mapping before

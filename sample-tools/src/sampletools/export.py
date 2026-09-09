@@ -17,12 +17,18 @@ from __future__ import annotations
 import shutil
 import csv
 import hashlib
+import io
+import json
+import os
+import tempfile
+import uuid
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .config import EXPORT_ROOT, SAMPLES_ROOT, SOURCE_EXTS, DeviceSpec
 from .convert import convert_file
-from . import naming, probe as probe_mod
+from . import naming, probe as probe_mod, receipts
+from .export_state import StateError, library_writer
 
 
 @dataclass
@@ -34,6 +40,7 @@ class Item:
     warnings: list[str] = field(default_factory=list)
     out_rel: Path | None = None
     spec_override: DeviceSpec | None = None
+    sample_id: str | None = None
 
 
 @dataclass
@@ -43,6 +50,8 @@ class Plan:
     spec: DeviceSpec
     items: list[Item]
     missing: list[str]  # manifest entries that matched nothing
+    samples_root: Path | None = None
+    export_root: Path | None = None
 
 
 class ExportError(ValueError):
@@ -77,9 +86,22 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def read_crate_tsv(path: Path) -> list[CrateRow]:
+def read_crate_tsv(path: Path, *, require_approval: bool = False) -> list[CrateRow]:
+    metadata = path.with_suffix(path.suffix + ".metadata.json")
+    data = {}
+    if metadata.exists():
+        try:
+            data = json.loads(metadata.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ExportError(f"invalid crate metadata: {metadata}") from exc
+        if (not isinstance(data, dict) or data.get("format") != "eidetic-crate"
+                or type(data.get("version")) is not int or data["version"] != 1):
+            raise ExportError(f"unsupported crate metadata version: {metadata}")
+    payload = path.read_bytes()
+    if "sha256" in data and data["sha256"] != hashlib.sha256(payload).hexdigest():
+        raise ExportError(f"crate metadata hash does not match TSV: {path}; preserve and regenerate the crate pair")
     expected = ("sample_id", "source_path", "role", "descriptor", "reason")
-    with path.open(encoding="utf-8", newline="") as fh:
+    with io.StringIO(payload.decode("utf-8"), newline="") as fh:
         reader = csv.DictReader(fh, delimiter="\t")
         if tuple(reader.fieldnames or ()) != expected:
             raise ExportError("crate TSV has an unexpected schema")
@@ -91,6 +113,15 @@ def read_crate_tsv(path: Path) -> list[CrateRow]:
                 row["sample_id"], Path(row["source_path"]), row["role"].upper(),
                 row["descriptor"], row["reason"],
             ))
+    if require_approval and 'approval' in data:
+        approval = data['approval']
+        if not isinstance(approval, dict) or approval.get('status') != 'approved':
+            raise ExportError('search crate requires review: recorded active promotion and favourite approval are missing')
+        evidence = approval.get('rows')
+        if not isinstance(evidence, list) or any(not isinstance(row, dict) or row.get('status') != 'approved' for row in evidence):
+            raise ExportError('search crate approval evidence is incomplete; regenerate it after review')
+        if [(row.get('sample_id'), row.get('source_path')) for row in evidence] != [(row.sample_id, row.source_path.as_posix()) for row in rows]:
+            raise ExportError('search crate approval evidence does not match its rows; regenerate it after review')
     return rows
 
 
@@ -106,9 +137,11 @@ def _compact_name(row: CrateRow, index: int) -> str:
 def build_crate_plan(
     spec: DeviceSpec,
     crate_path: Path,
-    samples_root: Path = SAMPLES_ROOT,
+    samples_root: Path | None = None,
+    *, export_root: Path | None = None,
 ) -> Plan:
-    rows = read_crate_tsv(crate_path)
+    samples_root = samples_root or SAMPLES_ROOT
+    rows = read_crate_tsv(crate_path, require_approval=True)
     if spec.name in {"digitakt", "tr8s"} and any(row.role in LONG_FORM_ROLES for row in rows):
         raise ExportError(f"{spec.name} foundation crate must contain one-shot roles only")
     if spec.max_project_samples is not None and len(rows) > spec.max_project_samples:
@@ -152,13 +185,13 @@ def build_crate_plan(
         override = None
         if spec.name == "tr8s" and "stereo-essential" in row.reason:
             override = replace(spec, channels=None)
-        items.append(Item(source, name, [], out_rel, override))
+        items.append(Item(source, name, [], out_rel, override, row.sample_id))
     if spec.max_total_seconds is not None and total_duration > spec.max_total_seconds:
         raise ExportError(
             f"{spec.name} user-sample capacity is {spec.max_total_seconds:g} seconds, "
             f"crate has {total_duration:.1f}"
         )
-    return Plan(spec, items, [])
+    return Plan(spec, items, [], samples_root, export_root)
 
 
 def parse_manifest(path: Path) -> list[tuple[str, str | None]]:
@@ -178,13 +211,14 @@ def parse_manifest(path: Path) -> list[tuple[str, str | None]]:
     return entries
 
 
-def _resolve_pattern(pattern: str) -> list[Path]:
+def _resolve_pattern(pattern: str, samples_root: Path | None = None) -> list[Path]:
     """Resolve a manifest pattern to concrete audio files under SAMPLES_ROOT."""
+    samples_root = samples_root or SAMPLES_ROOT
     p = Path(pattern)
-    base = p if p.is_absolute() else (SAMPLES_ROOT / p)
+    base = p if p.is_absolute() else (samples_root / p)
 
     if any(ch in pattern for ch in "*?["):
-        root = SAMPLES_ROOT
+        root = samples_root
         matches = [m for m in root.glob(pattern) if m.is_file()]
     elif base.is_dir():
         matches = [m for m in base.rglob("*") if m.is_file()]
@@ -196,16 +230,17 @@ def _resolve_pattern(pattern: str) -> list[Path]:
     return sorted(m for m in matches if m.suffix.lower() in SOURCE_EXTS)
 
 
-def build_plan(spec: DeviceSpec) -> Plan:
+def build_plan(spec: DeviceSpec, *, samples_root: Path | None = None, export_root: Path | None = None) -> Plan:
     from .config import manifest_path
 
-    entries = parse_manifest(manifest_path(spec.name))
+    samples_root = samples_root or SAMPLES_ROOT
+    entries = parse_manifest(manifest_path(spec.name, samples_root=samples_root))
     items: list[Item] = []
     missing: list[str] = []
     taken: set[str] = set()
 
     for pattern, rename in entries:
-        files = _resolve_pattern(pattern)
+        files = _resolve_pattern(pattern, samples_root)
         if not files:
             missing.append(pattern)
             continue
@@ -220,32 +255,107 @@ def build_plan(spec: DeviceSpec) -> Plan:
                 warnings.append(f"name >{spec.name_warn} chars (will truncate on device)")
             items.append(Item(src=src, out_name=out, warnings=warnings))
 
-    return Plan(spec=spec, items=items, missing=missing)
+    return Plan(spec=spec, items=items, missing=missing, samples_root=samples_root, export_root=export_root)
 
 
-def export_device(
+def _export_destination(spec: DeviceSpec, item: Item, export_root: Path | None = None) -> Path:
+    root = (export_root or EXPORT_ROOT) / spec.export_dir
+    destination = root / _safe_sync_relative(item.out_rel or Path(item.out_name))
+    if not destination.resolve().is_relative_to(root.resolve()) or destination.is_symlink():
+        raise ExportError(f"export destination escapes export root: {destination}")
+    if destination.exists() and not destination.is_file():
+        raise ExportError(f"invalid export destination: {destination}")
+    return destination
+
+
+def export_status(spec: DeviceSpec, item: Item, *, versions: dict | None = None,
+                  export_root: Path | None = None) -> str:
+    """Inspect whether the staged bytes are reusable without changing anything."""
+    source_hash = _sha256(item.src)
+    if item.sample_id is not None and source_hash != item.sample_id:
+        raise ExportError(f"hash changed for crate source: {item.src}")
+    destination = _export_destination(spec, item, export_root)
+    if not destination.exists():
+        return "new"
+    return receipts.check(destination, source_hash, item.spec_override or spec,
+                          versions if versions is not None else receipts.runtime())
+
+
+def _convert_verified(item: Item, destination: Path, spec: DeviceSpec,
+                      versions: dict, root: Path | None) -> None:
+    source_hash = _sha256(item.src)
+    if item.sample_id is not None and source_hash != item.sample_id:
+        raise ExportError(f"hash changed for crate source: {item.src}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix="." + destination.stem + ".", suffix=".wav", dir=destination.parent)
+    os.close(fd)
+    temporary = Path(name)
+    try:
+        convert_file(item.src, temporary, spec)
+        if _sha256(item.src) != source_hash:
+            raise ExportError(f"source changed during conversion: {item.src}")
+        info = probe_mod.probe(temporary)
+        expected_channels = spec.channels
+        if expected_channels is None:
+            expected_channels = probe_mod.probe(item.src).channels
+        if (info.rate != spec.rate or info.bits != spec.bits or info.channels != expected_channels
+                or info.channels not in (1, 2) or info.duration is None or info.duration <= 0):
+            raise ExportError(f"converted output has invalid format: {destination}")
+        from .export_state import check_state
+        library_id = check_state(root) if root is not None else None
+        data = receipts.make(temporary, item.src, source_hash, spec, versions, root=root, library_id=library_id)
+        with temporary.open("rb") as fh:
+            os.fsync(fh.fileno())
+        # Publish the WAV first. A crash before the receipt leaves it unverified,
+        # so it requires --force rather than becoming a silently reusable result.
+        temporary.replace(destination)
+        receipts.atomic_json(receipts.receipt_path(destination), data)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def export_device(spec: DeviceSpec, *, dry_run: bool = False, force: bool = False,
+                  plan: Plan | None = None) -> tuple[int, int]:
+    plan = plan or build_plan(spec)
+    if dry_run:
+        return _export_device(spec, dry_run=True, force=force, plan=plan)
+    try:
+        with library_writer(plan.samples_root or SAMPLES_ROOT, "sample-export"):
+            return _export_device(spec, force=force, plan=plan)
+    except StateError as exc:
+        raise ExportError(str(exc)) from exc
+
+
+def _export_device(
     spec: DeviceSpec,
     *,
     dry_run: bool = False,
     force: bool = False,
     plan: Plan | None = None,
 ) -> tuple[int, int]:
-    """Run the export. Returns (converted, skipped)."""
+    """Return (converted, verified reused); stale files require explicit --force."""
     plan = plan or build_plan(spec)
-    out_dir = EXPORT_ROOT / spec.export_dir
+    versions = receipts.runtime() if any(_export_destination(spec, i, plan.export_root).exists() for i in plan.items) or (plan.items and not dry_run) else {}
+    prepared = [(item, _export_destination(spec, item, plan.export_root), export_status(spec, item, versions=versions, export_root=plan.export_root))
+                for item in plan.items]
+    blocked = [(destination, status) for _, destination, status in prepared
+               if status not in ("new", "verified") and not force]
+    if blocked and not dry_run:
+        details = "; ".join(f"{path}: {status}" for path, status in blocked)
+        raise ExportError(f"{details}; rebuild derived output with --force")
     converted = skipped = 0
-
-    for item in plan.items:
-        dest = out_dir / (item.out_rel or Path(item.out_name))
-        if dest.exists() and not force:
+    for item, destination, status in prepared:
+        if status == "verified" and not force:
             skipped += 1
             continue
         if dry_run:
-            converted += 1
+            if status not in ("new", "verified") and not force:
+                print(f"  {destination}: {status}; requires --force")
+            else:
+                converted += 1
             continue
-        convert_file(item.src, dest, item.spec_override or spec)
+        _convert_verified(item, destination, item.spec_override or spec, versions, plan.samples_root)
         converted += 1
-
     return converted, skipped
 
 
@@ -260,7 +370,7 @@ def _sync_pairs(spec: DeviceSpec, dest_root: Path, plan: Plan | None) -> list[tu
     if not dest_root.is_dir():
         raise ExportError(f"sync target not found: {dest_root}")
 
-    src_dir = EXPORT_ROOT / spec.export_dir
+    src_dir = (plan.export_root if plan and plan.export_root else EXPORT_ROOT) / spec.export_dir
     export_root = src_dir.resolve()
     card_root = dest_root.resolve()
     if plan is None:
@@ -274,7 +384,7 @@ def _sync_pairs(spec: DeviceSpec, dest_root: Path, plan: Plan | None) -> list[tu
             for staged in sorted(src_dir.rglob("*.wav"))
         ] if src_dir.is_dir() else []
     else:
-        target_root = card_root
+        target_root = card_root if any(item.out_rel is not None for item in plan.items) else card_root / f"EIDETIC-{spec.export_dir}"
         sources = [
             (src_dir / _safe_sync_relative(item.out_rel or Path(item.out_name)),
              _safe_sync_relative(item.out_rel or Path(item.out_name)))
@@ -307,9 +417,75 @@ def _sync_pairs(spec: DeviceSpec, dest_root: Path, plan: Plan | None) -> list[tu
 
 
 def sync_to_card(spec: DeviceSpec, dest_root: Path, *, plan: Plan | None = None) -> int:
-    """Copy staged exports to a mounted card. A plan restricts copying to its items."""
+    try:
+        with library_writer(plan.samples_root if plan and plan.samples_root else SAMPLES_ROOT,
+                            "sample-export --sync"):
+            return _sync_to_card(spec, dest_root, plan=plan)
+    except StateError as exc:
+        raise ExportError(str(exc)) from exc
+
+
+def _sync_to_card(spec: DeviceSpec, dest_root: Path, *, plan: Plan | None = None) -> int:
+    """Copy selected stages atomically; persist copy evidence separately from playback."""
     pairs = _sync_pairs(spec, dest_root, plan)
-    for staged, destination in pairs:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(staged, destination)
+    if not pairs:
+        return 0
+    # Every path is preflighted above before inspecting reuse evidence. No card
+    # writes occur if any selected stage is damaged, stale or unverified.
+    if plan is not None:
+        versions = receipts.runtime()
+        for item in plan.items:
+            status = export_status(spec, item, versions=versions, export_root=plan.export_root)
+            if status != "verified":
+                raise ExportError(f"cannot transfer {item.out_name}: {status}; rebuild with --force")
+    else:
+        for staged, _ in pairs:
+            evidence = receipts.read_receipt(staged)
+            if evidence is None or evidence.get("output_sha256") != _sha256(staged):
+                raise ExportError(f"unverified or damaged staged export receipt: {staged}; rebuild with --force")
+    operation_id = str(uuid.uuid4())
+    library_root = plan.samples_root if plan and plan.samples_root else SAMPLES_ROOT
+    record_path = library_root / ".eidetic" / "transfers" / f"{operation_id}.json"
+    if record_path.parent.is_symlink():
+        raise ExportError(f"transfer evidence directory must not be a symlink: {record_path.parent}")
+    selected_export_root = plan.export_root if plan and plan.export_root else EXPORT_ROOT
+    data = {"format": "eidetic-transfer", "version": 1, "operation_id": operation_id,
+            "created_at": receipts.now(), "device": spec.name, "destination_root": str(dest_root.resolve()),
+            "status": "in_progress", "hardware_verification": "unverified",
+            "items": [{"source": str(source.relative_to(selected_export_root)),
+                       "destination": str(destination.relative_to(dest_root.resolve())),
+                       "output_sha256": _sha256(source), "status": "pending"}
+                      for source, destination in pairs]}
+    receipts.atomic_json(record_path, data)
+    try:
+        for (staged, destination), entry in zip(pairs, data["items"]):
+            expected_hash = entry["output_sha256"]
+            entry["status"] = "copying"
+            receipts.atomic_json(record_path, data)
+            if not destination.is_file() or _sha256(destination) != expected_hash:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                fd, name = tempfile.mkstemp(prefix="." + destination.name + ".", suffix=".tmp", dir=destination.parent)
+                os.close(fd)
+                temporary = Path(name)
+                try:
+                    shutil.copy2(staged, temporary)
+                    if _sha256(temporary) != expected_hash or _sha256(staged) != expected_hash:
+                        raise ExportError(f"staged output changed during transfer: {staged}")
+                    with temporary.open("rb") as fh:
+                        os.fsync(fh.fileno())
+                    temporary.replace(destination)
+                finally:
+                    temporary.unlink(missing_ok=True)
+            if _sha256(destination) != expected_hash:
+                raise ExportError(f"transferred output hash mismatch: {destination}")
+            entry["status"] = "verified"
+            receipts.atomic_json(record_path, data)
+    except BaseException as exc:
+        data["status"] = "interrupted"
+        data["error"] = str(exc)
+        receipts.atomic_json(record_path, data)
+        raise
+    data["status"] = "complete"
+    data["completed_at"] = receipts.now()
+    receipts.atomic_json(record_path, data)
     return len(pairs)

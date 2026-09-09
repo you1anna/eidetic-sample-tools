@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     plan = build_plan(root=args.root)
-    manifest = config.manifest_path("intake")
+    manifest = config.manifest_path("intake", root=args.root)
     moves.write_plan(manifest, plan)
     print(f"[{'APPLY' if args.apply else 'DRY-RUN'}] intake {args.root}")
     print(f"  stray packs: {len(plan)}")
@@ -123,8 +123,8 @@ def main(argv: list[str] | None = None) -> int:
         print("  (dry-run — re-run with --apply to move packs)")
         return 0
 
-    undo = config.manifest_path("undo-intake")
-    counts = moves.apply_plan(plan, undo)
+    undo = config.manifest_path("undo-intake", root=args.root)
+    counts = moves.apply_plan(plan, undo, root=args.root)
     record_manifest(plan, args.root / "PACKS")
     print(f"  moved: {counts['moved']}; skipped(exists): {counts['exists']}; missing: {counts['missing']}")
     print(f"  undo written: {undo}")

@@ -9,11 +9,15 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+import sqlite3
 from pathlib import Path
 
 from . import classifier, config
 from .inventory import LibraryDatabase, scan_library
 from .profiles import ProfileError, resolve_profile
+from .locking import library_lock
+from .state import resolve_library_db
+from .analysis_history import analysis_run
 from .analyze_features import build_feature_rows, derive_character_tags
 from .analyze_outputs import (
     write_clusters,
@@ -77,6 +81,14 @@ __all__ = [
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+def _main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="sample-analyze",
         description="Write read-only sample intelligence pilot manifests.",
@@ -85,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--output-dir",
         type=Path,
-        default=config.MANIFEST_DIR / "sample-intelligence-pilot",
+        default=None,
         help="directory for generated sample intelligence artifacts",
     )
     ap.add_argument("--pilot", action="store_true", help="run the phase-1 pilot output set")
@@ -101,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--feature-cache",
         type=Path,
-        default=config.MANIFEST_DIR / "sample-intelligence.sqlite",
+        default=None,
         help="SQLite cache for acoustic sample features",
     )
     ap.add_argument(
@@ -116,6 +128,18 @@ def main(argv: list[str] | None = None) -> int:
         help="write stable SHA-256 inventory to this new SQLite database",
     )
     args = ap.parse_args(argv)
+    args.output_dir = args.output_dir or args.root / '.eidetic' / 'runs' / 'sample-intelligence-pilot'
+    args.feature_cache = args.feature_cache or args.root / '.eidetic' / 'cache' / 'sample-intelligence.sqlite'
+    if args.library_db is not None or (args.root / '.eidetic' / 'library.sqlite').is_file():
+        args.library_db = resolve_library_db(args.root, args.library_db)
+    with library_lock(args.root, purpose='analyse library'):
+        with analysis_run(args.output_dir, args.root) as run:
+            result = _run(args)
+            run['exit_code'] = result
+            return result
+
+
+def _run(args) -> int:
 
     if not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)

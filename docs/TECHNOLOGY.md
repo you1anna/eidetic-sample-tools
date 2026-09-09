@@ -14,10 +14,30 @@ independently.
 
 CLI entry points are declared in each package's `pyproject.toml`. Commands
 exchange SQLite data, TSV manifests and labels, JSON review state and M3U8
-playlists. The exporter consumes a crate file without needing the library
-database. TOML files hold tag vocabulary, collection targets and device configuration.
+playlists. The exporter consumes a crate without requiring the `library-tools`
+package or a database; when portable library state is present, it validates that
+state before writes and joins the same writer protocol. TOML files hold tag
+vocabulary, collection targets and device configuration.
 
 ![Workflow: SHA-256 and SQLite inventory connects search, listening decisions, hash-verified curation and device-validated FFmpeg export.](assets/workflow.png)
+
+## Portable state and upgrades
+
+Release 0.2 binds the database to a portable library UUID under `SAMPLES/.eidetic/`.
+Machine onboarding separates usable current state from incomplete historical
+coverage. One Mac can start without the other. Later local databases and human
+files are captured with content fingerprints in state-relative archives; active
+SSD decisions are preserved and unresolved history remains visible in diagnostics.
+The shared SSD holds the active database and `.eidetic/runs/` evidence; Python
+environments and model installations remain local to each Mac. Captured secondary
+history is retained for reconciliation and never silently merged into active approval.
+Schema 5 adds staged scans, feature versions, tag provenance, and decision/event
+history. Historical schemas require explicit validated migrations with verified
+backups; ordinary database opening cannot upgrade or relabel older state.
+Single-writer locks and durable operation journals coordinate filesystem and
+SQLite changes. Classifier subprocesses inherit the held lock while updating the
+embedding cache; review sessions retain it until the server exits. Read-only diagnostics use settled evidence without creating
+sidecars. See the [lifecycle guide](LIFECYCLE.md) for adoption and recovery.
 
 ## Identity survives a folder change
 
@@ -30,7 +50,10 @@ SQLite links that identity to provenance, acoustic features, tags, reviews,
 promotions and kit picks. Measurements can be reused across paths, and listening
 history stays attached to the same bytes. Search prefers curated locations when
 collapsing exact copies and preserves canonical roles and approved descriptions
-in crates; promotion and undo update those locations immediately.
+in crates; promotion and undo update those locations immediately. Newly generated
+search crates record whether each exact curated copy has an active promotion and
+a recorded favourite. Missing approval evidence is marked as requiring review,
+even when the file was already in `CURATED/` before onboarding.
 Promotion preflights its full selection, and promotion and crate export recheck
 the bytes before copying or converting. A matching hash establishes byte identity;
 perceptual similarity is a separate search problem.
@@ -104,15 +127,19 @@ so a small kit can use its own targets without changing hardware profiles.
 ## Hardware export as a build step
 
 A crate records `sample_id`, `source_path`, `role`, `descriptor` and `reason`.
+Generated crates add a versioned metadata sidecar bound to the TSV hash. Export
+rejects explicit review-required metadata; legacy standalone five-column crates
+remain compatible as separately reviewed inputs.
 The [planner](../sample-tools/src/sampletools/export.py) verifies current hashes,
 paths inside `CURATED/`, accepted roles, compact names and device-specific count
 or duration limits from the resolved device configuration. Legacy path/glob
 manifests use a separate planning path.
 
 FFprobe reads media properties. FFmpeg writes PCM WAV copies to temporary files,
-renaming them after successful conversion. Existing outputs are skipped unless
-`--force` is explicit. With `--crate`, card sync copies only that crate's planned
-files, including existing staged conversions. Digitakt uses Elektron Transfer;
+renaming them after successful conversion. Existing outputs are reused only when
+their source, settings, runtime and output hashes match a versioned receipt;
+rebuilding stale outputs requires `--force`. With `--crate`, card sync copies only
+that crate's planned files, including existing staged conversions. Digitakt uses Elektron Transfer;
 Octatrack and TR-8S support mounted-media copying.
 
 The [export reference](../sample-tools/README.md) documents formats and limits.
@@ -125,7 +152,10 @@ The [reader](../ableton-tools/src/abletontools/read.py) parses gzip-compressed X
 to report tempo, tracks, scenes, devices and sample references without running
 Live. It never edits Sets or relinks media. Catalogue migration also has a
 conservative preflight for saved Sets containing `CURATED` references; it is not
-a complete dependency analysis.
+a complete dependency analysis. Report metadata records input hashes, roots,
+failures and completeness; regeneration archives earlier reports under `.history/`.
+A missing root or failed parse leaves an incomplete observation, so it cannot
+establish that a sample has no project dependencies.
 
 See [repository conventions](../AGENTS.md) for verification commands and the
 [roadmap](ROADMAP.md) for extension priorities.

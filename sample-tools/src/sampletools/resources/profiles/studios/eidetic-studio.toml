@@ -1,0 +1,53 @@
+schema_version = 1
+id = "eidetic-studio"
+display_name = "Eidetic Studio"
+source_document = "Eidetic Studio Knowledge Base"
+source_version = "v2.4"
+source_updated = "2026-07-09"
+session_rate = 48000
+ableton_version = "12.4"
+clock_master = "octatrack-mkii"
+primary_audition = "ableton-live"
+primary_performance_sampler = "octatrack-mkii"
+constraints = [
+  "octatrack-usb-cf-only",
+  "soundcraft-usb-disconnected",
+  "presonus-direct-to-mac",
+  "djm-usb-disconnected",
+  "tr8s-soft-thru-on",
+]
+
+[[devices]]
+id = "octatrack-mkii"
+role = "clock-master-performance-sampler"
+enabled = true
+
+[[devices]]
+id = "digitakt-mki"
+role = "drum-sampler-resample-target"
+enabled = true
+
+[[devices]]
+id = "tr8s"
+role = "drum-machine-synth"
+enabled = true
+
+[capture_inputs."1-2"]
+role = "guest-djm-or-vocal"
+physical = "front-xmax-preamp"
+
+[capture_inputs."3-4"]
+role = "octatrack-cue"
+physical = "rear-line"
+
+[capture_inputs."5"]
+role = "dry-kick"
+physical = "rear-line"
+
+[capture_inputs."6"]
+role = "dry-tb03"
+physical = "rear-line"
+
+[capture_inputs."7-8"]
+role = "soundcraft-main-sum"
+physical = "rear-line"

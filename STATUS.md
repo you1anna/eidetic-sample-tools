@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-03
+**Updated:** 2026-09-09
 
 ## Current position
 
@@ -29,6 +29,23 @@ policy. This validates shortlist publication, not musical approval: no row becom
 Robin chooses favourites and `sample-curate promote` creates hash-verified copies below `CURATED/`.
 
 ## Working software
+
+Release 0.2 lifecycle support is implemented on `codex/portable-library-lifecycle`:
+portable library identity, explicit historical database migration, one-writer
+locking, recoverable operations, backup/restore, versioned caches, verified export
+receipts and maintenance previews. Local verification passed 566 tests; two
+optional model-download checks were skipped. Installed wheels also passed smoke
+checks outside the checkout. CI includes the same installed-package check. See
+the [lifecycle guide](docs/LIFECYCLE.md), [release notes](CHANGELOG.md), and
+[development checks](docs/DEVELOPMENT.md).
+
+Machine setup is independent: the MacBook can onboard now with the Mac mini's
+unavailable history recorded as deferred. When the mini returns, its older database
+and listening files can be preserved without replacing the active SSD decisions.
+Historical reconciliation remains a visible follow-up, not a prerequisite for normal
+use. The attached SSD was inspected read-only and has not been initialised or
+migrated. This software work does not resolve or supersede the historical live-library
+discrepancies below.
 
 **Stable**
 

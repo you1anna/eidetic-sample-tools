@@ -16,11 +16,6 @@ from pathlib import Path
 
 from . import benchmark, config
 
-_DEFAULT_FEATURES = (
-    config.MANIFEST_DIR / "sample-intelligence-pilot" / "sample-features-latest.tsv"
-)
-
-
 def _cmd_prepare(args: argparse.Namespace) -> int:
     if not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)
@@ -109,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
 
     prepare = subparsers.add_parser("prepare", help="write a read-only benchmark audition packet")
     prepare.add_argument("--root", type=Path, default=config.SAMPLES_ROOT)
-    prepare.add_argument("--features", type=Path, default=_DEFAULT_FEATURES)
+    prepare.add_argument("--features", type=Path,
+                         help="feature TSV (default: ROOT/.eidetic/runs/sample-intelligence-pilot/sample-features-latest.tsv)")
     prepare.add_argument("--output-dir", type=Path, required=True)
     prepare.add_argument("--per-role", type=int, default=25)
     prepare.add_argument(
@@ -127,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "prepare":
+        args.features = args.features or args.root / '.eidetic' / 'runs' / 'sample-intelligence-pilot' / 'sample-features-latest.tsv'
         return _cmd_prepare(args)
     if args.command == "score":
         return _cmd_score(args)

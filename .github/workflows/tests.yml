@@ -1,0 +1,37 @@
+name: Python lifecycle checks
+on: [push, pull_request]
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FFmpeg
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install ffmpeg
+          else
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg libsndfile1
+          fi
+      - name: Install isolated environment
+        run: |
+          python -m venv "$RUNNER_TEMP/eidetic-tests"
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install -r requirements-dev.txt
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install --no-deps -e ./library-tools -e ./sample-tools -e ./ableton-tools
+      - name: Test
+        run: |
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pytest library-tools sample-tools ableton-tools -q -rs
+      - name: Build and verify installed packages
+        run: |
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/eidetic-wheels" ./library-tools ./sample-tools ./ableton-tools
+          python -m venv "$RUNNER_TEMP/eidetic-installed"
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -r requirements-dev.txt
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install --no-deps "$RUNNER_TEMP/eidetic-wheels/"*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py"

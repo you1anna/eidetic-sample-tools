@@ -1,0 +1,13 @@
+schema_version = 1
+id = "octatrack-mkii"
+display_name = "Elektron Octatrack MKII"
+sample_rate = 44100
+bits = 16
+channels = "preserve"
+transfer = "compactflash"
+import_root = "EIDETIC-CURATED/AUDIO"
+max_folder_depth = 8
+preserves_stereo = true
+timestretch = true
+usb_audio = false
+usb_midi = false

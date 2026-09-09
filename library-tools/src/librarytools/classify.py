@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     plan = build_plan(root=args.root, probe_durations=not args.no_probe)
-    manifest = config.manifest_path("classify")
+    manifest = config.manifest_path("classify", root=args.root)
     moves.write_plan(manifest, plan)
     print(f"[{'APPLY' if args.apply else 'DRY-RUN'}] classify {args.root}")
     _print_counts(plan)
@@ -123,8 +123,8 @@ def main(argv: list[str] | None = None) -> int:
         print("  (dry-run — re-run with --apply to move files)")
         return 0
 
-    undo = config.manifest_path("undo-classify")
-    counts = moves.apply_plan(plan, undo)
+    undo = config.manifest_path("undo-classify", root=args.root)
+    counts = moves.apply_plan(plan, undo, root=args.root)
     print(f"  moved: {counts['moved']}; skipped(exists): {counts['exists']}; "
           f"missing: {counts['missing']}")
     print(f"  undo written: {undo}")

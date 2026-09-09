@@ -7,12 +7,28 @@ from pathlib import Path
 
 import pytest
 
-from sampletools import config
+from sampletools import config, receipts
 from sampletools import cli as cli_mod
 from sampletools import export as export_mod
 from sampletools.export import ExportError, build_crate_plan
 from sampletools.probe import probe
 from sampletools.probe import AudioInfo
+
+
+@pytest.fixture(autouse=True)
+def isolated_library_root(tmp_path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    root.mkdir(exist_ok=True)
+    monkeypatch.setattr(export_mod, "SAMPLES_ROOT", root)
+
+
+def _receipt(staged: Path, *, item=None, device="octatrack"):
+    """Preexisting staged bytes have explicit versioned evidence in sync fixtures."""
+    source = item.src if item else staged
+    spec = config.get_spec(device)
+    data = receipts.make(staged, source, hashlib.sha256(source.read_bytes()).hexdigest(),
+                         item.spec_override or spec if item else spec, receipts.runtime())
+    receipts.atomic_json(receipts.receipt_path(staged), data)
 
 
 def _source(root: Path, rel: str, payload: bytes) -> tuple[Path, str]:
@@ -251,6 +267,7 @@ def test_profile_crate_sync_preserves_hardware_root_layout(tmp_path, monkeypatch
     sample = export_root / "TR8S" / "ROLAND" / "TR-8S" / "SAMPLE" / "foundation-v1" / "BD01.wav"
     sample.parent.mkdir(parents=True)
     sample.write_bytes(b"wav")
+    _receipt(sample, device="tr8s")
     monkeypatch.setattr(export_mod, "EXPORT_ROOT", export_root)
     card = tmp_path / "CARD"
     card.mkdir()
@@ -276,6 +293,7 @@ def test_crate_sync_copies_only_resolved_staged_files_in_native_layout(tmp_path,
     selected = export_root / spec.export_dir / plan.items[0].out_rel
     selected.parent.mkdir(parents=True)
     selected.write_bytes(b"selected")
+    _receipt(selected, item=plan.items[0], device=spec.name)
     (selected.parent / "stray.wav").write_bytes(b"stray")
     other_crate = selected.parents[1] / "other-crate" / "BD02.wav"
     other_crate.parent.mkdir(parents=True)
@@ -350,6 +368,7 @@ def test_crate_sync_rejects_obstructed_destination_ancestor_before_copying(tmp_p
         staged = export_root / spec.export_dir / item.out_rel
         staged.parent.mkdir(parents=True, exist_ok=True)
         staged.write_bytes(item.out_name.encode())
+        _receipt(staged, item=item, device=spec.name)
     monkeypatch.setattr(export_mod, "EXPORT_ROOT", export_root)
     card = tmp_path / "CARD"
     card.mkdir()
@@ -376,6 +395,7 @@ def test_crate_sync_overwrites_existing_destination_file(tmp_path, monkeypatch):
     staged = export_root / spec.export_dir / plan.items[0].out_rel
     staged.parent.mkdir(parents=True)
     staged.write_bytes(b"new")
+    _receipt(staged, item=plan.items[0], device=spec.name)
     monkeypatch.setattr(export_mod, "EXPORT_ROOT", export_root)
     card = tmp_path / "CARD"
     destination = card / plan.items[0].out_rel
@@ -444,6 +464,7 @@ def test_legacy_flat_sync_keeps_device_wrapper(tmp_path, monkeypatch):
     staged = export_root / "OCTATRACK" / "BD01.wav"
     staged.parent.mkdir(parents=True)
     staged.write_bytes(b"flat")
+    _receipt(staged)
     monkeypatch.setattr(export_mod, "EXPORT_ROOT", export_root)
     card = tmp_path / "CARD"
     card.mkdir()
@@ -467,6 +488,7 @@ def test_cli_crate_sync_uses_preexisting_selected_stage_only(tmp_path, monkeypat
     selected = export_root / spec.export_dir / plan.items[0].out_rel
     selected.parent.mkdir(parents=True)
     selected.write_bytes(b"selected")
+    _receipt(selected, item=plan.items[0], device=spec.name)
     (selected.parent / "stale.wav").write_bytes(b"stale")
     monkeypatch.setattr(export_mod, "EXPORT_ROOT", export_root)
     monkeypatch.setattr(cli_mod, "EXPORT_ROOT", export_root)
@@ -479,7 +501,7 @@ def test_cli_crate_sync_uses_preexisting_selected_stage_only(tmp_path, monkeypat
     assert rc == 0
     assert (card / plan.items[0].out_rel).read_bytes() == b"selected"
     assert not (card / plan.items[0].out_rel.parent / "stale.wav").exists()
-    assert "skipped (exists): 1" in capsys.readouterr().out
+    assert "reused (verified): 1" in capsys.readouterr().out
 
 
 def test_cli_dry_run_reports_selected_crate_scope_without_writing(tmp_path, monkeypatch, capsys):
@@ -521,6 +543,7 @@ def test_cli_returns_error_for_sync_preflight_failure(tmp_path, monkeypatch, cap
         staged = export_root / spec.export_dir / item.out_rel
         staged.parent.mkdir(parents=True, exist_ok=True)
         staged.write_bytes(b"selected")
+        _receipt(staged, item=item, device=spec.name)
     monkeypatch.setattr(export_mod, "EXPORT_ROOT", export_root)
     monkeypatch.setattr(cli_mod, "EXPORT_ROOT", export_root)
     monkeypatch.setattr(cli_mod.export_mod, "build_crate_plan", lambda _spec, _crate: plan)
@@ -535,3 +558,12 @@ def test_cli_returns_error_for_sync_preflight_failure(tmp_path, monkeypatch, cap
     assert rc == 2
     assert "--sync failed:" in capsys.readouterr().err
     assert not (card / plan.items[0].out_rel).exists()
+
+
+@pytest.mark.parametrize('device', ('octatrack', 'digitakt', 'tr8s'))
+def test_installed_profiles_produce_same_device_constraints_as_repository(device):
+    package_root = Path(config.__file__).parent / 'resources' / 'profiles'
+    canonical_root = Path(__file__).resolve().parents[2] / 'profiles'
+    packaged = config.get_profile_spec(device, 'eidetic-studio', profile_root=package_root)
+    canonical = config.get_profile_spec(device, 'eidetic-studio', profile_root=canonical_root)
+    assert packaged == canonical

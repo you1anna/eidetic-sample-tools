@@ -63,6 +63,12 @@ File moves preview by default and require `--apply`; applied moves retain undo
 records. Curation and export create copies. Read the [safety model](docs/SAFETY.md)
 before applying changes or syncing media.
 
+For installations used over time or across Macs, follow the
+[portable library lifecycle guide](docs/LIFECYCLE.md). Install and onboard each Mac
+independently; an unavailable machine's history can remain pending. The shared
+SSD carries the library database, decisions and recovery records in `.eidetic/`,
+so a returning Mac can preserve its older history without replacing newer work.
+
 ## Development status
 
 Actively developed. Core review, organisation, conversion and Ableton inspection
@@ -70,5 +76,7 @@ are established; search, curation and profile-based crates are beta. AI grouping
 and near-duplicate detection remain experimental. Broader library compatibility
 and hardware round-trip validation are still adoption gaps.
 
-See the [roadmap](docs/ROADMAP.md) for priorities and [decision records](decisions/)
-for research findings. No software licence has been selected.
+See the [release notes](CHANGELOG.md) for changes, the
+[development guide](docs/DEVELOPMENT.md) for tests and packaging, and the
+[roadmap](docs/ROADMAP.md) for priorities. [Decision records](decisions/) retain
+research findings. No software licence has been selected.

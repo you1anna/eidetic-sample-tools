@@ -284,12 +284,16 @@ def test_playlists_cli_regenerates_packet_without_library_database(tmp_path, cap
 
 
 def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    root.mkdir()
     labels = tmp_path / "packet" / "labels.tsv"
+    labels.parent.mkdir()
+    (labels.parent / "packet-meta.json").write_text(json.dumps({"root": str(root), "schema_version": 3}))
     calls = []
     monkeypatch.setattr(
         curate_cli,
         "load_review_packet",
-        lambda path: (Path("/samples"), "session", ["candidate"]),
+        lambda path, **kwargs: (root, "session", ["candidate"]),
         raising=False,
     )
     monkeypatch.setattr(
@@ -307,7 +311,7 @@ def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path
 
     assert rc == 0
     assert calls == [(
-        Path("/samples"),
+        root,
         "session",
         ["candidate"],
         {"port": 4321, "open_browser": True},
@@ -315,6 +319,9 @@ def test_review_packet_cli_loads_packet_and_starts_requested_local_port(tmp_path
 
 
 def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_path, monkeypatch):
+    root = tmp_path / "SAMPLES"
+    root.mkdir()
+    scan_library(root, LibraryDatabase(tmp_path / "library.sqlite"))
     labels = tmp_path / "packet" / "labels.tsv"
     benchmark = labels.parent / "benchmark-labels.tsv"
     labels.parent.mkdir()
@@ -346,7 +353,7 @@ def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_pat
     )
 
     rc = curate_cli.main([
-        "--library-db", str(tmp_path / "library.sqlite"),
+        "--root", str(root), "--library-db", str(tmp_path / "library.sqlite"),
         "classify-packet", "--labels", str(labels), "--benchmark", str(benchmark),
         "--carry-review",
     ])
@@ -358,6 +365,9 @@ def test_classify_packet_cli_carries_review_without_publishing_playlists(tmp_pat
 def test_classify_packet_cli_does_not_claim_success_while_review_is_pending(
     tmp_path, monkeypatch, capsys,
 ):
+    root = tmp_path / "SAMPLES"
+    root.mkdir()
+    scan_library(root, LibraryDatabase(tmp_path / "library.sqlite"))
     labels = tmp_path / "packet" / "labels.tsv"
     benchmark = labels.parent / "benchmark-labels.tsv"
     labels.parent.mkdir()
@@ -383,7 +393,7 @@ def test_classify_packet_cli_does_not_claim_success_while_review_is_pending(
     )
 
     rc = curate_cli.main([
-        "--library-db", str(tmp_path / "library.sqlite"),
+        "--root", str(root), "--library-db", str(tmp_path / "library.sqlite"),
         "classify-packet", "--labels", str(labels), "--benchmark", str(benchmark),
     ])
 

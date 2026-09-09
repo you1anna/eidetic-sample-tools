@@ -390,3 +390,31 @@ def test_score_cli_errors_when_labels_incomplete(tmp_path: Path) -> None:
     result = benchmark_cli.main(["score", "--output-dir", str(tmp_path / "run")])
 
     assert result == 3
+
+
+@pytest.mark.parametrize('selection', ['root', 'environment', 'explicit-paths'])
+def test_prepare_cli_uses_features_from_selected_library(tmp_path, monkeypatch, selection):
+    from librarytools import benchmark_cli
+
+    environment_root = tmp_path / 'old-mount' / 'SAMPLES'
+    selected_root = environment_root if selection == 'environment' else tmp_path / 'attached-ssd' / 'SAMPLES'
+    monkeypatch.setattr(benchmark_cli.config, 'SAMPLES_ROOT', environment_root)
+    monkeypatch.setattr(benchmark_cli.config, 'MANIFEST_DIR', environment_root / '.eidetic/runs')
+    relative = 'CURATED/KICKS/short.wav'
+    _make_files(selected_root, [relative])
+    features = selected_root / '.eidetic/runs/sample-intelligence-pilot/sample-features-latest.tsv'
+    output = tmp_path / 'named-benchmark'
+    args = ['prepare', '--output-dir', str(output)]
+    if selection != 'environment':
+        args += ['--root', str(selected_root)]
+    if selection == 'explicit-paths':
+        features = tmp_path / 'legacy/features.tsv'
+        args += ['--features', str(features)]
+    features.parent.mkdir(parents=True)
+    _write_features(features, [(relative, 'KICKS', '200', '0.9', '0.4')])
+
+    assert benchmark_cli.main(args) == 0
+    assert relative in (output / 'benchmark-manifest.tsv').read_text()
+    assert (selected_root / relative).read_bytes() == b'RIFFxxxxWAVE'
+    if selection != 'environment':
+        assert not environment_root.exists()

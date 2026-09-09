@@ -19,6 +19,8 @@ from pathlib import Path
 from .review import classify_role
 
 DEFAULT_VOCABULARY = Path(__file__).resolve().parents[2] / "vocabulary.toml"
+if not DEFAULT_VOCABULARY.is_file():
+    DEFAULT_VOCABULARY = Path(__file__).parent / 'resources' / 'vocabulary.toml'
 
 _COMPARISON_RE = re.compile(r"^(>=|<=|>|<|==)\s*(-?\d+(?:\.\d+)?)$")
 
@@ -107,12 +109,11 @@ def _lower_tuple(raw: object) -> tuple[str, ...]:
     return tuple(str(item).lower() for item in (raw or ()))
 
 
-def load_vocabulary(path: Path | None = None) -> list[Rule]:
+def load_vocabulary(path: Path | None = None, *, payload: bytes | None = None) -> list[Rule]:
     """Read and validate the rule file."""
     path = path or DEFAULT_VOCABULARY
     try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
+        data = tomllib.loads((payload if payload is not None else path.read_bytes()).decode('utf-8'))
     except FileNotFoundError as exc:
         raise VocabularyError(f"vocabulary not found: {path}") from exc
     except tomllib.TOMLDecodeError as exc:

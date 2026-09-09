@@ -6,6 +6,28 @@ from pathlib import Path
 from librarytools import analyze
 
 
+def test_reanalysis_preserves_prior_discrepancy_evidence(tmp_path):
+    root = tmp_path / 'SAMPLES'
+    root.mkdir()
+    (root / 'kick.wav').write_bytes(b'audio')
+    output = root / '.eidetic' / 'runs' / 'sample-intelligence-pilot'
+    output.mkdir(parents=True)
+    previous = b'path\tnotes\nmissing.wav\tunresolved history\n'
+    (output / 'sample-features-latest.tsv').write_bytes(previous)
+    assert analyze.main(['--root', str(root), '--no-probe', '--pilot']) == 0
+    assert any(path.read_bytes() == previous for path in (output / '.history').rglob('sample-features-latest.tsv'))
+    assert (output / 'analysis-run.json').is_file()
+
+
+def test_failed_analysis_is_not_published_as_complete(tmp_path):
+    import json
+    root = tmp_path / 'SAMPLES'
+    root.mkdir()
+    assert analyze.main(['--root', str(root), '--no-probe', '--profile', 'nonexistent-profile']) == 2
+    marker = root / '.eidetic/runs/sample-intelligence-pilot/analysis-run.json'
+    assert json.loads(marker.read_text())['status'] == 'failed'
+
+
 def _make(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x")

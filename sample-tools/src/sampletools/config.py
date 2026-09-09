@@ -110,7 +110,10 @@ def get_profile_spec(
             profile = tomllib.load(fh).get("profile")
     if not profile:
         return base
-    profile_root = profile_root or Path(__file__).resolve().parents[3] / "profiles"
+    if profile_root is None:
+        profile_root = Path(__file__).resolve().parents[3] / "profiles"
+        if not profile_root.is_dir():
+            profile_root = Path(__file__).parent / 'resources' / 'profiles'
     studio_path = profile_root / "studios" / f"{profile}.toml"
     if not studio_path.is_file():
         raise KeyError(f"unknown studio profile {profile!r}")
@@ -140,6 +143,10 @@ def get_profile_spec(
     )
 
 
-def manifest_path(device: str) -> Path:
-    """manifests/<device>.txt next to the package (repo-relative)."""
-    return Path(__file__).resolve().parents[2] / "manifests" / f"{get_spec(device).name}.txt"
+def manifest_path(device: str, *, samples_root: Path | None = None) -> Path:
+    """Prefer the selected library's manifest, then checkout or packaged defaults."""
+    portable = (samples_root or SAMPLES_ROOT) / '.eidetic' / 'manifests' / f'{get_spec(device).name}.txt'
+    if portable.is_file():
+        return portable
+    legacy = Path(__file__).resolve().parents[2] / "manifests" / f"{get_spec(device).name}.txt"
+    return legacy if legacy.is_file() else Path(__file__).parent / 'resources' / 'manifests' / f'{get_spec(device).name}.txt'

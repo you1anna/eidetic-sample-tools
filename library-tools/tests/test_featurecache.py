@@ -62,3 +62,60 @@ def test_feature_cache_error_rows_are_persisted_but_retried(tmp_path: Path):
     with sqlite3.connect(db_path) as conn:
         row = conn.execute("select error from features where path = ?", (path.as_posix(),)).fetchone()
     assert row == ("decode failed",)
+
+
+def test_feature_cache_does_not_reuse_a_different_algorithm(tmp_path):
+    path = tmp_path / 'features.sqlite'
+    old = FeatureCache(path, extractor_version='v1')
+    old.upsert(_record(Path('a.wav')))
+    new = FeatureCache(path, extractor_version='v2')
+    assert new.get_or_none(Path('a.wav'), 123, 4.5) is None
+    new.upsert(_record(Path('a.wav')))
+    assert new.get_or_none(Path('a.wav'), 123, 4.5) is not None
+
+
+def test_feature_cache_preserves_unversioned_rows_but_does_not_reuse_them(tmp_path):
+    path = tmp_path / 'features.sqlite'
+    cache = FeatureCache(path)
+    cache.upsert(_record(Path('a.wav')))
+    with sqlite3.connect(path) as conn:
+        conn.execute('delete from feature_versions')
+    assert cache.get_or_none(Path('a.wav'), 123, 4.5) is None
+    with sqlite3.connect(path) as conn:
+        assert conn.execute('select count(*) from features').fetchone()[0] == 1
+
+
+def test_feature_cache_does_not_write_under_future_library_state(tmp_path):
+    import json
+    import pytest
+    root = tmp_path / 'samples'
+    state = root / '.eidetic'
+    state.mkdir(parents=True)
+    (state / 'library.json').write_text(json.dumps({'format_version': 999, 'library_id': 'future'}))
+    with pytest.raises(ValueError, match='unsupported|future'):
+        FeatureCache(state / 'cache' / 'features.sqlite')
+    assert not (state / 'cache').exists()
+
+
+def test_analyser_remeasures_changed_bytes_even_with_preserved_stat(tmp_path):
+    import os
+    import struct
+    import wave
+    from librarytools.analyze_features import _read_acoustic_features
+    from types import SimpleNamespace
+    source = tmp_path / 'kick.wav'
+    def audio(amplitude):
+        with wave.open(str(source), 'wb') as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(44100)
+            out.writeframes(struct.pack('<h', amplitude) * 4410)
+    audio(1000)
+    before = source.stat()
+    cache = FeatureCache(tmp_path / 'cache.sqlite')
+    row = SimpleNamespace(path=Path('kick.wav'))
+    first = _read_acoustic_features(tmp_path, row, cache)
+    audio(10000)
+    os.utime(source, ns=(before.st_atime_ns, before.st_mtime_ns))
+    second = _read_acoustic_features(tmp_path, row, cache)
+    assert second.peak > first.peak * 9

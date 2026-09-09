@@ -28,42 +28,12 @@ class EmbeddingCache:
     """Store model embeddings in the existing library database without replacing its schema."""
 
     def __init__(self, path: Path):
+        from ..inventory import LibraryDatabase
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(
-                """
-                create table if not exists audio_embeddings (
-                    sample_id text not null,
-                    model_id text not null,
-                    model_revision text not null,
-                    excerpt_policy text not null,
-                    dimensions integer not null check(dimensions > 0),
-                    dtype text not null check(dtype = 'float16'),
-                    embedding blob not null,
-                    created_at text not null,
-                    updated_at text not null,
-                    primary key(sample_id, model_id, model_revision, excerpt_policy)
-                );
-                create table if not exists prompt_embeddings (
-                    model_id text not null,
-                    model_revision text not null,
-                    prompt_policy text not null,
-                    label text not null,
-                    dimensions integer not null check(dimensions > 0),
-                    dtype text not null check(dtype = 'float16'),
-                    embedding blob not null,
-                    created_at text not null,
-                    updated_at text not null,
-                    primary key(model_id, model_revision, prompt_policy, label)
-                );
-                """
-            )
+        self.database = LibraryDatabase(self.path)
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _connect(self):
+        return self.database._connect()
 
     def get(self, key: EmbeddingKey, *, expected_dimensions: int | None = None) -> np.ndarray | None:
         with self._connect() as conn:

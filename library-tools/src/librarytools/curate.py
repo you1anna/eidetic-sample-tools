@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import csv
 import gzip
+import hashlib
+import io
 import json
 import shutil
 import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import moves, review
+from . import moves, operations, review
+from .artifacts import packet_root, write_crate_metadata
+from .locking import library_lock
+from .state import library_identity
 from .classification.packets import classification_digest, read_classification_audit
 from .classification.review import ReviewSession
 from .inventory import LibraryDatabase, InventoryLocation, sha256_file
@@ -121,7 +127,7 @@ def plan_catalogue_migration(
 def apply_migration(
     root: Path, plan: list[moves.Move], undo_path: Path,
 ) -> dict[str, int]:
-    counts = moves.apply_plan(plan, undo_path)
+    counts = moves.apply_plan(plan, undo_path, root=root)
     if counts["exists"] or counts["missing"]:
         raise CurationError(f"migration incomplete: {counts}")
     (root / "CURATED").mkdir(parents=True, exist_ok=True)
@@ -304,7 +310,18 @@ def write_audition_playlists(
     return generated
 
 
-def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
+def regenerate_packet_playlists(labels_path: Path, *, root: Path | None = None) -> dict[str, Path]:
+    if not (labels_path.parent / 'packet-meta.json').is_file():
+        raise CurationError(f'packet-meta.json is missing beside {labels_path.name}')
+    try:
+        resolved = packet_root(_packet_metadata(labels_path), root)
+    except ValueError as exc:
+        raise CurationError(str(exc)) from exc
+    with library_lock(resolved, purpose='publish packet playlists'):
+        return _regenerate_packet_playlists(labels_path, root=resolved)
+
+
+def _regenerate_packet_playlists(labels_path: Path, *, root: Path | None = None) -> dict[str, Path]:
     metadata_path = labels_path.parent / "packet-meta.json"
     if not metadata_path.is_file():
         raise CurationError(f"packet-meta.json is missing beside {labels_path.name}")
@@ -312,12 +329,11 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise CurationError(f"invalid packet metadata: {exc}") from exc
-    root = metadata.get("root")
-    if not isinstance(root, str) or not root.strip():
-        raise CurationError("invalid packet metadata: root must be a non-empty path")
-    root_path = Path(root)
-    if not root_path.is_dir():
-        raise CurationError(f"invalid packet metadata: sample root is not a directory: {root}")
+    _packet_metadata(labels_path)
+    try:
+        root_path = packet_root(metadata, root)
+    except ValueError as exc:
+        raise CurationError(str(exc)) from exc
     benchmark = metadata.get("benchmark")
     if not isinstance(benchmark, dict) or not benchmark.get("ready") or not benchmark.get("passed"):
         raise CurationError("benchmark quality gate has not passed")
@@ -393,7 +409,14 @@ def regenerate_packet_playlists(labels_path: Path) -> dict[str, Path]:
     return generated
 
 
-def prepare_packet(
+def prepare_packet(root: Path, database: LibraryDatabase, output_dir: Path, *,
+                   quotas: dict[str, int] | None = None, multiplier: int = 2) -> int:
+    with library_lock(root, purpose='prepare listening packet'):
+        database.bind_root(root)
+        return _prepare_packet(root, database, output_dir, quotas=quotas, multiplier=multiplier)
+
+
+def _prepare_packet(
     root: Path,
     database: LibraryDatabase,
     output_dir: Path,
@@ -404,6 +427,10 @@ def prepare_packet(
     scan_id = database.latest_complete_scan()
     if scan_id is None:
         raise CurationError("a complete inventory scan is required")
+    if output_dir.exists() and (not output_dir.is_dir() or any(output_dir.iterdir())):
+        raise CurationError(f"packet output directory must be new or empty: {output_dir}")
+    if output_dir.is_symlink():
+        raise CurationError(f"packet output directory exists as a symlink: {output_dir}")
     quotas = quotas or PILOT_QUOTAS
     grouped: dict[str, list[InventoryLocation]] = {role: [] for role in quotas}
     for item in database.current_locations():
@@ -426,7 +453,9 @@ def prepare_packet(
                 "descriptor": "", "tags": "", "notes": "",
             })
     (output_dir / "packet-meta.json").write_text(
-        json.dumps({"schema_version": 2, "scan_id": scan_id, "root": str(root)}, indent=2) + "\n",
+        json.dumps({"schema_version": 2, "packet_format_version": 1, "packet_id": uuid.uuid4().hex,
+                    "library_id": library_identity(root), "scan_id": scan_id, "root": str(root),
+                    "quotas": quotas, "multiplier": multiplier}, indent=2) + "\n",
         encoding="utf-8",
     )
     _write_m3u8(output_dir / "audition.m3u8", [root / item.path for _, item in selected])
@@ -434,16 +463,20 @@ def prepare_packet(
 
 
 def read_labels(path: Path) -> list[LabelRow]:
-    with path.open(encoding="utf-8", newline="") as fh:
-        reader = csv.DictReader(fh, delimiter="\t")
-        if tuple(reader.fieldnames or ()) != LABEL_FIELDS:
-            raise CurationError("labels.tsv has an unexpected schema")
-        return [LabelRow(
-            sample_id=row["sample_id"], current_path=Path(row["current_path"]),
-            suggested_role=row["suggested_role"], decision=row["decision"].strip().lower(),
-            true_role=row["true_role"].strip().upper(), descriptor=row["descriptor"].strip(),
-            tags=row["tags"].strip(), notes=row["notes"].strip(),
-        ) for row in reader]
+    _packet_metadata(path)
+    return _parse_label_text(path.read_text(encoding='utf-8'))
+
+
+def _parse_label_text(text: str) -> list[LabelRow]:
+    reader = csv.DictReader(io.StringIO(text, newline=''), delimiter='\t')
+    if tuple(reader.fieldnames or ()) != LABEL_FIELDS:
+        raise CurationError('labels.tsv has an unexpected schema')
+    return [LabelRow(
+        sample_id=row['sample_id'], current_path=Path(row['current_path']),
+        suggested_role=row['suggested_role'], decision=row['decision'].strip().lower(),
+        true_role=row['true_role'].strip().upper(), descriptor=row['descriptor'].strip(),
+        tags=row['tags'].strip(), notes=row['notes'].strip(),
+    ) for row in reader]
 
 
 def validate_labels(rows: list[LabelRow]) -> None:
@@ -470,6 +503,21 @@ def _parse_tags(value: str, *, row_number: int) -> list[tuple[str, str]]:
     return parsed
 
 
+def _packet_metadata(labels_path: Path) -> dict:
+    path = labels_path.parent / 'packet-meta.json'
+    if not path.is_file():
+        return {}
+    try:
+        meta = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CurationError(f'invalid packet metadata: {exc}') from exc
+    if not isinstance(meta, dict):
+        raise CurationError('invalid packet metadata: expected an object')
+    if meta.get('schema_version', 1) not in {1, 2, 3} or meta.get('packet_format_version', 1) != 1:
+        raise CurationError('unsupported packet version; use compatible tools before changing this packet')
+    return meta
+
+
 def promote_favourites(
     root: Path,
     database: LibraryDatabase,
@@ -477,64 +525,79 @@ def promote_favourites(
     *,
     run_id: str,
 ) -> list[Path]:
-    meta_path = labels_path.parent / "packet-meta.json"
-    if meta_path.is_file():
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        if meta.get("scan_id") != database.latest_complete_scan():
-            raise CurationError("stale packet: a newer complete inventory scan exists")
-        if Path(str(meta.get("root", ""))) != root:
-            raise CurationError("stale packet: sample root does not match")
-    rows = read_labels(labels_path)
+    try:
+        with library_lock(root, purpose='promote favourites', allow_recovery=True):
+            return _promote_favourites(root, database, labels_path, run_id=run_id)
+    except operations.OperationError as exc:
+        raise CurationError(str(exc)) from exc
+
+
+def _promote_favourites(root: Path, database: LibraryDatabase, labels_path: Path, *, run_id: str) -> list[Path]:
+    validate_crate_name(run_id)
+    root = root.resolve()
+    database.bind_root(root)
+    meta = _packet_metadata(labels_path)
+    labels_bytes = labels_path.read_bytes()
+    labels_text = labels_bytes.decode('utf-8')
+    rows = _parse_label_text(labels_text)
     validate_labels(rows)
+    labels_digest = hashlib.sha256(labels_bytes).hexdigest()
+    existing = operations.find_operation(root, 'promotion', run_id)
+    if existing:
+        path, data = existing
+        if data['labels_sha256'] != labels_digest:
+            raise CurationError('run ID belongs to different listening decisions; choose a new run ID')
+        operations.resume_operation(root, path, data, database)
+        return [root / item['destination'] for item in data['items'] if item['action'] == 'copy']
+    operations.require_settled(root)
+    if meta:
+        if meta.get('scan_id') != database.latest_complete_scan():
+            raise CurationError('stale packet: a newer complete inventory scan exists')
+        if meta.get('library_id'):
+            if meta['library_id'] != library_identity(root):
+                raise CurationError('stale packet: library identity does not match')
+        elif Path(str(meta.get('root', ''))).resolve() != root:
+            raise CurationError('stale packet: sample root does not match')
     current = {item.path: item for item in database.current_locations()}
-    plan: list[tuple[LabelRow, InventoryLocation, Path | None]] = []
+    items = []
     destinations: set[Path] = set()
     for row in rows:
         location = current.get(row.current_path)
-        if location is None or location.sample_id != row.sample_id:
-            raise CurationError(f"stale or missing source: {row.current_path}")
-        source = root / row.current_path
-        if not source.is_file():
-            raise CurationError(f"stale or missing source: {row.current_path}")
+        source = operations.contained(root, row.current_path)
+        if location is None or location.sample_id != row.sample_id or not source.is_file():
+            raise CurationError(f'stale or missing source: {row.current_path}')
         if sha256_file(source) != row.sample_id:
-            raise CurationError(f"hash changed since inventory scan: {row.current_path}")
+            raise CurationError(f'hash changed since inventory scan: {row.current_path}')
         dest = None
-        if row.decision == "favourite":
+        if row.decision == 'favourite':
             role_token = review.normalise_token(row.true_role)
             descriptor = review.normalise_token(row.descriptor)
             source_token = review.normalise_token(location.source_name)
-            name = f"{role_token}_{descriptor}_{source_token}_{row.sample_id[:8]}{source.suffix.lower()}"
-            dest = root / "CURATED" / row.true_role / name
+            name = f'{role_token}_{descriptor}_{source_token}_{row.sample_id[:8]}{source.suffix.lower()}'
+            dest = operations.contained(root, Path('CURATED') / row.true_role / name)
             if dest.exists() or dest.is_symlink() or dest in destinations:
-                raise CurationError(f"curated destination exists or is repeated: {dest}")
+                raise CurationError(f'curated destination exists or is repeated: {dest}')
             for parent in dest.parents:
                 if (parent.exists() or parent.is_symlink()) and not parent.is_dir():
-                    raise CurationError(f"curated destination parent is not a directory: {parent}")
+                    raise CurationError(f'curated destination parent is not a directory: {parent}')
             destinations.add(dest)
-        plan.append((row, location, dest))
-
-    # Validate the whole selection before recording decisions or copying audio.
-    promoted: list[Path] = []
-    for row, location, dest in plan:
-        source = root / row.current_path
-        if sha256_file(source) != row.sample_id:
-            raise CurationError(f"hash changed since inventory scan: {row.current_path}")
-        if dest is not None and (dest.exists() or dest.is_symlink()):
-            raise CurationError(f"curated destination exists: {dest}")
-        database.record_review(
-            row.sample_id, labels_path.parent.name, row.decision, row.true_role,
-            row.descriptor, row.notes,
-        )
-        database.record_tags(row.sample_id, _parse_tags(row.tags, row_number=0))
-        if dest is None:
-            continue
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, dest)
-        rel_dest = dest.relative_to(root)
-        database.record_promotion(row.sample_id, rel_dest, row.current_path, run_id)
-        database.record_file(root, dest, location.scan_id)
-        promoted.append(dest)
-    return promoted
+        items.append({'source': row.current_path.as_posix(),
+                      'destination': dest.relative_to(root).as_posix() if dest else None,
+                      'action': 'copy' if dest else 'review', 'status': 'pending',
+                      'fingerprint': {'kind': 'file', 'sha256': row.sample_id},
+                      'scan_id': location.scan_id,
+                      'sidecars_left_at_source': operations.sidecars(source),
+                      'review': {'sample_id': row.sample_id, 'decision': row.decision,
+                                 'true_role': row.true_role, 'descriptor': row.descriptor,
+                                 'notes': row.notes, 'tags': _parse_tags(row.tags, row_number=0)}})
+    packet_id = meta.get('packet_id') or 'legacy-' + labels_digest
+    path, data = operations.create_operation(root, 'promotion', run_id, items,
+                                               packet_id=packet_id, packet_metadata=meta,
+                                               labels_sha256=labels_digest,
+                                               labels_tsv=labels_text,
+                                               database_path=str(database.path), run_id=run_id)
+    operations.resume_operation(root, path, data, database)
+    return [root / item['destination'] for item in items if item['action'] == 'copy']
 
 
 def write_consumer_views(
@@ -555,9 +618,12 @@ def write_consumer_views(
     if shortages:
         detail = ", ".join(f"{role}:{count}" for role, count in shortages.items())
         raise CurationError(f"pilot quota shortages: {detail}")
+    current_paths = {item.path: item.sample_id for item in database.current_locations()}
     promotion_by_id = {
         str(item["sample_id"]): Path(str(item["curated_path"]))
         for item in database.promotions()
+        if item.get("status", "active") == "active"
+        and current_paths.get(Path(str(item["curated_path"]))) == item["sample_id"]
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     fields = ("sample_id", "source_path", "role", "descriptor", "reason")
@@ -580,11 +646,13 @@ def write_consumer_views(
 
     all_crate_rows = crate_rows(favourites)
     one_crate_rows = [row for row in all_crate_rows if row["role"] in ONE_SHOT_ROLES]
+    packet_id = _packet_metadata(labels_path).get("packet_id")
     for path, output_rows in ((all_path, all_crate_rows), (one_path, one_crate_rows)):
         with path.open("w", encoding="utf-8", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=fields, delimiter="\t")
             writer.writeheader()
             writer.writerows(output_rows)
+        write_crate_metadata(path, packet_id=packet_id)
     with ableton_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(
             fh,
@@ -608,17 +676,35 @@ def write_consumer_views(
 
 
 def undo_promotions(root: Path, database: LibraryDatabase, run_id: str) -> int:
-    selected = [item for item in database.promotions() if item["run_id"] == run_id]
-    moved = 0
-    for item in selected:
-        source = root / str(item["curated_path"])
-        rel = Path(str(item["curated_path"]))
-        dest = root / "_QUARANTINE" / "promotion-undo" / run_id / rel
-        status = moves.safe_move(source, dest)
-        if status == "exists":
-            raise CurationError(f"promotion undo destination exists: {dest}")
-        if status == "missing":
-            raise CurationError(f"promoted copy missing: {source}")
-        database.mark_missing(rel)
-        moved += 1
-    return moved
+    validate_crate_name(run_id)
+    root = root.resolve()
+    try:
+        with library_lock(root, purpose='undo promotion', allow_recovery=True):
+            database.bind_root(root)
+            existing = operations.find_operation(root, 'undo-promotion', run_id)
+            if existing:
+                path, data = existing
+            else:
+                operations.require_settled(root)
+                selected = [item for item in database.promotions() if item['run_id'] == run_id]
+                if not selected:
+                    raise CurationError(f'unknown promotion run: {run_id}')
+                items = []
+                for item in selected:
+                    rel = Path(str(item['curated_path']))
+                    source = operations.contained(root, rel)
+                    destination = operations.contained(root, Path('_QUARANTINE/promotion-undo') / run_id / rel)
+                    expected = {'kind': 'file', 'sha256': str(item['sample_id'])}
+                    if not source.is_file() or operations.fingerprint(source) != expected:
+                        raise CurationError(f'promoted copy missing or changed: {source}')
+                    if destination.exists() or destination.is_symlink():
+                        raise CurationError(f'promotion undo destination exists: {destination}')
+                    items.append({'source': rel.as_posix(), 'destination': destination.relative_to(root).as_posix(),
+                                  'action': 'move', 'status': 'pending', 'fingerprint': expected,
+                                  'sidecars_left_at_source': operations.sidecars(source)})
+                path, data = operations.create_operation(root, 'undo-promotion', run_id, items,
+                                                           run_id=run_id, database_path=str(database.path))
+            operations.resume_operation(root, path, data, database)
+            return len(data['items'])
+    except operations.OperationError as exc:
+        raise CurationError(str(exc)) from exc

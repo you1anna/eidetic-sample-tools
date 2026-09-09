@@ -10,18 +10,31 @@ from .config import DEVICE_SPECS, EXPORT_ROOT, SAMPLES_ROOT, get_profile_spec
 from . import export as export_mod
 
 
-def _print_plan(spec_name: str, *, profile: str | None, crate: Path | None) -> int:
+def _selected_plan(spec, crate: Path | None, samples_root: Path | None, export_root: Path | None):
+    options = {}
+    if samples_root is not None:
+        options['samples_root'] = samples_root
+    if export_root is not None:
+        options['export_root'] = export_root
+    return export_mod.build_crate_plan(spec, crate, **options) if crate else export_mod.build_plan(spec, **options)
+
+
+def _print_plan(spec_name: str, *, profile: str | None, crate: Path | None,
+                samples_root: Path | None = None, export_root: Path | None = None) -> int:
     spec = get_profile_spec(spec_name, profile)
-    plan = export_mod.build_crate_plan(spec, crate) if crate else export_mod.build_plan(spec)
-    print(f"\n[{spec.name}]  ->  {EXPORT_ROOT / spec.export_dir}")
+    plan = _selected_plan(spec, crate, samples_root, export_root)
+    print(f"\n[{spec.name}]  ->  {(plan.export_root or EXPORT_ROOT) / spec.export_dir}")
     print(f"  format: {spec.rate} Hz / {spec.bits}-bit / "
           f"{'mono' if spec.channels == 1 else 'preserve channels'}")
     if not plan.items:
         print("  (no files matched — manifest empty or patterns unresolved)")
     for item in plan.items:
-        rel = item.src.relative_to(SAMPLES_ROOT) if SAMPLES_ROOT in item.src.parents else item.src
+        source_root = plan.samples_root or SAMPLES_ROOT
+        rel = item.src.relative_to(source_root) if source_root in item.src.parents else item.src
         warn = f"  ⚠ {'; '.join(item.warnings)}" if item.warnings else ""
-        print(f"  {item.out_name:<40} <- {rel}{warn}")
+        status = export_mod.export_status(spec, item, export_root=plan.export_root)
+        action = "" if status in {"new", "verified"} else "; requires --force"
+        print(f"  {item.out_name:<40} <- {rel}{warn}  [{status}{action}]")
     for miss in plan.missing:
         print(f"  ✗ no match: {miss}")
     print(f"  total: {len(plan.items)} file(s), {len(plan.missing)} unresolved pattern(s)")
@@ -29,21 +42,22 @@ def _print_plan(spec_name: str, *, profile: str | None, crate: Path | None) -> i
 
 
 def _run_export(spec_name: str, *, dry_run: bool, force: bool, sync: str | None,
-                profile: str | None, crate: Path | None) -> int:
+                profile: str | None, crate: Path | None,
+                samples_root: Path | None = None, export_root: Path | None = None) -> int:
     spec = get_profile_spec(spec_name, profile)
-    plan = export_mod.build_crate_plan(spec, crate) if crate else None
+    plan = _selected_plan(spec, crate, samples_root, export_root)
     verb = "DRY-RUN" if dry_run else "EXPORT"
-    print(f"[{verb}] {spec.name} -> {EXPORT_ROOT / spec.export_dir}")
+    print(f"[{verb}] {spec.name} -> {(plan.export_root or EXPORT_ROOT) / spec.export_dir}")
     converted, skipped = export_mod.export_device(spec, dry_run=dry_run, force=force, plan=plan)
-    print(f"  {'would convert' if dry_run else 'converted'}: {converted}; skipped (exists): {skipped}")
+    print(f"  {'would convert' if dry_run else 'converted'}: {converted}; reused (verified): {skipped}")
 
     if sync:
         if not spec.can_sync:
             print(f"  --sync not supported for {spec.name}: {spec.sync_note}")
             return 0
         if dry_run:
-            if plan is None:
-                print(f"  (dry-run) would sync the staged {spec.export_dir} export to {sync}")
+            if crate is None:
+                print(f"  (dry-run) would sync {len(plan.items)} selected manifest file(s) to {sync}")
             else:
                 print(f"  (dry-run) would sync {len(plan.items)} selected crate file(s) to {sync}")
             return 0
@@ -69,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
         "device", nargs="?", choices=sorted(DEVICE_SPECS),
         help="target device (omit with --all)",
     )
+    parser.add_argument("--root", type=Path, help="attached sample library (defaults to $SAMPLES_ROOT)")
+    parser.add_argument("--export-root", type=Path, help="staging root (with --root defaults to ROOT/_EXPORT)")
     parser.add_argument("--all", action="store_true", help="export every device")
     parser.add_argument("--list", action="store_true",
                         help="resolve the manifest and print planned files (no conversion)")
@@ -82,8 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--crate", type=Path, help="versioned curated crate TSV")
     args = parser.parse_args(argv)
 
-    if not SAMPLES_ROOT.exists():
-        print(f"SAMPLES_ROOT not found: {SAMPLES_ROOT}\n"
+    samples_root = args.root if args.root is not None else SAMPLES_ROOT
+    export_root = args.export_root if args.export_root is not None else (samples_root / "_EXPORT" if args.root is not None else EXPORT_ROOT)
+    if not samples_root.is_dir():
+        print(f"SAMPLES_ROOT not found: {samples_root}\n"
               f"Mount the SSD or set $SAMPLES_ROOT.", file=sys.stderr)
         return 2
 
@@ -95,13 +113,14 @@ def main(argv: list[str] | None = None) -> int:
     for dev in devices:
         try:
             if args.list:
-                rc |= _print_plan(dev, profile=args.profile, crate=args.crate)
+                rc |= _print_plan(dev, profile=args.profile, crate=args.crate, samples_root=samples_root, export_root=export_root)
             else:
                 rc |= _run_export(
                     dev, dry_run=args.dry_run, force=args.force, sync=args.sync,
                     profile=args.profile, crate=args.crate,
+                    samples_root=samples_root, export_root=export_root,
                 )
-        except (ValueError, KeyError, OSError) as exc:
+        except (ValueError, KeyError, OSError, RuntimeError) as exc:
             print(f"{dev}: {exc}", file=sys.stderr)
             rc |= 2
     return rc

@@ -14,6 +14,8 @@ from pathlib import Path
 
 
 PROFILE_ROOT = Path(__file__).resolve().parents[3] / "profiles"
+if not PROFILE_ROOT.is_dir():
+    PROFILE_ROOT = Path(__file__).parent / 'resources' / 'profiles'
 DEFAULT_CONFIG = Path.home() / ".config" / "eidetic-sample-tools" / "config.toml"
 _VERSION_RE = re.compile(r"\*\*Document version:\*\*\s*([^\s]+)")
 _UPDATED_RE = re.compile(r"\*\*Last updated:\*\*\s*(\d{4}-\d{2}-\d{2})")

@@ -9,7 +9,7 @@ import pytest
 from librarytools.curate import (
     CurationError, LABEL_FIELDS, promote_favourites, undo_promotions,
 )
-from librarytools import curate
+from librarytools import curate, operations
 from librarytools.find import Query, load_index, search, write_crate
 from librarytools.inventory import LibraryDatabase, scan_library
 
@@ -108,7 +108,7 @@ def test_promotion_preflights_the_entire_selection_before_writing(tmp_path, prob
 def test_promotion_rechecks_each_copy_after_preflight(tmp_path, monkeypatch, interference):
     root, db, labels, rows = _collection(tmp_path)
     second_destination = root / "CURATED" / "SNARE" / f"snare_short_fixtures_{rows[1]['sample_id'][:8]}.wav"
-    copy_file = curate.shutil.copy2
+    copy_file = operations.copy_exclusive
 
     def copy_then_change_later_file(source, destination):
         result = copy_file(source, destination)
@@ -120,12 +120,14 @@ def test_promotion_rechecks_each_copy_after_preflight(tmp_path, monkeypatch, int
                 second_destination.write_bytes(b"another process wrote this")
         return result
 
-    monkeypatch.setattr(curate.shutil, "copy2", copy_then_change_later_file)
+    monkeypatch.setattr(operations, "copy_exclusive", copy_then_change_later_file)
 
     with pytest.raises(CurationError):
         promote_favourites(root, db, labels, run_id="session")
 
-    assert len(db.promotions()) == 1
+    # An incomplete operation blocks normal index opens; inspect its settled rows read-only.
+    with sqlite3.connect(f"file:{db.path}?mode=ro", uri=True) as connection:
+        assert connection.execute("select count(*) from promotions").fetchone()[0] == 1
     if interference == "destination":
         assert second_destination.read_bytes() == b"another process wrote this"
     else:
