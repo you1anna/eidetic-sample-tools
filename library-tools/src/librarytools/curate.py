@@ -15,27 +15,17 @@ from .classification.packets import classification_digest, read_classification_a
 from .classification.review import ReviewSession
 from .inventory import LibraryDatabase, InventoryLocation, sha256_file
 from .packet_classifier import AUDITION_GROUPS, PacketClassifierError, read_classifications
-
-
-ONE_SHOT_ROLES = (
-    "KICK", "SNARE", "CLAP", "RIM", "HAT-CLOSED", "HAT-OPEN", "SHAKER",
-    "CYMBAL", "RIDE", "TOM", "PERC", "BASS", "STAB-CHORD", "FX", "VOCAL",
+from .curation_policy import (
+    LONG_ROLES, ONE_SHOT_ROLES, PILOT_QUOTAS, TRUSTED_ROLES, validate_crate_name,
 )
-LONG_ROLES = ("DRUM-LOOP", "BASS-LOOP", "SYNTH-LOOP", "VOCAL-LOOP", "TEXTURE-DRONE")
-TRUSTED_ROLES = frozenset((*ONE_SHOT_ROLES, *LONG_ROLES))
+
+
 DECISIONS = frozenset({"reject", "keep", "favourite"})
 TAG_GROUPS = frozenset({"envelope", "tone", "texture", "source", "device"})
 LABEL_FIELDS = (
     "sample_id", "current_path", "suggested_role", "decision", "true_role",
     "descriptor", "tags", "notes",
 )
-PILOT_QUOTAS = {
-    "KICK": 12, "SNARE": 8, "CLAP": 8, "RIM": 4, "HAT-CLOSED": 10,
-    "HAT-OPEN": 8, "SHAKER": 6, "CYMBAL": 4, "RIDE": 4, "TOM": 8,
-    "PERC": 10, "BASS": 4, "STAB-CHORD": 4, "FX": 4, "VOCAL": 2,
-    "DRUM-LOOP": 4, "BASS-LOOP": 2, "SYNTH-LOOP": 2,
-    "VOCAL-LOOP": 4, "TEXTURE-DRONE": 4,
-}
 
 
 class CurationError(ValueError):
@@ -497,32 +487,52 @@ def promote_favourites(
     rows = read_labels(labels_path)
     validate_labels(rows)
     current = {item.path: item for item in database.current_locations()}
-    promoted: list[Path] = []
+    plan: list[tuple[LabelRow, InventoryLocation, Path | None]] = []
+    destinations: set[Path] = set()
     for row in rows:
         location = current.get(row.current_path)
         if location is None or location.sample_id != row.sample_id:
             raise CurationError(f"stale or missing source: {row.current_path}")
         source = root / row.current_path
+        if not source.is_file():
+            raise CurationError(f"stale or missing source: {row.current_path}")
         if sha256_file(source) != row.sample_id:
             raise CurationError(f"hash changed since inventory scan: {row.current_path}")
+        dest = None
+        if row.decision == "favourite":
+            role_token = review.normalise_token(row.true_role)
+            descriptor = review.normalise_token(row.descriptor)
+            source_token = review.normalise_token(location.source_name)
+            name = f"{role_token}_{descriptor}_{source_token}_{row.sample_id[:8]}{source.suffix.lower()}"
+            dest = root / "CURATED" / row.true_role / name
+            if dest.exists() or dest.is_symlink() or dest in destinations:
+                raise CurationError(f"curated destination exists or is repeated: {dest}")
+            for parent in dest.parents:
+                if (parent.exists() or parent.is_symlink()) and not parent.is_dir():
+                    raise CurationError(f"curated destination parent is not a directory: {parent}")
+            destinations.add(dest)
+        plan.append((row, location, dest))
+
+    # Validate the whole selection before recording decisions or copying audio.
+    promoted: list[Path] = []
+    for row, location, dest in plan:
+        source = root / row.current_path
+        if sha256_file(source) != row.sample_id:
+            raise CurationError(f"hash changed since inventory scan: {row.current_path}")
+        if dest is not None and (dest.exists() or dest.is_symlink()):
+            raise CurationError(f"curated destination exists: {dest}")
         database.record_review(
             row.sample_id, labels_path.parent.name, row.decision, row.true_role,
             row.descriptor, row.notes,
         )
         database.record_tags(row.sample_id, _parse_tags(row.tags, row_number=0))
-        if row.decision != "favourite":
+        if dest is None:
             continue
-        role_token = review.normalise_token(row.true_role)
-        descriptor = review.normalise_token(row.descriptor)
-        source_token = review.normalise_token(location.source_name)
-        name = f"{role_token}_{descriptor}_{source_token}_{row.sample_id[:8]}{source.suffix.lower()}"
-        dest = root / "CURATED" / row.true_role / name
-        if dest.exists():
-            raise CurationError(f"curated destination exists: {dest}")
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, dest)
         rel_dest = dest.relative_to(root)
         database.record_promotion(row.sample_id, rel_dest, row.current_path, run_id)
+        database.record_file(root, dest, location.scan_id)
         promoted.append(dest)
     return promoted
 
@@ -533,7 +543,9 @@ def write_consumer_views(
     output_dir: Path,
     *,
     quotas: dict[str, int] | None = None,
+    name: str = "foundation-v1",
 ) -> dict[str, Path]:
+    validate_crate_name(name)
     rows = read_labels(labels_path)
     validate_labels(rows)
     favourites = [row for row in rows if row.decision == "favourite"]
@@ -549,8 +561,8 @@ def write_consumer_views(
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     fields = ("sample_id", "source_path", "role", "descriptor", "reason")
-    all_path = output_dir / "foundation-v1-all.tsv"
-    one_path = output_dir / "foundation-v1-one-shots.tsv"
+    all_path = output_dir / f"{name}-all.tsv"
+    one_path = output_dir / f"{name}-one-shots.tsv"
     ableton_path = output_dir / "ableton-curated.tsv"
 
     def crate_rows(items: list[LabelRow]) -> list[dict[str, str]]:
@@ -607,5 +619,6 @@ def undo_promotions(root: Path, database: LibraryDatabase, run_id: str) -> int:
             raise CurationError(f"promotion undo destination exists: {dest}")
         if status == "missing":
             raise CurationError(f"promoted copy missing: {source}")
+        database.mark_missing(rel)
         moved += 1
     return moved

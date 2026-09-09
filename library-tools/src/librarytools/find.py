@@ -1,11 +1,7 @@
-"""Query the sample index by tag, and rank by sound.
+"""Search musical tags and rank samples by measured acoustic similarity.
 
-Keyword tags narrow across the library; they cannot narrow *within* a pack, because 7,826
-Goldbaby SA909 samples share every keyword tag they will ever have.  Similarity ranking over
-measured acoustics is the only thing that splits them, so ``--like`` matters more here than
-any amount of vocabulary work.
-
-Read-only.  Nothing in this module moves, renames or converts audio.
+Content identity joins retrieval to approved collection metadata. Search results
+can become audition playlists or export crates without changing source audio.
 """
 
 from __future__ import annotations
@@ -16,6 +12,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .featurecache import FEATURE_COLUMNS
+from .curation_policy import TRUSTED_ROLES
 from .inventory import LibraryDatabase
 from .origin import is_generated_name
 from .review import _description, classify_role
@@ -55,6 +52,21 @@ _ROLE_REFINEMENTS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
     ),
 }
 
+# A broad search covers every approved subtype, including loops. This is
+# deliberately separate from choosing a default role for an unreviewed crate.
+_ROLE_QUERY_ALIASES = {
+    "KICKS": ("KICK",),
+    "CLAP-SNARE": ("CLAP", "SNARE", "RIM"),
+    "HATS-CYM": ("HAT-CLOSED", "HAT-OPEN", "CYMBAL", "RIDE", "SHAKER"),
+    "PERC": ("PERC", "TOM"),
+    "BASS": ("BASS", "BASS-LOOP"),
+    "SYNTH-STAB-CHORD": ("STAB-CHORD", "SYNTH-LOOP"),
+    "DRONE-ATMOS": ("TEXTURE-DRONE",),
+    "FX-RISE-IMPACT": ("FX",),
+    "VOCALS": ("VOCAL", "VOCAL-LOOP"),
+    "DRUM-LOOPS": ("DRUM-LOOP",),
+}
+
 
 @dataclass(frozen=True)
 class Match:
@@ -66,6 +78,7 @@ class Match:
     tags: tuple[str, ...] = ()
     distance: float | None = None
     picks: int = 0
+    descriptor: str = ""
 
     @property
     def name(self) -> str:
@@ -152,10 +165,17 @@ def load_index(database: LibraryDatabase) -> list[Match]:
     """Read every indexed sample with its tags and origin."""
     origins = database.origins()
     picks = database.pick_counts()
+    descriptions = database.favourite_descriptions()
 
     matches: list[Match] = []
     seen: set[str] = set()
-    for location in database.current_locations():
+    # Select the playable copy before collapsing exact copies to one identity.
+    # Alphabetical path order alone puts CATALOGUE ahead of CURATED.
+    locations = sorted(
+        database.current_locations(),
+        key=lambda item: (item.zone != "CURATED", item.path.as_posix()),
+    )
+    for location in locations:
         if location.sample_id in seen:
             continue
         seen.add(location.sample_id)
@@ -164,15 +184,21 @@ def load_index(database: LibraryDatabase) -> list[Match]:
             if group not in _DISPLAY_SKIP_GROUPS
         ))
         origin, _, _ = origins.get(location.sample_id, ("unknown", "none", ""))
+        role = classify_role(location.path).role
+        if location.zone == "CURATED" and len(location.path.parts) > 2:
+            canonical = location.path.parts[1]
+            if canonical in TRUSTED_ROLES:
+                role = canonical
         matches.append(
             Match(
                 sample_id=location.sample_id,
                 path=location.path,
-                role=classify_role(location.path).role,
+                role=role,
                 origin=origin,
                 zone=location.zone,
                 tags=tags,
                 picks=picks.get(location.sample_id, 0),
+                descriptor=descriptions.get((location.sample_id, role), ""),
             )
         )
     return matches
@@ -199,7 +225,10 @@ def matches_query(match: Match, query: Query) -> bool:
             if not any(value in match.origin for value in values):
                 return False
         elif group == "role":
-            if not any(value.upper() == match.role for value in values):
+            roles = {value.upper() for value in values}
+            for role in tuple(roles):
+                roles.update(_ROLE_QUERY_ALIASES.get(role, ()))
+            if match.role not in roles:
                 return False
         elif not any(value in tagged for value in values):
             return False
@@ -356,7 +385,8 @@ def write_crate(matches: list[Match], path: Path, reason: str) -> None:
             writer.writerow([
                 match.sample_id,
                 match.path.as_posix(),
-                export_role(match.role, match.path.as_posix()),
-                descriptor_for(match.path),
+                match.role if match.zone == "CURATED" and match.role in TRUSTED_ROLES
+                else export_role(match.role, match.path.as_posix()),
+                match.descriptor or descriptor_for(match.path),
                 reason,
             ])

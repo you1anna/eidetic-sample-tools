@@ -239,6 +239,11 @@ class LibraryDatabase:
             rows = conn.execute("select * from locations where exists_now=1 order by path").fetchall()
         return [_location(row) for row in rows]
 
+    def mark_missing(self, path: Path) -> None:
+        """Retire a known location after a successful move out of the library."""
+        with self._connect() as conn:
+            conn.execute("update locations set exists_now=0 where path=?", (path.as_posix(),))
+
     def location(self, path: Path) -> InventoryLocation:
         with self._connect() as conn:
             row = conn.execute("select * from locations where path=?", (path.as_posix(),)).fetchone()
@@ -264,6 +269,15 @@ class LibraryDatabase:
                 """,
                 (sample_id, packet_id, decision, true_role, descriptor, notes, _now()),
             )
+
+    def favourite_descriptions(self) -> dict[tuple[str, str], str]:
+        """Latest approved description for each sample and canonical role."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """select sample_id,true_role,descriptor from reviews
+                   where decision='favourite' order by reviewed_at,rowid"""
+            ).fetchall()
+        return {(row["sample_id"], row["true_role"]): row["descriptor"] for row in rows}
 
     def record_promotion(
         self, sample_id: str, curated_path: Path, source_path: Path, run_id: str,

@@ -1,235 +1,103 @@
 # Getting started
 
-This guide installs Eidetic Sample Tools and runs a first review without changing
-audio. Commands use example paths; replace `/path/to/eidetic-sample-tools` and
-`/path/to/SAMPLES` with your own locations.
+Install the tools, inspect a folder and turn your first search into a playlist.
+Examples run from the repository root; replace the sample path with your own.
 
-## Before you begin
+## Install
 
-You need:
-
-- Python 3.12;
-- `ffmpeg` and `ffprobe` on your `PATH`;
-- a local clone of this repository; and
-- a backup of any library you may later reorganise.
-
-On macOS with Homebrew:
+Use Python 3.12 with FFmpeg and FFprobe on your `PATH`. On macOS:
 
 ```bash
 brew install python@3.12 ffmpeg
 ```
 
-The first review can run against any sample folder. The later profile-aware
-workflow currently targets Octatrack MKII, Digitakt MKI and TR-8S.
-
-## Install the library tools
-
-Create one environment for the working packages:
+From your local clone, create an isolated environment:
 
 ```bash
-cd /path/to/eidetic-sample-tools
 python3.12 -m venv .venv
-.venv/bin/pip install -e "./library-tools"
-```
-
-This installs commands such as `sample-review`, `sample-sort`, `sample-curate`
-and `sample-analyze`. See the [library command reference](../library-tools/README.md)
-for the complete list.
-
-## Install the export tool
-
-Install the exporter into the same environment:
-
-```bash
-cd /path/to/eidetic-sample-tools
-.venv/bin/pip install -e "./sample-tools"
-```
-
-This installs `sample-export`. See the [sample export reference](../sample-tools/README.md)
-for device formats and transfer routes.
-
-## Install Ableton inspection when needed
-
-To index saved Live Sets and report their sample dependencies, add the third
-package to the same environment:
-
-```bash
-cd /path/to/eidetic-sample-tools
-.venv/bin/pip install -e "./ableton-tools"
-```
-
-This installs `als-index` and `als-samples`. The package uses Python's standard
-library and reads saved `.als` files directly, so Live does not need to be running.
-
-## Optional audio classification and browser review
-
-For model-assisted audition grouping and the local review page, install the
-library extras:
-
-```bash
-cd /path/to/eidetic-sample-tools
-.venv/bin/pip install -e "./library-tools[audio-classifier,review-ui]"
-```
-
-These add PyTorch, Transformers, librosa and Flask. The two pinned CLAP models
-download on first use and run locally on the CPU; allow time and disk space for
-that initial setup. Core review, tag search, `--like` acoustic search and device
-export use the base packages.
-
-Follow the [curation workflow](WORKFLOWS.md#3-curate-by-ear) to prepare a packet,
-classify it and complete its review. The
-[technology guide](TECHNOLOGY.md#optional-local-ai-for-listening-packets) explains
-the model cache and human review gates.
-
-## Activate the environment
-
-Activate the environment if you want to use commands without the `.venv/bin/`
-prefix:
-
-```bash
 source .venv/bin/activate
+python -m pip install -e ./library-tools -e ./sample-tools -e ./ableton-tools
 ```
 
-## Point the tools at your library
-
-Most library commands accept an explicit `--root`:
-
-```bash
-sample-review --root /path/to/SAMPLES --no-probe --summary
-```
-
-The exporter reads two environment variables:
+The packages are independent; omit any you do not need. Set your library path
+explicitly, since the code retains legacy machine-specific defaults:
 
 ```bash
 export SAMPLES_ROOT=/path/to/SAMPLES
-export EXPORT_ROOT=/path/to/SAMPLES/_EXPORT
 ```
 
-`EXPORT_ROOT` is optional. Its default is `_EXPORT` inside `SAMPLES_ROOT`.
+Library commands also accept `--root`. Converted exports default to
+`$SAMPLES_ROOT/_EXPORT`; set `EXPORT_ROOT` to use another destination.
 
-Portable studio and device profiles live in `profiles/`. Select a studio profile
-with `--profile`, `MUSIC_TOOLS_PROFILE`, or a local configuration file:
-
-```toml
-# ~/.config/eidetic-sample-tools/config.toml
-profile = "eidetic-studio"
-```
-
-Profile selection follows this order: command line, environment variable, local
-configuration, then the built-in default.
-
-## Run a read-only review
-
-Start with a summary:
+## Inspect a folder
 
 ```bash
-sample-review --root /path/to/SAMPLES --no-probe --summary
+sample-review --root "$SAMPLES_ROOT" --no-probe --summary
 ```
 
-`sample-review` reads paths and filenames. It never moves, renames, converts or
-deletes audio. With the command above, it prints counts and writes no files.
-
-To create review material, name the outputs explicitly:
+This reads names and paths, prints counts and writes nothing. To inspect the
+proposed roles, sample types, BPM/key evidence and naming warnings in a table:
 
 ```bash
-sample-review \
-  --root /path/to/SAMPLES \
-  --no-probe \
-  --output manifests/review.tsv \
-  --index-dir manifests/index
+sample-review --root "$SAMPLES_ROOT" --no-probe \
+  --output manifests/review.tsv --index-dir manifests/index
 ```
 
-This writes TSV files only. It still does not change the sample library.
+Open the TSV in a spreadsheet or text editor. The split index groups results by
+role, tempo and review priority. Omit `--no-probe` to enable FFprobe duration
+fallback. Source audio stays in place.
 
-## Read the output
+## Search and listen
 
-The main manifest records the source path, proposed role, sample type, explicit
-BPM or key evidence, confidence, hardware-friendly name and warnings.
-
-The split index contains focused views:
-
-```text
-high-confidence/<ROLE>.tsv
-tempo/techno-core.tsv
-tempo/techno-adjacent.tsv
-tempo/house-lower.tsv
-tempo/too-fast.tsv
-tempo/unknown.tsv
-review-needed.tsv
-```
-
-Open these files in a spreadsheet or text editor. Treat every proposal as review
-material, not permission to move audio.
-
-## Make the library searchable
-
-Review tells you what is there. To find things by style, type and origin, build the
-search index once:
+Build the content-hash inventory, recover pack origins and generate tags:
 
 ```bash
-sample-tag --root /path/to/SAMPLES --rescan --apply
+sample-tag --root "$SAMPLES_ROOT" --rescan --apply
 ```
 
-This recovers each sample's pack origin, measures its acoustics against the content
-hash, and generates tags from [`vocabulary.toml`](../library-tools/vocabulary.toml).
-It reads audio but never moves, renames or converts it.
+This writes the derived index, including acoustic measurements, without moving
+or converting audio. The default database is
+`library-tools/manifests/sample-library.sqlite`. If you supply `--library-db`, use
+that same path for subsequent search, analysis and curation commands.
 
-Then search, and audition what comes back:
+Find a shortlist and write an audition playlist:
 
 ```bash
-sample-find perc tribal analog --root /path/to/SAMPLES \
-  --limit 20 --m3u8 manifests/hunt.m3u8
+sample-find perc tribal analog --limit 20 --m3u8 manifests/percussion.m3u8
 ```
 
-Run `sample-tag` without `--apply` to preview vocabulary coverage before replacing
-stored tags. Scanning, origin recovery and feature extraction can still update
-the derived index and write a proposal; source audio stays in place.
-
-Once a reference sample has measurements, use its ID or a unique path fragment to
-rank candidates by sound:
+Compare sounds against an indexed reference:
 
 ```bash
 sample-find --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
-Replace `YOUR_SAMPLE_ID` with a real indexed sample ID or an unambiguous fragment
-of its path. This compares acoustic measurements and requires no model download.
-The [search reference](../library-tools/README.md#sample-find) covers filters,
-playlists, kit picks and `--curated-only` crates for already promoted favourites.
+Replace `YOUR_SAMPLE_ID` with a sample ID or a unique path fragment. Similarity
+uses measured acoustic features and needs no AI models. See the
+[search reference](../library-tools/README.md#sample-find) for filters and kit picks.
 
-## Inspect saved Ableton projects
+To tune the tags, edit [`vocabulary.toml`](../library-tools/vocabulary.toml) and
+run `sample-tag` without `--apply` to preview coverage. Scanning and feature
+extraction may still update derived data; only `--apply` replaces stored tags.
 
-With `ableton-tools` installed, point both reports at a projects directory:
+## Optional listening assistant
 
 ```bash
-als-index --root /path/to/ABLETON_PROJECTS --out manifests/ableton
-als-samples --root /path/to/ABLETON_PROJECTS --out manifests/ableton
+python -m pip install -e './library-tools[audio-classifier,review-ui]'
 ```
 
-These write `als-index.tsv` and `als-samples.tsv`. They report Set structure and
-present or missing sample references without editing a Set or its audio. See the
-[Ableton reference](../ableton-tools/README.md) for root configuration.
+This adds PyTorch, Transformers, librosa and Flask for audio-based grouping and
+browser review. The two pinned CLAP checkpoints download on first use and run
+locally on the CPU. Follow the [curation workflow](WORKFLOWS.md#3-curate-by-ear)
+to use them.
 
-## Choose your next workflow
+## Next steps
 
-- Read [Workflows](WORKFLOWS.md) to move from inspection to curation and export.
-- Read [Technology and architecture](TECHNOLOGY.md) for the search, data and model implementation.
-- Read the [Safety model](SAFETY.md) before using an apply step.
-- Check the [Roadmap](ROADMAP.md) to distinguish stable, beta and experimental
-  work.
+- [Workflows](WORKFLOWS.md): organise, approve favourites and export a crate.
+- [Export reference](../sample-tools/README.md): device formats and transfer.
+- [Ableton reports](../ableton-tools/README.md): inspect Sets and sample dependencies.
+- [Architecture](TECHNOLOGY.md): understand identity, search and model review.
 
-## Robin's current setup
-
-The personal installation uses separate environments rather than the single
-portable environment shown above:
-
-| Item | Current location |
-|---|---|
-| Repository | `/Users/macmini/Projects/eidetic-sample-tools` |
-| Sample library | `/Volumes/Extreme SSD/Production/SAMPLES` |
-| Python environments | `~/.venvs/library-tools`, `~/.venvs/sample-tools` and `~/.venvs/ableton-tools` |
-| Studio profile | `profiles/studios/eidetic-studio.toml` |
-
-These paths are examples, not requirements. The current studio keeps its sample
-library on a backed-up APFS SSD; removable hardware media stays in the format
-required by each device.
+Before moving audio, read the [safety model](SAFETY.md) and verify your library
+backup. [Configuration details](../library-tools/README.md#profiles) cover the
+bundled profile and selection order.

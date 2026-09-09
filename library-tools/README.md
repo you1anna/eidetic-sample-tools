@@ -1,154 +1,77 @@
 # Library tools
 
-## Purpose
-
-The library package reviews, organises, curates and analyses large sample
-libraries. It is the library-management half of **Eidetic Sample Tools**.
-
-The default posture is cautious: review commands leave audio in place, move
-commands preview first, and musical decisions remain human decisions.
+Find useful sounds in a large archive and build a collection worth playing.
+`library-tools` combines content-hash inventory, musical tags, acoustic search
+and recorded listening decisions. Organisation commands preview file moves;
+search and analysis leave source audio in place.
 
 ## Install
 
-Follow the portable [getting started guide](../docs/GETTING-STARTED.md), or use
-the current personal environment:
+From the repository root, in an activated Python 3.12 environment:
 
 ```bash
-/opt/homebrew/bin/python3.12 -m venv ~/.venvs/library-tools
-~/.venvs/library-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-sample-tools/library-tools[dev]"
+python -m pip install -e './library-tools[dev]'
 ```
 
-The experimental drum classifier is optional and heavy:
+See [Getting started](../docs/GETTING-STARTED.md) for environment setup, FFmpeg
+and library paths. Set `SAMPLES_ROOT` or pass `--root` explicitly. Index commands
+share `library-tools/manifests/sample-library.sqlite` by default; use the same
+`--library-db` wherever you override it.
 
-```bash
-~/.venvs/library-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-sample-tools/library-tools[classifier,dev]"
-```
+## Command map
 
-Its upstream weights have no software licence and are not shipped in this
-repository. Locally supplied weights belong at
-`library-tools/models/drum-cnn-lstm.model` and must remain uncommitted.
+| Task | Commands | Maturity |
+|---|---|---|
+| Inspect names, roles and metadata | `sample-review` | Stable |
+| Plan sorting, exact deduplication and pack intake | `sample-sort`, `sample-dedupe`, `sample-intake` | Stable |
+| Recover origin, tag and search | `sample-tag`, `sample-find` | Beta |
+| Prepare listening packets, promote favourites and check copies | `sample-curate` | Beta |
+| Inspect configuration | `sample-profile` | Beta |
+| Measure audio and build inventory | `sample-analyze` | Beta; interpretation experimental |
+| Evaluate model suggestions and similar loops | `sample-benchmark`, `sample-role-cleanup`, `sample-near-dupes` | Experimental |
 
-Audio-derived packet classification and its localhost review page use separate
-local extras. The two pinned CLAP checkpoints are cached on first use:
+See the [roadmap](../docs/ROADMAP.md) for maturity definitions. Each command has
+`--help`; the [workflow guide](../docs/WORKFLOWS.md) joins them into a session.
 
-```bash
-~/.venvs/library-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-sample-tools/library-tools[audio-classifier,review-ui,dev]"
-```
-
-## Commands at a glance
-
-| Command | Maturity | Purpose | Audio effect by default |
-|---|---|---|---|
-| `sample-review` | Stable | Write a filename- and path-based review. | None; optional TSV output only |
-| `sample-sort` | Stable | Plan role-based moves from confident review rules. | Dry run |
-| `sample-dedupe` | Stable | Find byte-identical copies and stage extras. | Dry run |
-| `sample-intake` | Stable | Route loose vendor packs into `PACKS/`. | Dry run |
-| `sample-analyze` | Beta / Experimental | Build stable inventory and acoustic evidence; optionally run the drum classifier. | Derived files only |
-| `sample-near-dupes` | Experimental | Produce conservative near-duplicate audition groups. | Derived files; reviewed apply is a dry run by default |
-| `sample-role-cleanup` | Experimental | Turn classifier routes into human calibration packets. | Derived files only |
-| `sample-benchmark` | Experimental | Prepare ear-labelled model benchmarks and score them. | Derived files only |
-| `sample-tag` | Beta | Recover pack origin, measure acoustics and regenerate search tags. | Derived files only |
-| `sample-find` | Beta | Find samples by style, type and origin; write playlists and crates. | None |
-| `sample-profile` | Beta | Show or validate portable studio profiles. | None |
-| `sample-curate` | Beta | Plan catalogue migration, curate by ear and write consumer views. | Depends on subcommand |
-| `sample-classify` | Retired | Legacy coarse loop/one-shot sorter. | Dry run |
-
-Stable means used in the current personal workflow and covered by tests. Beta is
-implemented but still being refined. Experimental output needs extra scrutiny.
-Retired commands remain available for old workflows but are not recommended for
-new ones.
-
-## Safe starting point
-
-Print a summary without writing files or changing audio:
-
-```bash
-sample-review --root /path/to/SAMPLES --no-probe --summary
-```
-
-Write a review manifest and focused indexes:
-
-```bash
-sample-review \
-  --root /path/to/SAMPLES \
-  --no-probe \
-  --output manifests/review.tsv \
-  --index-dir manifests/index
-```
-
-Use `--no-probe` when filename and path evidence is enough. Omit it when you
-want `ffprobe` duration fallback.
-
-## Review and index
+## Review and organise
 
 ### `sample-review`
 
-```text
-sample-review [--root PATH] [--output FILE] [--index-dir DIR]
-              [--summary] [--no-probe]
+```bash
+sample-review --root /path/to/SAMPLES --no-probe --summary
+sample-review --root /path/to/SAMPLES --no-probe \
+  --output manifests/review.tsv --index-dir manifests/index
 ```
 
-The main TSV keeps musical axes separate:
+The summary writes nothing; the second command writes TSV review material.
+Fields include proposed role, loop/one-shot type, explicit BPM/key evidence,
+tempo group, compact name and warnings. Indexes split by role, tempo and review
+priority. Omit `--no-probe` for FFprobe duration fallback.
 
-| Field | Meaning |
-|---|---|
-| `main_category` | Proposed role such as kicks, bass or vocals |
-| `sample_type` | Loop, one-shot, texture or unknown |
-| `bpm` / `key` | Explicit path or filename evidence; never guessed |
-| `tempo_fit` | Advisory tempo group, not a deletion decision |
-| `proposed_name` | Hardware-friendly filename |
-| `warnings` | Review notes such as a Digitakt name over 24 characters |
+BPM parsing excludes instrument names such as 707, 808, 909, 303 and SH101.
+Role confidence and tempo fit prioritise review; they never approve removal.
 
-`--index-dir` writes high-confidence role files, tempo views and
-`review-needed.tsv`. BPM parsing deliberately avoids treating instrument names
-such as 707, 808, 909, 303 and SH101 as tempos.
-
-## Organise and deduplicate
-
-### `sample-sort`
+### `sample-sort`, `sample-dedupe`, `sample-intake`
 
 ```text
 sample-sort [--root PATH] [--include-review] [--apply]
-```
-
-Plans confident moves into flat role folders. `--include-review` also gathers
-low-confidence files in `_REVIEW/`. It does not overwrite a destination; name
-collisions receive a numeric suffix. `--apply` performs the moves and writes an
-undo manifest.
-
-### `sample-dedupe`
-
-```text
 sample-dedupe [--root PATH] [--apply]
-```
-
-Compares file bytes, not names alone. `--apply` moves extra exact copies to
-`_TO-DELETE/dupes/` for later inspection. It never deletes them.
-
-Run sorting before exact de-duplication so the duplicate plan reflects the
-intended layout.
-
-### `sample-intake`
-
-```text
 sample-intake [--root PATH] [--apply]
 ```
 
-Finds whole vendor packs at the library root or in `00_INBOX/`, normalises their
-folder names and plans moves into `PACKS/`. Loose audio at the root is not
-treated as a pack.
+- **Sort** plans flat role folders; `--include-review` collects uncertain files
+  in `_REVIEW/`. Numeric suffixes resolve name collisions without overwriting.
+- **Dedupe** compares file bytes and moves extras to `_TO-DELETE/dupes/` only
+  with `--apply`. It never deletes them. Sort first if both operations are needed.
+- **Intake** finds vendor packs at the root or in `00_INBOX/`, normalises their
+  folder names and plans moves into `PACKS/`. Loose root audio is excluded.
 
-### `sample-classify` — retired
+All three preview by default and record successful applied moves for undo.
+Check the backup and plan before applying; regenerate plans after library changes.
+The older `sample-classify [--root PATH] [--no-probe] [--apply]` coarse sorter is
+retired; use review and sort for new workflows.
 
-```text
-sample-classify [--root PATH] [--no-probe] [--apply]
-```
-
-This older command sorts `_PACKS/`, `DRUM-KITS/` and `00_INBOX/` into coarse
-sound-type buckets. Use `sample-review` and `sample-sort` for new role-based
-work. The command remains available when the older loop/one-shot split is useful.
-
-## Find samples and load hardware
+## Search
 
 ### `sample-tag`
 
@@ -157,17 +80,9 @@ sample-tag [--root PATH] [--library-db FILE] [--vocabulary FILE]
            [--rescan] [--skip-features] [--apply]
 ```
 
-Builds the search index in three read-only steps: recovers each sample's pack origin,
-moves acoustic measurements onto the content hash, then regenerates tags from
-[`vocabulary.toml`](vocabulary.toml).
-
-Origin survives the earlier flattening because `sample-sort` renamed files to
-`{role}-{description}_{source}`, leaving the pack token in the filename. Where a folder still
-names the pack it is used directly, and a sample that also exists somewhere with intact
-provenance inherits it by content hash. On the current library that resolves 20,300 of 21,306
-samples (95.3%) across 44 packs.
-
-A tag is a saved predicate over evidence, not a label applied per file:
+Recovers origins from pack folders, filename tokens and identical copies; reuses
+or extracts acoustic features; evaluates [`vocabulary.toml`](vocabulary.toml).
+Tags are rules over evidence:
 
 ```toml
 [[tag]]
@@ -177,120 +92,144 @@ origin_matches = ["tribal"]
 name_matches = ["conga", "bongo", "djembe", "cowbell"]
 ```
 
-Run without `--apply` to write a coverage proposal listing what each rule would match and
-why. Edit the vocabulary, re-run, and tags regenerate — you never re-label samples.
+Without `--apply`, it writes a coverage proposal. Scans, origins and measurements
+can still update the derived index. `--apply` replaces stored tags from the
+vocabulary; neither mode moves, renames or converts audio.
 
 ### `sample-find`
 
 ```text
-sample-find [TERMS...] [--role R] [--style S] [--gear G] [--character C] [--origin O]
+sample-find [TERMS...] [--root PATH] [--library-db FILE]
+            [--role R] [--style S] [--gear G] [--character C] [--origin O]
             [--any] [--curated-only] [--like PATH|ID] [--preferred] [--no-spread]
             [--limit N] [--m3u8 FILE] [--crate FILE] [--kit-id ID]
 ```
 
-Terms match across every tag group and are ANDed unless `--any` is given.
-
-`--like` ranks by measured acoustic distance instead of keywords. This is what narrows
-*within* a pack: 7,826 Goldbaby SA909 samples share every keyword tag they will ever have, so
-only sound can separate them. It is plain min-max normalised euclidean distance over the
-measured features — no clustering and no model.
-
-Results spread across sound families by default, so "find me a bongo" returns different
-bongos rather than eight round-robin takes of one. Use `--no-spread` for a flat alphabetical
-list.
-
-`--crate` writes the schema `sample-export` already reads, which makes search-to-hardware two
-commands — but `sample-export` rejects any row whose source isn't already promoted into
-`CURATED/`, so add `--curated-only` to search only what will actually pass:
+Terms combine with AND across tags, origins and names; `--any` matches any term.
+Default ranking spreads results across sound families. `--no-spread` sorts
+alphabetically; `--like` ranks acoustic distance to an indexed ID or unique path
+fragment; `--preferred` ranks recorded kit picks.
 
 ```bash
-sample-find kick --gear 909 --character subby --curated-only --limit 16 \
-  --crate manifests/ot-kit-01.tsv --kit-id ot-kit-01
-sample-export octatrack --profile eidetic-studio --crate manifests/ot-kit-01.tsv --list
+sample-find perc tribal analog --limit 20 --m3u8 manifests/percussion.m3u8
+sample-find --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
-Without `--curated-only`, a written crate may still contain `CATALOGUE/`- or `PACKS/`-sourced
-rows; `sample-find` warns at write time, and `sample-export` refuses the whole crate until
-those samples are promoted with `sample-curate`.
+`--like` uses min-max normalised Euclidean distance over measured features.
+It requires no model download. `--kit-id` records the returned selection as a
+future ranking signal; picks do not replace curation decisions.
 
-`--kit-id` records what went into a kit. Those picks accumulate into a preference signal that
-`--preferred` sorts by, so the trusted set builds itself out of real use instead of requiring
-a labelling session up front.
+`--crate` writes the [export schema](../sample-tools/README.md#crate-format).
+Use `--curated-only` to restrict results to indexed `CURATED/` paths. The exporter
+rejects the entire crate if any source is outside that zone or fails its hash
+check. Search warns when a written crate contains uncurated rows.
 
-## Curate trusted samples
+## Curation
 
 ### `sample-curate`
 
-Global options must appear before the subcommand:
+Global options go before the subcommand:
 
 ```text
 sample-curate [--root PATH] [--library-db FILE] SUBCOMMAND ...
 ```
 
-| Subcommand | Required options | Effect |
+| Subcommand | Required options | Result |
 |---|---|---|
-| `check` | None; optional `--run-id`, `--json` | Reads recorded promotions and verifies current source, curated and relevant quarantine hashes. Never writes. |
-| `migrate-catalogue` | `--ableton-root`, `--manifest`, `--undo` | Writes a migration plan; `--apply` moves after preflight. |
-| `prepare` | `--output-dir` | Writes labels and a combined candidate playlist; it never publishes name-derived categories. |
-| `classify-packet` | `--labels`, `--benchmark` | Runs two pinned CLAP checkpoints sequentially, caches embeddings and writes review candidates. `--carry-review` preserves same-sample decisions across an intentional tuning run; `--restart-review` archives and discards them. |
-| `review-packet` | `--labels` | Serves the exception/sentinel queue on `127.0.0.1`; `--open` opens it and `--port` selects a port. |
-| `playlists` | `--labels` | Publishes combined and category playlists only after the digest-bound review and benchmark gates pass. |
-| `validate` | `--labels` | Checks that required human decisions are complete. |
-| `promote` | `--labels`, `--run-id` | Hash-checks and copies approved favourites to `CURATED/`. |
-| `views` | `--labels`, `--output-dir` | Writes device and Ableton consumer TSVs. |
-| `undo-promotion` | `--run-id` | Moves promoted copies to quarantine. |
+| `prepare` | `--output-dir` | Labels, scan metadata and an audition playlist; optional `--quotas`. |
+| `classify-packet` | `--labels`, `--benchmark` | Audio predictions, cached embeddings and review candidates. |
+| `review-packet` | `--labels` | Local playback and classification review; optional `--open`, `--port`. |
+| `playlists` | `--labels` | Rebuilds playlists after review and benchmark gates pass. |
+| `validate` | `--labels` | Checks every required listening decision. |
+| `promote` | `--labels`, `--run-id` | Hash-checks sources and copies favourites into `CURATED/`. |
+| `views` | `--labels`, `--output-dir` | Device and Ableton TSVs; optional `--quotas` and `--name`. |
+| `check` | None | Read-only verification; optional `--run-id`, `--json`. |
+| `undo-promotion` | `--run-id` | Moves curated copies into quarantine immediately; no `--apply` gate. |
+| `migrate-catalogue` | `--ableton-root`, `--manifest`, `--undo` | Legacy-layout plan; `--apply` moves after preflight. |
 
-Check a previously approved collection before reusing it:
+Follow the [curation walkthrough](../docs/WORKFLOWS.md#3-curate-by-ear).
+Promotion requires a complete label set; every favourite needs a canonical role
+and descriptor. Sources and destinations are preflighted before writing, and
+promotion and undo update indexed locations immediately. Migration checks for
+`CURATED` references in saved Sets and requires a reviewed plan and backed-up library.
+
+`prepare` and `views` accept a TOML file through `--quotas`. Its `[quotas]` table
+maps canonical roles to non-negative integer targets, with at least one positive
+target. Views require enough promoted favourites to meet those targets.
+`--name` sets the crate filename prefix using letters, digits, hyphens or
+underscores. Defaults retain the Foundation quotas and `foundation-v1` prefix.
+
+### Packet classification
+
+Install the optional local models and review UI:
 
 ```bash
-sample-curate --root /path/to/SAMPLES --library-db /path/to/sample-library.sqlite \
-  check --run-id session-01
+python -m pip install -e './library-tools[audio-classifier,review-ui]'
 ```
 
-Omit `--run-id` to check all recorded promotions. Add `--json` for a structured
-report containing `summary` counts and per-promotion source, curated and quarantine
-results. A file is reported as `ok`, `missing` or `changed`; hashes are calculated
-from its current bytes, rather than trusting inventory timestamps.
+After preparing a packet:
 
-When a curated copy is missing, `check` also examines its existing
-`_QUARANTINE/promotion-undo/<run-id>/` location. Matching bytes there are reported
-as quarantine evidence, without inferring why an absent file was removed. A
-matching quarantined copy is accounted for only when its original also matches.
+```bash
+sample-curate classify-packet \
+  --labels manifests/session-01/labels.tsv \
+  --benchmark manifests/session-01/benchmark-labels.tsv
+sample-curate review-packet --labels manifests/session-01/labels.tsv --open
+```
 
-Exit codes are `0` for no discrepancies among the recorded promotions, `1` for
-missing or changed content, and `2` for invalid inputs or unreadable evidence.
-An empty promotion history reports "No promotions recorded"; it does not certify
-the library. An unknown requested run is an input error. In JSON mode, input
-errors are returned as an `error` object on stdout.
+Two pinned CLAP checkpoints run sequentially and cache embeddings. The ensemble
+uses acoustic form evidence and audio content prompts; filenames have zero
+decision weight. Its nine groups cover rim, tom and percussion hits; percussion
+and drum loops; vocal stabs, phrases and long sources; and out-of-brief material.
 
-This command opens the existing database read-only and does not create its parent
-directory, update its schema, rescan the inventory, restore files or alter audio.
-It requires a settled index: pending database journal evidence or a database change
-observed during the query returns `2`. Finish other database work before retrying;
-retained journal evidence may need recovery by the tool that owns the database.
-The check does not create sidecar files, checkpoint or repair the index.
-It checks recorded promotion paths only, so it is not a complete library audit
-or proof of musical suitability or hardware save state.
+Review every exception and one blind sentinel per accepted group. A failed
+sentinel reopens that group. The UI supports notes, undo and resume, writes
+`review-state.json` atomically and generates the 24-row benchmark when the queue
+completes. Do not edit benchmark rows manually.
 
-Use the complete [curation workflow](../docs/WORKFLOWS.md#3-curate-by-ear).
-Promotion accepts only a complete label set. Every favourite needs a canonical
-role and a short descriptor.
+Grouped playlists require complete review and at least 22/24 form and 19/24
+joint content/group matches. This permits shortlist publication; musical
+approval still requires decisions in `labels.tsv`.
 
-`classify-packet` always predicts both form and content. Its nine audition groups are rim,
-tom and general percussion one-shots; percussion and full-drum loops; vocal stabs, phrases
-and long sources; and out-of-brief. Filenames have zero decision weight. Review only model/acoustic
-exceptions plus one blind sentinel per accepted group in `review-packet`; the UI writes and resumes
-the audit state and regenerates `benchmark-labels.tsv`, so no spreadsheet editing is required.
-If prompt tuning changes the classification digest, rerun with `--carry-review`; only newly affected
-automatic samples are reopened. The two review-state flags are mutually exclusive.
-Category playlists remain unavailable until review is complete and the 22/24 form and 19/24
-joint content-and-group benchmark gate passes. The joint threshold is the nearest whole-sample
-boundary to the accepted approximately 20% error policy for this 24-row cohort. Low-confidence
-files appear last. On the first pass, the rejected name-derived playlists are preserved below the
-packet's `archive/` directory. Undo or reclassification withdraws superseded public playlists into
-`archive/stale-publications/`; only a newly passed resolution digest can publish replacements.
+For prompt-tuning reruns, `--carry-review` retains human decisions by sample hash
+and reopens newly affected automatic samples. `--restart-review` archives and
+discards prior decisions; the flags are mutually exclusive. Undo or changed
+classification withdraws stale playlists to `archive/stale-publications/` until
+new evidence passes. Initial name-derived playlists are retained in `archive/`.
 
-## Analyse and run experiments
+After removing label rows, regenerate playlists immediately:
+
+```bash
+sample-curate playlists --labels manifests/session-01/labels.tsv
+```
+
+Missing or stale classification fails validation. Read the
+[architecture guide](../docs/TECHNOLOGY.md#optional-local-ai-for-listening-packets)
+for model execution and publication details.
+
+### Promotion integrity checks
+
+```bash
+sample-curate check --run-id session-01 --json
+```
+
+Omit `--run-id` to check all recorded promotions. Current bytes are hashed for
+the original, curated copy and relevant promotion-undo quarantine path. Results
+are `ok`, `missing` or `changed`; a matching quarantined copy is accounted for
+only when its original also matches.
+
+| Exit | Meaning |
+|---|---|
+| `0` | No discrepancies among recorded promotions. Empty history reports no promotions. |
+| `1` | Missing or changed content. |
+| `2` | Invalid input, unknown run or unreadable evidence. JSON mode returns an `error` object. |
+
+The check reads a settled database without modifying its schema or sidecars.
+Pending journal evidence or a database change during the query returns `2`.
+Finish other database work before retrying; retained journals may need recovery
+by the owning tool. This checks recorded paths only, without rescanning,
+repairing or restoring files, and does not certify the whole library.
+
+## Analysis and experiments
 
 ### `sample-analyze`
 
@@ -300,14 +239,15 @@ sample-analyze [--root PATH] [--output-dir DIR] [--pilot]
                [--library-db FILE] [--classifier]
 ```
 
-`--pilot` writes source registries, acoustic features, reports and suggested
-device crates. `--library-db` adds a stable SHA-256 inventory. `--no-probe`
-skips duration and acoustic extraction for a faster path-only pass.
+`--pilot` writes source registries, features, reports and candidate crates.
+`--library-db` adds stable inventory; `--no-probe` skips duration and acoustic
+extraction. Candidate crates require human curation before hardware use.
 
-`--classifier` runs the optional drum-role model and writes review candidates.
-It does not authorise moves, exclusions, curation or hardware crates. The first
-high-confidence route tested in the current library failed its ear calibration,
-so classifier output remains strictly experimental.
+`--classifier` invokes the older CNN-LSTM drum-role experiment. Its first route
+failed ear calibration, so output remains suggestion-only. It requires the
+separate `classifier` extra and user-supplied weights at
+`models/drum-cnn-lstm.model` relative to this package, or `DRUM_MODEL_PATH`.
+Upstream weights are unlicensed and must remain uncommitted.
 
 ### `sample-near-dupes`
 
@@ -317,34 +257,24 @@ sample-near-dupes [--features FILE] [--output-dir DIR] [--root PATH]
                   [--apply-manifest FILE] [--apply]
 ```
 
-The default pilot emits only long, high-certainty loop pairs. Short-hit acoustic
-similarity was not reliable enough. Review the TSV and mark `decision=remove`
-before passing it back with `--apply-manifest`; the operation still previews
-unless `--apply` is also present.
+The pilot emits long, high-certainty loop pairs; short-hit similarity proved
+unreliable. Audition and mark `decision=remove`, then pass the reviewed TSV with
+`--apply-manifest`. It still previews unless `--apply` is explicit.
 
-### `sample-role-cleanup`
+### `sample-role-cleanup` and `sample-benchmark`
 
 ```text
 sample-role-cleanup prepare --audit FILE --root PATH --output-dir DIR
+sample-benchmark prepare --output-dir DIR [--root PATH] [--features FILE]
+                         [--per-role N] [--max-duration SECONDS]
+sample-benchmark score --output-dir DIR [--root PATH] [--model cnn-lstm]
 ```
 
-Freezes a classifier audit into deterministic role-to-role audition packets.
-Every calibration row must be labelled before a route can advance. A failed
-route stays rejected.
-
-### `sample-benchmark`
-
-```text
-sample-benchmark prepare --output-dir DIR [--root PATH]
-                         [--features FILE] [--per-role N]
-                         [--max-duration SECONDS]
-sample-benchmark score --output-dir DIR [--root PATH]
-                       [--model cnn-lstm]
-```
-
-`prepare` selects a deterministic, feature-spanning set of one-shots for human
-labels. The default duration cap is 2.5 seconds. `score` reports per-role
-precision, recall and confusion against those ear labels.
+Cleanup freezes classifier routes into deterministic audition packets; every
+calibration row must be labelled before a route can advance. Benchmark preparation
+selects feature-spanning one-shots (default duration cap: 2.5 seconds); scoring
+reports precision, recall and confusion against ear labels. Failed routes stay
+rejected. Neither tool authorises audio moves or musical selections.
 
 ## Profiles
 
@@ -354,38 +284,13 @@ precision, recall and confusion against those ear labels.
 sample-profile {show,validate} [--profile NAME] [--source-kb FILE]
 ```
 
-`show` prints the resolved studio and device capabilities. `validate` compares
-the profile's source version with the header of the external Studio Knowledge
-Base. It does not inspect wiring or walk an archive directory.
+`show` prints resolved capabilities. `validate` checks version and date headers
+against a supplied source document; it does not test hardware compatibility.
 
-Profile selection order is command line, `MUSIC_TOOLS_PROFILE`,
-`~/.config/eidetic-sample-tools/config.toml`, then the built-in default.
+Selection order: `--profile`, `MUSIC_TOOLS_PROFILE`,
+`~/.config/eidetic-sample-tools/config.toml`, then the bundled `eidetic-studio`
+profile. Profiles describe supported capabilities; additional devices also need
+export and transfer implementation. See [configuration](../docs/SAMPLE-FOUNDATION-WORKFLOW.md).
 
-## Output files
-
-Common derived outputs include:
-
-```text
-manifests/review.tsv
-manifests/index/high-confidence/<ROLE>.tsv
-manifests/index/review-needed.tsv
-manifests/sample-library.sqlite
-manifests/sample-intelligence-pilot/
-manifests/foundation-v1-review/
-manifests/foundation-v1/
-```
-
-These are review evidence and generated views. Their presence does not mean that
-an audio move or musical decision has been approved.
-
-## Safety and recovery
-
-- Review a plan before every `--apply`.
-- Verify the library backup before a large move.
-- Keep run manifests, human labels and undo records together.
-- Do not delete `_TO-DELETE/` or `_QUARANTINE/` without a separate ear and path
-  check.
-- Re-run a plan after the library changes.
-
-See the full [safety model](../docs/SAFETY.md) for action levels, hashes,
-automation limits and recovery behaviour.
+Retain manifests, labels and undo records together. The
+[safety model](../docs/SAFETY.md) defines apply, backup and recovery requirements.

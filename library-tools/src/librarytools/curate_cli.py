@@ -14,6 +14,7 @@ from .curate import (
     undo_promotions, write_consumer_views,
 )
 from .inventory import LibraryDatabase
+from .curation_policy import CurationPolicyError, load_quotas, validate_crate_name
 from .promotion_health import HealthCheckError, check_promotions
 from .packet_classifier import PacketClassifierError, classify_packet
 from .classification.review_server import load_review_packet, serve_review
@@ -37,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     migrate.add_argument("--apply", action="store_true")
     prepare = sub.add_parser("prepare")
     prepare.add_argument("--output-dir", type=Path, required=True)
+    prepare.add_argument("--quotas", type=Path, help="TOML [quotas] collection targets")
     playlists = sub.add_parser("playlists")
     playlists.add_argument("--labels", type=Path, required=True)
     classify = sub.add_parser("classify-packet")
@@ -57,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     views = sub.add_parser("views")
     views.add_argument("--labels", type=Path, required=True)
     views.add_argument("--output-dir", type=Path, required=True)
+    views.add_argument("--quotas", type=Path, help="TOML [quotas] collection targets")
+    views.add_argument("--name", default="foundation-v1", help="crate filename prefix")
     undo_promotion = sub.add_parser("undo-promotion")
     undo_promotion.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
@@ -72,6 +76,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2) if args.json_output else report.text())
         return report.exit_code
     try:
+        quotas = load_quotas(args.quotas) if args.command in {"prepare", "views"} else None
+        if args.command == "views":
+            validate_crate_name(args.name)
         if args.command == "playlists":
             paths = regenerate_packet_playlists(args.labels)
             categories = len(paths) - 2  # combined playlist and index are not categories
@@ -127,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.apply:
                 print(apply_migration(args.root, plan, args.undo))
         elif args.command == "prepare":
-            count = prepare_packet(args.root, db, args.output_dir)
+            count = prepare_packet(args.root, db, args.output_dir, quotas=quotas)
             print(f"[MANIFEST-ONLY] audition candidates: {count} -> {args.output_dir}")
         elif args.command == "validate":
             rows = read_labels(args.labels)
@@ -137,13 +144,13 @@ def main(argv: list[str] | None = None) -> int:
             paths = promote_favourites(args.root, db, args.labels, run_id=args.run_id)
             print(f"promoted: {len(paths)}")
         elif args.command == "views":
-            paths = write_consumer_views(db, args.labels, args.output_dir)
+            paths = write_consumer_views(db, args.labels, args.output_dir, quotas=quotas, name=args.name)
             print(f"consumer views: {len(paths)} -> {args.output_dir}")
         elif args.command == "undo-promotion":
             count = undo_promotions(args.root, db, args.run_id)
             print(f"quarantined promoted copies: {count}")
         return 0
-    except (CurationError, PacketClassifierError, OSError) as exc:
+    except (CurationError, CurationPolicyError, PacketClassifierError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 

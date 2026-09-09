@@ -1,28 +1,51 @@
-# ableton-tools
+# Ableton tools
 
-Read-only introspection for Ableton Live Sets (`.als`, gzip-compressed XML). Never writes or edits
-a Set — see `docs/superpowers/specs/2026-06-26-ableton-als-introspection-design.md` for the design.
+Inspect a project archive without opening each Live Set. `ableton-tools` reads
+saved `.als` files to report Set structure and sample dependencies, helping you
+find projects and identify missing media before library changes.
 
-## Commands
-
-- `als-index --root <dir> --out <dir>` — walk a projects root, emit `als-index.tsv`: one row per
-  Set (path, tempo, track count, track names, scene count, devices, mtime).
-- `als-samples --root <dir> --out <dir>` — resolve every `SampleRef` in every Set under a root,
-  report present/missing media to `als-samples.tsv`.
-
-Both commands accept `--root` for a single directory, or fall back to the `ALS_ROOTS`
-environment variable (colon-separated list of roots), defaulting to
-`~/Projects/Production:/Volumes/Extreme SSD/Production/ABLETON_PROJECTS` (active scratch + SSD archive).
+It parses gzip-compressed XML using Python's standard library. Live does not
+need to be running; Sets and audio are never edited or relinked.
 
 ## Install
 
+From the repository root, in an activated Python 3.12 environment:
+
 ```bash
-/opt/homebrew/bin/python3.12 -m venv ~/.venvs/ableton-tools
-~/.venvs/ableton-tools/bin/pip install -e ".[dev]"
+python -m pip install -e './ableton-tools[dev]'
 ```
 
-## Test
+See [Getting started](../docs/GETTING-STARTED.md) for environment setup.
+
+## Generate reports
 
 ```bash
-~/.venvs/ableton-tools/bin/pytest -v
+als-index --root /path/to/ABLETON_PROJECTS --out manifests/ableton
+als-samples --root /path/to/ABLETON_PROJECTS --out manifests/ableton
+```
+
+| Report | Contents |
+|---|---|
+| `als-index.tsv` | One row per Set: path, tempo, track count and names, scene count, devices and modification time. |
+| `als-samples.tsv` | Sample references by Set, resolved path and present/missing status. |
+
+Malformed Sets are skipped with parse errors reported on stderr. Reports reflect
+saved project data and the files accessible during the scan.
+
+## Scan multiple roots
+
+Set `ALS_ROOTS` to a colon-separated list and omit `--root`:
+
+```bash
+export ALS_ROOTS=/path/to/active-projects:/path/to/project-archive
+als-samples --out manifests/ableton
+```
+
+An explicit `--root` takes precedence. Set one of these options to avoid the
+legacy machine-specific root defaults.
+
+## Verify
+
+```bash
+python -m pytest ableton-tools -q
 ```

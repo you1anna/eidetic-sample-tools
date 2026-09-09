@@ -1,43 +1,30 @@
-# Studio-aware sample foundation
+# Profiles and configuration
 
-The canonical catalogue, curation and export sequence now lives in
-[Workflows](WORKFLOWS.md). Read [Getting started](GETTING-STARTED.md) for portable
-setup and the [Safety model](SAFETY.md) before applying the migration.
+TOML profiles describe the capabilities used by library analysis and export.
+Device definitions live in [`profiles/devices/`](../profiles/devices/); the
+bundled `eidetic-studio` profile selects Octatrack MKII, Digitakt MKI and TR-8S.
 
-This page preserves the profile checks that are specific to the current Eidetic
-studio.
+Inspect the resolved profile:
 
-## Current profile
+```bash
+sample-profile show --profile eidetic-studio
+```
 
-The `eidetic-studio` profile describes software-actionable capabilities for
-Octatrack MKII, Digitakt MKI and TR-8S. It deliberately omits patchbay detail,
-purchases and physical build work.
-
-Select it locally:
+To select it locally:
 
 ```toml
 # ~/.config/eidetic-sample-tools/config.toml
 profile = "eidetic-studio"
 ```
 
-Selection order is command-line `--profile`, `MUSIC_TOOLS_PROFILE`, local
-configuration, then the built-in default.
+Precedence is `--profile`, `MUSIC_TOOLS_PROFILE`, then local configuration.
+Library profile commands fall back to the bundled profile; the exporter uses
+built-in device defaults when no profile is selected. Set library and export
+paths separately as described in [Getting started](GETTING-STARTED.md).
 
-## Check against the Studio Knowledge Base
+`sample-profile validate --source-kb /path/to/source-document.md` checks version
+and date headers against the profile's source metadata. It does not test hardware
+or inspect the library. Device additions require implementation and validation
+beyond a profile edit.
 
-```bash
-sample-profile show --profile eidetic-studio
-sample-profile validate \
-  --profile eidetic-studio \
-  --source-kb "$HOME/Projects/eidetic-studio/knowledge-base.md"
-```
-
-Validation reads only the document version and update-date header. The
-`eidetic-studio` repo (private) remains the authority for physical wiring.
-
-## Current operating state
-
-Portable profiles, content-hash inventory, catalogue planning, human-gated
-promotion and profile-aware exports are implemented. The live SSD migration and
-foundation-v1 ear review have not yet been applied. Follow [`STATUS.md`](../STATUS.md)
-for the current next action rather than treating this page as a run log.
+For curation and export, use the [workflow guide](WORKFLOWS.md).

@@ -17,7 +17,7 @@ from __future__ import annotations
 import shutil
 import csv
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .config import EXPORT_ROOT, SAMPLES_ROOT, SOURCE_EXTS, DeviceSpec
@@ -83,10 +83,14 @@ def read_crate_tsv(path: Path) -> list[CrateRow]:
         reader = csv.DictReader(fh, delimiter="\t")
         if tuple(reader.fieldnames or ()) != expected:
             raise ExportError("crate TSV has an unexpected schema")
-        rows = [CrateRow(
-            row["sample_id"], Path(row["source_path"]), row["role"].upper(),
-            row["descriptor"], row["reason"],
-        ) for row in reader]
+        rows: list[CrateRow] = []
+        for row in reader:
+            if None in row or any(value is None for value in row.values()):
+                raise ExportError(f"crate row {reader.line_num}: expected exactly five TSV fields")
+            rows.append(CrateRow(
+                row["sample_id"], Path(row["source_path"]), row["role"].upper(),
+                row["descriptor"], row["reason"],
+            ))
     return rows
 
 
@@ -107,10 +111,14 @@ def build_crate_plan(
     rows = read_crate_tsv(crate_path)
     if spec.name in {"digitakt", "tr8s"} and any(row.role in LONG_FORM_ROLES for row in rows):
         raise ExportError(f"{spec.name} foundation crate must contain one-shot roles only")
-    if spec.name == "digitakt" and len(rows) > 127:
-        raise ExportError(f"Digitakt project capacity is 127 samples, crate has {len(rows)}")
-    if spec.name == "tr8s" and len(rows) > 256:
-        raise ExportError(f"TR-8S import folder capacity is 256 files, crate has {len(rows)}")
+    if spec.max_project_samples is not None and len(rows) > spec.max_project_samples:
+        raise ExportError(
+            f"{spec.name} project capacity is {spec.max_project_samples} samples, crate has {len(rows)}"
+        )
+    if spec.max_folder_files is not None and len(rows) > spec.max_folder_files:
+        raise ExportError(
+            f"{spec.name} import folder capacity is {spec.max_folder_files} files, crate has {len(rows)}"
+        )
     crate_name = naming.normalise_base(crate_path.stem)
     curated_root = (samples_root / "CURATED").resolve()
     per_role: dict[str, int] = {}
@@ -128,7 +136,7 @@ def build_crate_plan(
             )
         if _sha256(source) != row.sample_id:
             raise ExportError(f"hash changed for crate source: {row.source_path}")
-        if spec.name == "tr8s":
+        if spec.max_total_seconds is not None:
             total_duration += probe_mod.probe(source).duration or 0.0
         per_role[row.role] = per_role.get(row.role, 0) + 1
         name = _compact_name(row, per_role[row.role])
@@ -143,14 +151,13 @@ def build_crate_plan(
             out_rel = Path("EIDETIC-CURATED/AUDIO") / crate_name / row.role / name
         override = None
         if spec.name == "tr8s" and "stereo-essential" in row.reason:
-            override = DeviceSpec(
-                name=spec.name, export_dir=spec.export_dir, rate=spec.rate, bits=spec.bits,
-                channels=None, name_warn=spec.name_warn, can_sync=spec.can_sync,
-                sync_note=spec.sync_note,
-            )
+            override = replace(spec, channels=None)
         items.append(Item(source, name, [], out_rel, override))
-    if spec.name == "tr8s" and total_duration > 600.0:
-        raise ExportError(f"TR-8S user-sample capacity is 600 seconds, crate has {total_duration:.1f}")
+    if spec.max_total_seconds is not None and total_duration > spec.max_total_seconds:
+        raise ExportError(
+            f"{spec.name} user-sample capacity is {spec.max_total_seconds:g} seconds, "
+            f"crate has {total_duration:.1f}"
+        )
     return Plan(spec, items, [])
 
 

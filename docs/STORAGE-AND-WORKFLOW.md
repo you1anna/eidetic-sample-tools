@@ -1,47 +1,16 @@
-# Personal storage and creative workflow
+# Library storage
 
-The canonical operating sequence now lives in [Workflows](WORKFLOWS.md). Read
-[Getting started](GETTING-STARTED.md) for installation and the [Safety model](SAFETY.md)
-before applying changes.
+Keep original packs, searchable catalogue audio and approved favourites as
+separate [library zones](WORKFLOWS.md#library-zones). Device exports are derived
+copies that can be rebuilt from those sources and retained listening decisions.
 
-This page keeps the storage and creative context that is specific to Robin's
-studio.
+Set `SAMPLES_ROOT` to the library location. `EXPORT_ROOT` defaults to `_EXPORT/`
+inside that root and can point to another staging location. Hardware media uses
+the [device-specific transfer route](../sample-tools/README.md#transfer-to-a-card).
 
-## Current storage
+Back up source audio, labels, manifests and the inventory. A second copy on the
+same physical drive does not protect against drive failure; undo records are
+not backups. See the [safety model](SAFETY.md#backup-responsibilities).
 
-| Location | Format | Role |
-|---|---|---|
-| `/Volumes/Extreme SSD/Production/SAMPLES/` | APFS | Master sample library and production archive |
-| `/Users/macmini/Projects/eidetic-sample-tools` | APFS | Repository on the Mac mini |
-| Octatrack CF and TR-8S SD | Device-compatible FAT/exFAT | Rebuildable exports |
-| Digitakt +Drive | Managed through Elektron Transfer | Rebuildable device library |
-
-The 2 TB Extreme SSD was confirmed as APFS, read/write and backed up on
-2026-07-07. Backup maintenance remains an operating responsibility. It is not a
-substitute for previewing moves and retaining undo manifests.
-
-## Creative path
-
-The studio centres on Octatrack MKII as clock master, with Digitakt MKI, TR-8S
-and Ableton. The target is hypnotic, dub, raw and hard-groove techno around
-130–150 BPM.
-
-The main paths are:
-
-1. Record hardware jams into Ableton.
-2. Capture and reshape material in Octatrack.
-3. Arrange and finish in Ableton.
-4. Return useful resamples and stems to the library with clear names and tags.
-
-The tools should reduce the distance between hearing an idea and loading the
-right sound. Ableton and hardware consume the same trusted library through
-different views and device-specific copies.
-
-The external Eidetic Studio Knowledge Base remains authoritative for wiring and
-physical setup. This repository models only capabilities the tools can act on.
-
-## Open personal question
-
-The current workflow adds only `SAMPLES/CURATED/` to Ableton Places. Whether to
-mirror favourites into Ableton's User Library remains open and should be tested
-after the catalogue and first curated foundation are stable.
+Continue with the canonical [workflow](WORKFLOWS.md). Historical observations
+about the reference library remain in [operational status](../STATUS.md).

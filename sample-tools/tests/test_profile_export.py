@@ -60,6 +60,80 @@ def test_environment_selects_profile_when_cli_omits_it(monkeypatch):
         config.get_profile_spec("digitakt", None)
 
 
+def _profile(root, device, limits, *, enabled=True):
+    device_id = {"digitakt": "digitakt-mki", "tr8s": "tr8s"}[device]
+    (root / "studios").mkdir(parents=True)
+    (root / "devices").mkdir()
+    (root / "studios" / "test.toml").write_text(
+        f'schema_version = 1\n[[devices]]\nid = "{device_id}"\nenabled = {str(enabled).lower()}\n'
+    )
+    (root / "devices" / f"{device_id}.toml").write_text(
+        'schema_version = 1\nsample_rate = 48000\nbits = 16\nchannels = "mono"\n'
+        + limits
+    )
+
+
+@pytest.mark.parametrize(("device", "limits", "message"), [
+    ("digitakt", "max_project_samples = 1\n", "1 samples"),
+    ("tr8s", "max_folder_files = 1\n", "1 files"),
+    ("tr8s", "max_total_seconds = 0.075\n", "0.075 seconds"),
+])
+def test_crate_validation_uses_selected_profile_capacities(tmp_path, device, limits, message):
+    profiles = tmp_path / "profiles"
+    _profile(profiles, device, limits)
+    root = tmp_path / "SAMPLES"
+    rows = []
+    for index in range(2):
+        rel = f"CURATED/KICK/{index}.wav"
+        _, sample_id = _wav(root / rel)
+        rows.append({
+            "sample_id": sample_id, "source_path": rel, "role": "KICK",
+            "descriptor": "short", "reason": "favourite",
+        })
+    crate = _crate(tmp_path / "kit.tsv", rows)
+
+    spec = config.get_profile_spec(device, "test", profile_root=profiles)
+
+    with pytest.raises(ExportError, match=message):
+        build_crate_plan(spec, crate, root)
+
+
+def test_profile_cannot_export_a_disabled_device(tmp_path):
+    profiles = tmp_path / "profiles"
+    _profile(profiles, "digitakt", "", enabled=False)
+
+    with pytest.raises(KeyError, match="not enabled"):
+        config.get_profile_spec("digitakt", "test", profile_root=profiles)
+
+
+@pytest.mark.parametrize("limits", [
+    "max_project_samples = 0\n", "max_folder_files = true\n", "max_total_seconds = nan\n",
+])
+def test_invalid_profile_capacities_are_rejected(tmp_path, limits):
+    profiles = tmp_path / "profiles"
+    _profile(profiles, "digitakt", limits)
+
+    with pytest.raises(ValueError, match="capacity"):
+        config.get_profile_spec("digitakt", "test", profile_root=profiles)
+
+
+def test_cli_reports_a_missing_crate_without_a_traceback(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli_mod, "SAMPLES_ROOT", tmp_path)
+
+    assert cli_mod.main(["digitakt", "--crate", str(tmp_path / "absent.tsv"), "--list"]) == 2
+
+    assert "absent.tsv" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("body", ["abc\n", "abc\tCURATED/KICK/a.wav\tKICK\tshort\t\textra\n"])
+def test_malformed_crate_rows_report_the_row_number(tmp_path, body):
+    crate = tmp_path / "malformed.tsv"
+    crate.write_text("sample_id\tsource_path\trole\tdescriptor\treason\n" + body)
+
+    with pytest.raises(ExportError, match="row 2"):
+        export_mod.read_crate_tsv(crate)
+
+
 def test_crate_plan_builds_device_specific_layouts_and_compact_names(tmp_path):
     root = tmp_path / "SAMPLES"
     _, sample_id = _source(root, "CURATED/KICK/kick.wav", b"kick")

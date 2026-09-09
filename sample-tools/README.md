@@ -1,199 +1,121 @@
-# Sample export tool
+# Sample export
 
-## Purpose
+Prepare a reviewed collection for Octatrack MKII, Digitakt MKI or TR-8S.
+`sample-export` resolves a manifest or curated crate, validates the selection and
+uses FFmpeg to create device-specific WAV copies. Source audio stays intact.
 
-`sample-export` prepares approved samples for Octatrack MKII, Digitakt MKI and
-TR-8S. It validates a manifest or curated crate, converts each source to the
-device format with `ffmpeg`, and stages a copy below `_EXPORT/`.
+## Install and configure
 
-Source audio is never converted in place. Use `--list` and `--dry-run` before a
-real export.
-
-## Install
-
-Follow the portable [getting started guide](../docs/GETTING-STARTED.md), or use
-the current personal environment:
+From the repository root, in an activated Python 3.12 environment:
 
 ```bash
-brew install ffmpeg python@3.12
-/opt/homebrew/bin/python3.12 -m venv ~/.venvs/sample-tools
-~/.venvs/sample-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-sample-tools/sample-tools"
-```
-
-This installs the `sample-export` command. The repository also keeps a
-`bin/sample-export` shim for the personal setup.
-
-## Supported hardware
-
-| Device | Output | Channels | Transfer |
-|---|---|---|---|
-| Octatrack MKII | 16-bit WAV, 44.1 kHz | Preserve source mono or stereo | CompactFlash card |
-| Digitakt MKI | 16-bit WAV, 48 kHz | Mono | Elektron Transfer |
-| TR-8S | 16-bit WAV, 48 kHz | Mono by default; approved `stereo-essential` crate rows preserve stereo | SD card import |
-
-Profile files in [`../profiles/devices/`](../profiles/devices/) are the
-versioned authority for these capabilities.
-
-## Preview an export
-
-Set the library location first:
-
-```bash
+python -m pip install -e ./sample-tools
 export SAMPLES_ROOT=/path/to/SAMPLES
 ```
 
-Resolve inputs and output names without conversion:
+Install FFmpeg and FFprobe as described in
+[Getting started](../docs/GETTING-STARTED.md). Set `SAMPLES_ROOT` explicitly;
+the code retains a legacy machine-specific fallback. `EXPORT_ROOT` defaults to
+`$SAMPLES_ROOT/_EXPORT`.
+
+Optional profile selection follows `--profile`, `MUSIC_TOOLS_PROFILE`, then
+`~/.config/eidetic-sample-tools/config.toml`. Without a selection, the exporter
+uses built-in device defaults. See [profile configuration](../docs/SAMPLE-FOUNDATION-WORKFLOW.md).
+
+## Output formats
+
+These are the toolkit's configured export targets:
+
+| Device | WAV format | Channels | Transfer |
+|---|---|---|---|
+| Octatrack MKII | 16-bit, 44.1 kHz | Preserve mono/stereo | CompactFlash card |
+| Digitakt MKI | 16-bit, 48 kHz | Mono | Elektron Transfer |
+| TR-8S | 16-bit, 48 kHz | Mono by default; `stereo-essential` crate rows preserve stereo | SD card import |
+
+Versioned capabilities are in [`profiles/devices/`](../profiles/devices/).
+
+## Preview, then export
+
+Create a crate from [promoted favourites](../docs/WORKFLOWS.md#3-curate-by-ear),
+then resolve its inputs and preview conversion:
 
 ```bash
-sample-export digitakt --list
+sample-export digitakt --crate manifests/digitakt-kit.tsv --list
+sample-export digitakt --crate manifests/digitakt-kit.tsv --dry-run
 ```
 
-Preview conversion counts:
+Confirm the selected files, names and counts before writing the export:
 
 ```bash
-sample-export digitakt --dry-run
+sample-export digitakt --crate manifests/digitakt-kit.tsv
 ```
 
-Preview every supported device:
+`--list` reports the plan; `--dry-run` writes no audio. Existing staged outputs
+are skipped. `--force` replaces derived outputs without touching sources.
+
+## Crate format
+
+A TSV crate carries the selection's identity and context:
+
+| Column | Value |
+|---|---|
+| `sample_id` | Full SHA-256 of the source file. |
+| `source_path` | Path to the promoted copy inside `CURATED/`, relative to `SAMPLES_ROOT` or absolute. |
+| `role` | Canonical role, such as `KICK` or `PERC`. |
+| `descriptor` | Short description used in the compact output name. |
+| `reason` | Selection context or tags; `stereo-essential` enables TR-8S stereo preservation. |
+
+`sample-curate views` generates crates from promoted favourites, with configurable
+targets (`--quotas`) and a filename prefix (`--name`).
+`sample-find --curated-only --crate FILE` selects from indexed curated paths.
+
+Before conversion, crate validation checks source location, current hash, role
+and output-name collisions. Default capacities are 127 samples for Digitakt and
+256 files / 600 seconds per TR-8S plan; selected profiles supply these limits.
+Both reject long-form roles. Disabled profile devices are rejected. These checks
+do not inspect samples already stored on the instrument.
+
+## Transfer to a card
+
+For Octatrack or TR-8S, preview the selected crate's transfer:
 
 ```bash
-sample-export --all --dry-run
+sample-export tr8s --crate manifests/tr8s-kit.tsv \
+  --sync /Volumes/TR8S-SD --dry-run
 ```
 
-`--list` reports missing patterns and naming warnings. `--dry-run` follows the
-conversion path but writes no audio.
+The preview reports the selected file count without inspecting or writing the
+card. After review, remove `--dry-run` to convert as needed and copy the crate.
+The destination must already exist; the exporter checks every selected staged
+file and destination before copying.
 
-## Export a reviewed crate
+With `--crate`, sync includes only that plan's WAVs, including staged files whose
+conversion was skipped. Native paths such as `EIDETIC-CURATED/AUDIO/` and
+`ROLAND/TR-8S/SAMPLE/` are copied directly below the card root. Legacy flat
+exports use an `EIDETIC-<DEVICE>/` wrapper.
 
-`sample-curate views` writes versioned TSV crates from complete human labels.
-Inspect a crate before conversion:
+Digitakt does not support `--sync`; drag staged exports into Elektron Transfer.
+TR-8S may require front-panel import after copying. Complete a
+[one-sample hardware test](../docs/WORKFLOWS.md#first-device-smoke-test) before
+expanding a crate.
 
-```bash
-sample-export digitakt \
-  --profile eidetic-studio \
-  --crate ../library-tools/manifests/foundation-v1/foundation-v1-one-shots.tsv \
-  --list
-```
+## Legacy path manifests
 
-Preview it:
-
-```bash
-sample-export digitakt \
-  --profile eidetic-studio \
-  --crate ../library-tools/manifests/foundation-v1/foundation-v1-one-shots.tsv \
-  --dry-run
-```
-
-Run the same command without `--list` or `--dry-run` to write converted copies:
-
-```bash
-sample-export digitakt \
-  --profile eidetic-studio \
-  --crate ../library-tools/manifests/foundation-v1/foundation-v1-one-shots.tsv
-```
-
-Each crate row contains `sample_id`, `source_path`, `role`, `descriptor` and
-`reason`. Before conversion, the exporter checks the content hash, device
-capacity, accepted roles, path depth and compact output names.
-
-Digitakt and TR-8S crates reject long-form roles. Octatrack accepts the full
-performance supplement.
-
-## Copy to removable media
-
-Octatrack and TR-8S can receive a built export through a mounted filesystem:
-
-```bash
-sample-export octatrack \
-  --profile eidetic-studio \
-  --crate /path/to/foundation-v1-all.tsv \
-  --sync /Volumes/OCTACF
-```
-
-`--sync` copies an already converted export after conversion finishes. For
-profile crates, hardware-native paths such as `EIDETIC-CURATED/AUDIO/` and
-`ROLAND/TR-8S/SAMPLE/` are copied directly to the card root. Legacy flat exports
-use an `EIDETIC-<DEVICE>/` wrapper.
-
-When `--crate` is supplied, sync copies only the staged WAVs in that resolved
-crate plan. It does not scan the rest of the device staging folder, so other
-crates and stale files are excluded. Existing staged outputs that conversion
-skips are still included when they belong to the selected crate. Before copying,
-the exporter checks every selected staged file and its card destination.
-
-Preview the selected transfer scope without writing converted audio or card
-files:
-
-```bash
-sample-export tr8s \
-  --profile eidetic-studio \
-  --crate /path/to/foundation-v1-one-shots.tsv \
-  --sync /Volumes/TR8S-SD \
-  --dry-run
-```
-
-The preview reports the selected crate file count. It does not inspect or create
-files on the card.
-
-Digitakt's +Drive is not a mounted disk. Stage the Digitakt export, then drag it
-into Elektron Transfer. `--sync` is intentionally unsupported for Digitakt.
-
-TR-8S may still require front-panel import after the files reach the SD card,
-depending on its firmware and project state.
-
-## Manifest format
-
-Legacy manifests live at `manifests/<device>.txt`. Entries are relative to
-`SAMPLES_ROOT`; absolute paths also work. Blank lines and `#` comments are
-ignored.
+Without `--crate`, the exporter reads this package's `manifests/<device>.txt`:
 
 ```text
-CATALOGUE/KICKS/Goldbaby-909
-CATALOGUE/DRUM-LOOPS/Tribal-Techno/*.wav
-CATALOGUE/PERC/conga.wav => conga-hi
+CURATED/KICK/
+CURATED/PERC/*.wav
+CURATED/FX/impact.wav => impact-short
 ```
 
-A directory recurses, a glob selects matching files, and `=>` replaces the
-output base name. Supported sources are WAV, AIFF, FLAC, MP3 and OGG. Output is
-always WAV.
+Directories recurse, globs select files and `=>` sets an output base name.
+Paths are relative to `SAMPLES_ROOT` unless absolute; blank lines and `#`
+comments are ignored. Sources may be WAV, AIFF, FLAC, MP3 or OGG.
 
-Curated crate TSVs are preferred for the profile-aware workflow because they
-carry identity, role and human-selection evidence.
+This path does not carry crate identity or curation checks; retain a separately
+reviewed source selection. Preview with `sample-export digitakt --list` or
+`sample-export --all --dry-run`. Names are normalised and deduplicated; legacy
+Digitakt names warn above 24 characters.
 
-## Conversion rules
-
-- Existing derived outputs are skipped, making normal exports repeatable.
-- `--force` replaces existing derived outputs; it does not touch sources.
-- Output names are normalised and de-duplicated.
-- Digitakt names warn above 24 characters in legacy exports.
-- Digitakt crates enforce the 127-sample project limit.
-- TR-8S crates enforce one-shot roles, folder limits and the 600-second user
-  sample limit used by the current profile.
-- Profile crates use compact names built from role, sequence, descriptor and
-  content identity.
-
-## Configuration
-
-| Setting | Default |
-|---|---|
-| `SAMPLES_ROOT` | `/Volumes/Extreme SSD/Production/SAMPLES` |
-| `EXPORT_ROOT` | `<SAMPLES_ROOT>/_EXPORT` |
-| `MUSIC_TOOLS_PROFILE` | Not set; use built-in device defaults |
-| Local profile file | `~/.config/eidetic-sample-tools/config.toml` |
-
-Select a studio profile with `--profile`, the environment variable, or the
-local configuration file. The command-line value wins.
-
-## Safety and troubleshooting
-
-- Start with `--list`, then `--dry-run`.
-- A missing `SAMPLES_ROOT` stops the command before planning.
-- A changed crate hash stops export before conversion.
-- Existing outputs are skipped unless `--force` is explicit.
-- A missing sync destination returns an error instead of creating a guessed
-  mount path.
-- Device exports are derived copies. Rebuild them from the backed-up library and
-  retained curation evidence.
-
-Read the complete [safety model](../docs/SAFETY.md) and
-[workflow guide](../docs/WORKFLOWS.md) before the first card sync.
+Read the [safety model](../docs/SAFETY.md) before export or card sync.

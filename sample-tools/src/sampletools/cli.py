@@ -93,13 +93,17 @@ def main(argv: list[str] | None = None) -> int:
 
     rc = 0
     for dev in devices:
-        if args.list:
-            rc |= _print_plan(dev, profile=args.profile, crate=args.crate)
-        else:
-            rc |= _run_export(
-                dev, dry_run=args.dry_run, force=args.force, sync=args.sync,
-                profile=args.profile, crate=args.crate,
-            )
+        try:
+            if args.list:
+                rc |= _print_plan(dev, profile=args.profile, crate=args.crate)
+            else:
+                rc |= _run_export(
+                    dev, dry_run=args.dry_run, force=args.force, sync=args.sync,
+                    profile=args.profile, crate=args.crate,
+                )
+        except (ValueError, KeyError, OSError) as exc:
+            print(f"{dev}: {exc}", file=sys.stderr)
+            rc |= 2
     return rc
 
 

@@ -1,383 +1,202 @@
 # Workflows
 
-Eidetic Sample Tools separates inspection, organisation, curation and export.
-Each stage leaves evidence for the next one. No classifier or heuristic gets to
-approve a musical decision.
+Move from a searchable archive to a collection you have heard, selected and
+prepared for an instrument. Each stage produces a reviewable output.
 
-Read the [safety model](SAFETY.md) before using an apply step.
-
-## The operating model
-
-The intended sequence is:
-
-1. Inspect the library and write review material.
-2. Plan any structural change and examine its manifest.
-3. Listen and mark a small set of trusted sounds.
-4. Export approved copies to a device-specific format.
-5. Use undo records or quarantine when a decision needs revising.
-
-The tools are useful independently, but this sequence keeps broad library
-organisation separate from musical selection.
-
-## Current recovery position
-
-Three working packages support this sequence: library management, device export
-and read-only Ableton `.als` inspection. The Ableton tools can index Sets and
-report sample references, but never edit a Set.
-
-A local post-run audit dated 2026-07-18 verified 18 authorised catalogue moves.
-The 2026-07-23 read-only reconciliation scanned 22,952 audio files and verified
-that all 18 audited destination paths match their recorded SHA-256 identities;
-all 18 former source paths are absent. The associated confidence-organisation
-code is not merged. Treat this as historical organisation evidence only: it does
-not establish a complete catalogue, curated audio, verified PACKS preservation
-or an exportable crate, and confidence does not permit any additional move.
-
-The reconciliation found 130 absent entries from a 7,689-entry protected
-`PACKS/` snapshot; none were found relocated or changed in place. It also found
-one canonical Foundation v1 sample identity absent from inventory. These are
-blocking integrity discrepancies. Preserve the read-only evidence and conduct a
-human recovery review before promotion, export or a new organisation plan; do
-not infer their cause or mutate audio while resolving them.
-
-Foundation v1 is still human-gated. Its canonical `labels.tsv` has 216 rows;
-215 current rows resolve to decisions in the 214-row `labels-categorised.tsv`
-reference because one sample identity is duplicated, and one canonical identity
-is absent from inventory. The reference has 169 `keep` and 45 `reject` decisions
-but no favourites, so it cannot drive promotion. The 2026-07-18 audit found no
-curated audio. Recover the sequence by resolving the integrity discrepancies
-through human review, reviewing any future move plan in preview, completing and
-validating the canonical listening sheet, and only then promoting hash-verified
-favourites and previewing an export.
+Complete [setup](GETTING-STARTED.md) first. Examples run from the repository root
+with `SAMPLES_ROOT` set and the default index at
+`library-tools/manifests/sample-library.sqlite`. Use the same `--library-db` path
+throughout if you choose a different index.
 
 ## Library zones
 
 | Zone | Purpose |
 |---|---|
-| `PACKS/` | Intact source packs and native Octatrack Sets. |
-| `CATALOGUE/` | Broad material organised by role. It may be useful, but it has not all been approved by ear. |
-| `CURATED/` | A small working collection that has been auditioned and approved. |
+| `PACKS/` | Intact source packs and native sample Sets. |
+| `CATALOGUE/` | Broad material organised for discovery. |
+| `CURATED/` | Auditioned favourites copied into a working collection. |
+| `_EXPORT/` | Rebuildable, device-specific conversions. |
 
-Generated indexes, review packets and export folders sit outside these source
-zones. They can be rebuilt from the library and its decision records.
+Search and analysis work before any reorganisation. Keep source audio, labels,
+run manifests and undo records backed up; see the [safety model](SAFETY.md).
+For the existing reference library, consult the dated
+[operational record](../STATUS.md#live-library-state) before applying changes.
 
 ## Find a sound now
 
-**Action level:** Writes derived files.
-
-Most sessions do not need the full sequence below. If the index is built, searching
-is the fast path from "I need an analog bongo" to a loaded card.
-
-Build the index once. This recovers each sample's pack origin, moves acoustic
-measurements onto the content hash, and regenerates tags from `vocabulary.toml`.
-It never moves, renames or converts audio:
+Build the index once, then write a shortlist to a playlist:
 
 ```bash
-sample-tag --root /path/to/SAMPLES --rescan --apply
+sample-tag --root "$SAMPLES_ROOT" --rescan --apply
+sample-find perc tribal analog --limit 20 --m3u8 manifests/percussion.m3u8
 ```
 
-Then search. Terms match across every tag group and are combined with AND:
+These commands write derived data and leave audio in place. Terms combine with
+AND; `--any` broadens the query. Default ranking spreads results across sound
+families to reduce repeated variants.
+
+For a measured comparison, replace `YOUR_SAMPLE_ID` with an indexed ID or a
+unique path fragment:
 
 ```bash
-sample-find perc tribal analog --limit 30
-sample-find --role KICKS --style techno --character subby --limit 20
+sample-find --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
-Keywords cannot separate samples that share a pack — 7,826 Goldbaby SA909 samples
-carry the same tags. `--like` ranks by measured sound instead, which is the only
-thing that narrows inside a pack:
-
-```bash
-sample-find --like perc-cr78-bongolo-aorig-r1 --role PERC --limit 10
-```
-
-Results spread across sound families by default, so a search for a bongo returns
-different bongos rather than eight round-robin takes of one.
-
-Write a playlist to audition, and a crate the exporter can read. `sample-export`
-only accepts crate rows whose source has already been promoted into `CURATED/`
-(§3 below) — add `--curated-only` so the crate it writes only contains samples
-that will actually pass:
-
-```bash
-sample-find --role PERC --style tribal --gear analog --curated-only --limit 8 \
-  --m3u8 manifests/tribal-perc.m3u8 \
-  --crate manifests/ot-tribal-perc.tsv \
-  --kit-id ot-tribal-perc
-
-sample-export octatrack --profile eidetic-studio \
-  --crate manifests/ot-tribal-perc.tsv --list
-```
-
-Without `--curated-only`, search still helps you *find* the sound — but a row whose
-source is still in `CATALOGUE/` or `PACKS/` will make `sample-export` refuse the
-whole crate until that sample is promoted (`sample-curate promote`, §3). `sample-find`
-prints a warning at write time if a written crate contains any such rows.
-
-`--kit-id` records what went into the kit. Those picks accumulate, and
-`sample-find --preferred` sorts by them, so a trusted set builds itself out of real
-use rather than a separate labelling exercise.
-
-When a search disappoints, edit one rule in `vocabulary.toml` and re-run
-`sample-tag --apply`. Tags regenerate from the rules; individual samples are never
-labelled by hand and never move.
+See the [search reference](../library-tools/README.md#sample-find) for vocabulary,
+filters and recording kit selections. For a new collection, continue below.
 
 ## 1. Inspect without changing audio
 
-**Action level:** Writes derived files.
-
-Start with a read-only summary:
+**Action level:** Read-only summary; optional derived files.
 
 ```bash
-sample-review --root /path/to/SAMPLES --no-probe --summary
+sample-review --root "$SAMPLES_ROOT" --no-probe --summary
+sample-review --root "$SAMPLES_ROOT" --no-probe \
+  --output manifests/review.tsv --index-dir manifests/index
 ```
 
-Write a main TSV and focused indexes when you are ready to inspect rows:
+Review proposed roles, sample types, naming warnings and uncertain rows. Add
+acoustic analysis when you need detailed measurements and pilot reports:
 
 ```bash
-sample-review \
-  --root /path/to/SAMPLES \
-  --no-probe \
-  --output manifests/review.tsv \
-  --index-dir manifests/index
+sample-analyze --root "$SAMPLES_ROOT" --pilot \
+  --library-db library-tools/manifests/sample-library.sqlite
 ```
-
-For a stable content identity and acoustic evidence, run the analysis layer:
-
-```bash
-sample-analyze \
-  --root /path/to/SAMPLES \
-  --pilot \
-  --library-db manifests/sample-library.sqlite
-```
-
-This can decode audio and write TSV, SQLite and report files. It does not change
-source audio. Content is identified by SHA-256 so review history can survive a
-move or exact copy.
 
 ## 2. Organise with a reviewed move plan
 
-**Action level:** Moves audio after `--apply`.
+**Action level:** Moves audio only after `--apply`.
 
-Organisation commands preview by default:
+Choose the operation you need and inspect its preview:
 
 ```bash
-sample-intake --root /path/to/SAMPLES
-sample-sort --root /path/to/SAMPLES
-sample-dedupe --root /path/to/SAMPLES
+sample-intake --root "$SAMPLES_ROOT"
+sample-sort --root "$SAMPLES_ROOT"
+sample-dedupe --root "$SAMPLES_ROOT"
 ```
 
-Read the plan, check destination collisions and confirm the library backup before
-running the same command with `--apply`. Applied moves do not overwrite existing
-files and write undo records for files that actually moved.
+Intake gathers vendor packs, sorting proposes role folders, and deduplication
+stages extra byte-identical copies. If sorting and deduplicating, complete the
+sorting review first so the duplicate plan reflects the intended layout.
 
-Confidence is a way to prioritise a reviewed plan, not permission to move audio.
-The unmerged confidence-organisation work and its 18-move audit do not change
-this gate. The reconciliation's PACKS and canonical-label discrepancies block a
-fresh plan until human recovery review resolves them.
+Check the backup, destinations and collisions before repeating an operation with
+`--apply`. Applied moves do not overwrite files and record successful moves in
+an undo manifest. Refresh the plan after any library change.
 
-The profile-aware foundation can plan a legacy-role migration into the
-[library zones](#library-zones):
+For the supported legacy layout, catalogue migration has a separate preview:
 
 ```bash
-sample-curate \
-  --root /path/to/SAMPLES \
-  --library-db manifests/sample-library.sqlite \
-  migrate-catalogue \
+sample-curate migrate-catalogue \
   --ableton-root /path/to/ABLETON_PROJECTS \
   --manifest manifests/catalogue-migration.tsv \
   --undo manifests/catalogue-migration-undo.tsv
 ```
 
-The command checks Ableton references before proposing moves. Review the
-manifest and add `--apply` only when the preflight and destinations are correct.
+It requires a complete inventory and checks saved Sets for `CURATED` references.
+Review the manifest and preflight before adding `--apply`; inspect affected
+Ableton projects after migration. Rescan the index after applied organisation
+and before preparing a new listening packet.
 
 ## 3. Curate by ear
 
-**Action level:** Copies approved audio.
+**Action level:** Writes review files, then copies approved audio.
 
-Prepare an audition packet from the current stable inventory:
+Set collection targets in `manifests/kit-quotas.toml`:
 
-```bash
-sample-curate \
-  --root /path/to/SAMPLES \
-  --library-db manifests/sample-library.sqlite \
-  prepare \
-  --output-dir manifests/foundation-v1-review
+```toml
+[quotas]
+KICK = 1
+PERC = 2
 ```
 
-`prepare` writes one feedback sheet plus a combined candidate playlist. It deliberately does not
-publish filename-derived categories. Run the local audio classifier next:
+Prepare a fresh, named audition packet for those roles:
 
 ```bash
-sample-curate \
-  --root /path/to/SAMPLES \
-  --library-db manifests/sample-library.sqlite \
-  classify-packet \
-  --labels manifests/foundation-v1-review/labels.tsv \
-  --benchmark manifests/foundation-v1-review/benchmark-labels.tsv
+sample-curate prepare --output-dir manifests/session-01 --quotas manifests/kit-quotas.toml
 ```
 
-The classifier keeps form acoustic, runs the two pinned CLAP models one at a time and stores their
-embeddings in the library database. It writes best guesses, a structured audit and a resumable
-review state, but it does not publish playlists. Filenames have zero decision weight.
-For an intentional prompt-tuning rerun, add `--carry-review` to retain decisions by sample hash and
-reopen only newly affected automatic samples. Use `--restart-review` instead only when the prior
-human decisions must be archived and discarded; the two flags cannot be combined.
+Listen through `audition.m3u8` and fill in `labels.tsv`. Every row needs a
+`reject`, `keep` or `favourite` decision. A favourite also needs a canonical
+`true_role` and a short `descriptor`. Preparation selects up to twice each target
+for comparison. Keep the packet with its scan metadata and quota file.
 
-Review every exception plus one blind sentinel from each accepted group in the local browser:
+For optional audio-derived groups, follow
+[packet classification and review](../library-tools/README.md#packet-classification).
+The browser resolves classification; musical favourite decisions still belong
+in `labels.tsv`. Grouped playlists require completed review and a passing
+benchmark before publication.
+
+Validate the complete sheet, then explicitly promote the favourites:
 
 ```bash
-sample-curate review-packet \
-  --labels manifests/foundation-v1-review/labels.tsv \
-  --open
+sample-curate validate --labels manifests/session-01/labels.tsv
+sample-curate promote --run-id session-01 --labels manifests/session-01/labels.tsv
 ```
 
-The page provides audio playback, one-click form/content choices, notes, undo and resume. It writes
-`review-state.json` atomically and regenerates the 24-row benchmark when the queue completes; never
-edit benchmark TSV rows manually. A failed sentinel reopens the rest of that group. Publication
-remains blocked until review is complete and the 22/24 form plus 19/24 joint content-and-group gate
-passes. Nineteen is the nearest whole-sample boundary to the approximately 20% group-error policy
-adopted for the 24-row benchmark. Before the first replacement, the rejected name-derived playlists
-are retained once under the packet's `archive/` directory. Undoing or changing a completed review
-withdraws the official playlist links into `archive/stale-publications/`; republishing requires the
-new resolution digest to pass both gates.
+Promotion checks the entire selection's sources and destinations before copying
+favourites into `CURATED/`. It rechecks each source and updates the search index.
+A stale packet or changed source is rejected; an automated suggestion never
+counts as approval.
 
-Open `playlists/README.md` only after that pass and listen through one audio-derived group at a
-time. Mark every `labels.tsv` row as `reject`, `keep` or `favourite`. A favourite also needs its
-true canonical role and a short descriptor. `labels.tsv` remains the single promotion record;
-classifier output never becomes an approval by itself.
-
-If you trim rows from `labels.tsv`, regenerate the derived playlists immediately so they cannot
-retain removed candidates:
+Once approved favourites meet the targets, generate device and Ableton views:
 
 ```bash
-sample-curate playlists \
-  --labels manifests/foundation-v1-review/labels.tsv
+sample-curate views --labels manifests/session-01/labels.tsv \
+  --output-dir manifests/crates --quotas manifests/kit-quotas.toml --name session-01
 ```
 
-This rewrites the combined playlist, category playlists and their index from the current label
-rows joined to sibling `classification.tsv`. It fails if classification is absent or stale and
-does not change decisions or audio.
-
-Validate the complete label file before promotion:
-
-```bash
-sample-curate validate \
-  --labels manifests/foundation-v1-review/labels.tsv
-```
-
-Promotion verifies the content hash, then copies approved favourites into
-`CURATED/`. It does not move the catalogue source:
-
-```bash
-sample-curate \
-  --root /path/to/SAMPLES \
-  --library-db manifests/sample-library.sqlite \
-  promote \
-  --run-id foundation-v1 \
-  --labels manifests/foundation-v1-review/labels.tsv
-```
-
-Write consumer views after promotion:
-
-```bash
-sample-curate \
-  --library-db manifests/sample-library.sqlite \
-  views \
-  --output-dir manifests/foundation-v1 \
-  --labels manifests/foundation-v1-review/labels.tsv
-```
+This writes `session-01-all.tsv`, `session-01-one-shots.tsv` and
+`ableton-curated.tsv`. Adjust targets to your intended collection; do not add
+unapproved favourites to satisfy them. Omitting `--quotas` uses the original
+Foundation targets, and the default crate name remains `foundation-v1`.
 
 ## 4. Build device-specific exports
 
 **Action level:** Copies approved audio.
 
-Always resolve and inspect a crate first:
+Choose a crate, resolve its contents and preview conversion:
 
 ```bash
-sample-export digitakt \
-  --profile eidetic-studio \
-  --crate manifests/foundation-v1/foundation-v1-one-shots.tsv \
-  --list
+sample-export digitakt --crate manifests/crates/session-01-one-shots.tsv --list
+sample-export digitakt --crate manifests/crates/session-01-one-shots.tsv --dry-run
 ```
 
-Then preview conversion:
+Check that both previews contain the intended selection. Running the same
+command without either preview flag writes converted copies under `_EXPORT/`.
+The exporter rechecks hashes, curated paths, roles, names and device limits.
 
-```bash
-sample-export digitakt \
-  --profile eidetic-studio \
-  --crate manifests/foundation-v1/foundation-v1-one-shots.tsv \
-  --dry-run
-```
-
-Running without `--list` or `--dry-run` writes converted copies below the export
-root. Octatrack and TR-8S folders can then be copied to mounted media with
-`--sync`. Digitakt uses Elektron Transfer.
-
-The exporter checks hashes, device capacity, role compatibility, path depth and
-compact names before conversion. See the [export reference](../sample-tools/README.md)
-for exact formats.
+Octatrack and TR-8S exports can be copied to mounted media with `--sync`; Digitakt
+uses Elektron Transfer. See the [export reference](../sample-tools/README.md)
+for formats and transfer scope.
 
 ### First-device smoke test
 
-Do not make the first hardware trial a batch export. Select and promote one representative sample
-for Digitakt and one for Octatrack; add one TR-8S percussion sample only when its native engine has
-already failed the musical role. Keep a minimal, versioned crate beside the audition packet using
-the normal `sample_id`, `source_path`, `role`, `descriptor`, `reason` schema. Every `source_path`
-must be the promoted copy below `CURATED/`; a matching source hash elsewhere is deliberately rejected.
-
-For each device, run the same crate through three separate gates:
-
-```bash
-sample-export DEVICE --profile eidetic-studio --crate /path/to/device-smoke.tsv --list
-sample-export DEVICE --profile eidetic-studio --crate /path/to/device-smoke.tsv --dry-run
-sample-export DEVICE --profile eidetic-studio --crate /path/to/device-smoke.tsv
-```
-
-The first command must resolve exactly the selected files with no missing rows. The second must
-report the same conversion count without writing audio. The third stages derived WAV copies below
-`_EXPORT/<DEVICE>/`; inspect that folder before transferring anything. Load one machine at a time,
-make one audible pattern, save it, reload it and record whether the sample, assignment and device
-state survived. Expand a crate only after that device-specific round trip passes.
-
-`sample-curate views` remains the quota-enforced Foundation view generator; do not pad a smoke test
-with unapproved favourites merely to satisfy those quotas. A deliberately small smoke crate is a
-separate retained selection artefact, not a relaxation of promotion or hash checks.
+Start with one representative promoted sample in a minimal crate. Run `--list`,
+then `--dry-run`, then the export command. Inspect the staged WAV before transfer.
+On the instrument, load it, make an audible pattern, save and reload. Record
+whether the sample and assignment survive before expanding the crate. Software
+validation covers the files; this round trip checks the instrument workflow.
 
 ## 5. Recover or revise a decision
 
-**Action level:** Moves derived audio after an explicit recovery command.
+**Action level:** Read-only checks; an explicit recovery command moves copies.
 
-Applied sort, intake, de-duplication and catalogue changes write undo manifests.
-Those files record the exact destination-to-source mapping for items that moved;
-retain them with the run evidence. The current toolkit does not expose one
-generic undo command, so review the record before reversing a move.
-
-Curated promotion has a dedicated recovery command:
+Verify a recorded promotion before reuse:
 
 ```bash
-sample-curate \
-  --root /path/to/SAMPLES \
-  --library-db manifests/sample-library.sqlite \
-  undo-promotion \
-  --run-id foundation-v1
+sample-curate check --run-id session-01
 ```
 
-It moves promoted copies to `_QUARANTINE/promotion-undo/`. It does not delete
-them. Unlike the organisation commands, this recovery command has no separate
-`--apply` flag: running it is the approval step. Device exports are derived
-copies and can be removed and rebuilt after checking that the source library is
-intact.
+To withdraw that run's curated copies:
 
-## Personal studio workflow
+```bash
+sample-curate undo-promotion --run-id session-01
+```
 
-The current Eidetic studio uses the `eidetic-studio` profile with Octatrack MKII,
-Digitakt MKI and TR-8S. The supported creative loop is hardware jam → Ableton,
-resample in Octatrack, then arrange and finish in Ableton.
+This moves copies to `_QUARANTINE/promotion-undo/` and removes their locations
+from active search. It has no `--apply` flag: running the recovery command is
+the approval step.
 
-The current library lives at `/Volumes/Extreme SSD/Production/SAMPLES/`. Add only
-`SAMPLES/CURATED/` to Ableton Places, and use the generated
-`ableton-curated.tsv` as the tag and saved-search reference. The external Studio
-Knowledge Base remains authoritative for physical wiring; tool profiles describe
-only capabilities the software can act on.
+Sort, intake, deduplication and migration retain undo manifests, but there is no
+generic undo command. Review each recorded destination-to-source mapping before
+reversing a move. Undo records are not backups.
