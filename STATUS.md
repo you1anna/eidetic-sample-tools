@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-09
+**Updated:** 2026-09-10
 
 ## Current position
 
@@ -56,6 +56,12 @@ favourites; promotion hashes and the resulting Octatrack WAV export passed
 software checks. Five approved sounds repeat the September 7 collection.
 Larger collections need explicit freshness, variety and device-budget controls.
 Card transfer and the hardware round trip remain pending.
+
+The first [collection-planning increment](docs/COLLECTION-PLANNER.md) saves
+reproducible metadata candidate plans with explicit repeat handling, shortages
+and retained pins. It does not yet connect to browser decisions, musical-brief
+ranking or device capacity. A read-only preview selected 1,000 candidates from
+21,689 indexed identities in about two seconds; the database was unchanged.
 
 **Stable**
 

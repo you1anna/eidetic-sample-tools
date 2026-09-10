@@ -1,6 +1,11 @@
 # Larger collection planning: design assessment
 
-**9 September 2026 — assessment only; collection controls are not implemented.**
+**9 September 2026 — assessment recorded before implementation.**
+
+**10 September:** the [first collection-planner increment](COLLECTION-PLANNER.md)
+adds immutable metadata plans, explicit history/freshness and retained pins.
+The larger listening, audio-retrieval and export changes assessed below remain
+separate increments.
 
 The approach is viable at the current 21,689 unique samples. Proceed with a
 collection planner, but separate preparation, interactive selection, listening

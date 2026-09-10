@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add experimental `sample-collection` plans with explicit per-device export
+  history, freshness modes, deterministic regeneration, inherited pins and
+  visible shortages. Plans freeze metadata and remain unreviewed; source audio,
+  existing listening decisions and export gates are unchanged.
 - Require `--root` or `SAMPLES_ROOT` for sample-library commands and `--root` or
   `ALS_ROOTS` for Ableton reports; remove machine-specific library defaults.
 - Add a hashed Python 3.12 Apple Silicon AI dependency snapshot and `sample-ai`

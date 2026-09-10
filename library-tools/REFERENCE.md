@@ -51,6 +51,7 @@ retries failed measurements; successful results retain versioned provenance.
 | Inspect names, roles and metadata | `sample-review` | Stable |
 | Plan sorting, exact deduplication and pack intake | `sample-sort`, `sample-dedupe`, `sample-intake` | Stable |
 | Recover origin, tag and search | `sample-tag`, `sample-find` | Beta |
+| Save candidate plans with explicit freshness and retained pins | `sample-collection` | Experimental; metadata selection |
 | Prepare listening packets, promote favourites and check copies | `sample-curate` | Beta |
 | Inspect configuration | `sample-profile` | Beta |
 | Measure audio and build inventory | `sample-analyze` | Beta; interpretation experimental |
@@ -163,6 +164,15 @@ files remain searchable, but their folder alone cannot approve a generated crate
 Search warns when a written crate contains uncurated or unverified rows.
 
 ## Curation
+
+### `sample-collection`
+
+`plan` saves unreviewed candidates using explicit metadata filters, a device,
+freshness mode and seed. `regenerate` varies a frozen plan while retaining pins;
+`show` inspects it. Each revision is a new directory with its own review summary.
+See the [collection planner guide](../docs/COLLECTION-PLANNER.md) for commands,
+history formats and limits. The recorded musical brief is context only in this
+increment; plans are not favourite decisions or export crates.
 
 ### `sample-curate`
 

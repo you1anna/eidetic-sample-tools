@@ -12,6 +12,7 @@ copy your favourites into a collection ready for export.
 |---|---|
 | Inspect sample names, roles, BPM/key evidence and warnings | [`sample-review`](REFERENCE.md#sample-review) |
 | Search tags, pack origins and similar sounds; write playlists | [`sample-tag`](REFERENCE.md#sample-tag), [`sample-find`](REFERENCE.md#sample-find) |
+| Save candidate plans, control known repeats and retain pins | [Collection planner](../docs/COLLECTION-PLANNER.md) |
 | Preview sorting, exact deduplication and pack intake | [`sample-sort`, `sample-dedupe`, `sample-intake`](REFERENCE.md#sample-sort-sample-dedupe-sample-intake) |
 | Audition explicit candidates in a browser and save a shortlist | [`sample-vibe`](REFERENCE.md#sample-vibe) |
 | Record listening decisions, promote favourites and check copies | [`sample-curate`](REFERENCE.md#sample-curate) |
