@@ -1,6 +1,6 @@
 """Exercise built wheels in a fresh environment, using generated audio only.
 
-Run with all three wheels installed and FFmpeg/FFprobe on PATH. This deliberately
+Run with the three core wheels, or all four wheels, and FFmpeg/FFprobe on PATH. This deliberately
 rejects editable source installs: packaging and bundled resources are the boundary
 being checked. All library state and exports are created in a temporary directory.
 """
@@ -19,6 +19,8 @@ import sys
 import sysconfig
 import tempfile
 import wave
+
+from package_catalog import ALL_PACKAGES, CORE_PACKAGES, LIVE_PACKAGE
 
 
 def invoke(function, arguments, expected=0):
@@ -117,16 +119,76 @@ def check_audition(root: Path, scratch: Path, source: Path):
     assert rows[0].decision == 'keep' and not rows[0].true_role and not rows[0].descriptor
 
 
+def check_plan_audition(root: Path, scratch: Path, plan_path: Path):
+    """Check the installed collection-plan handoff and lazy packaged audio path."""
+    from librarytools.vibe_cli import main as audition_main
+    from librarytools.vibe_server import create_vibe_app
+
+    session = scratch / 'plan-audition'
+    invoke(audition_main, ['prepare', '--root', str(root), '--plan', str(plan_path),
+                           '--output-dir', str(session)])
+    state = json.loads((session / 'session.json').read_text())
+    assert state['schema_version'] == 2 and state['plan_id']
+    assert len(state['candidate_ids']) == 1
+    sample_id = state['candidate_ids'][0]
+    client = create_vibe_app(session, write_token='wheel-test').test_client()
+    batch = client.get('/api/sources').get_json()
+    assert batch['schema_version'] == 2 and batch['batch_count'] == 1
+    assert [row['sample_id'] for row in batch['sources']] == [sample_id]
+    working = session / 'sources' / f'{sample_id}.wav'
+    assert working.is_file()
+    assert hashlib.sha256(working.read_bytes()).hexdigest() == json.loads(
+        (session / 'session.json').read_text())['sources'][sample_id]['preview_hash']
+    response = client.post('/api/shortlist', json={'source_id': sample_id, 'decision': 'keep'},
+                           headers={'X-Vibe-Token': 'wheel-test'})
+    assert response.status_code == 200
+    assert client.get('/api/shortlist').get_json()['decisions'][sample_id] == 'keep'
+
+
+def check_live_stage(scratch: Path):
+    """Exercise staged package data, manifest hashes and the upstream notice."""
+    executable = Path(sys.executable).parent / 'eidetic-live'
+    destination = scratch / 'live-device'
+    result = subprocess.run([str(executable), 'stage-device', str(destination),
+                             '--port', '19000', '--ack-port', '19001'],
+                            capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f'eidetic-live stage-device failed:\n{result.stderr}')
+    report = json.loads(result.stdout)
+    manifest = json.loads((destination / 'build.json').read_text())
+    expected = {'eidetic_runtime.js', 'eidetic_receiver.js',
+                'eidetic_live.maxpat', 'LICENSE.upstream'}
+    assert report['build_id'] == manifest['build_id']
+    assert manifest['schema'] == 'eidetic-live.runtime-build'
+    assert manifest['hardware_verified'] is False
+    assert set(manifest['files']) == expected
+    for name, digest in manifest['files'].items():
+        assert hashlib.sha256((destination / name).read_bytes()).hexdigest() == digest
+    assert json.loads((destination / 'eidetic_live.maxpat').read_text())['patcher']
+    assert 'MIT License' in (destination / 'LICENSE.upstream').read_text()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--core-only', action='store_true', help='verify the base install without optional browser review')
     args = parser.parse_args()
     installed = Path(sysconfig.get_path('purelib')).resolve()
-    for name in ('librarytools', 'sampletools', 'abletontools'):
+    packages = CORE_PACKAGES if args.core_only else ALL_PACKAGES
+    if args.core_only:
+        assert import_module('importlib.util').find_spec(LIVE_PACKAGE['import_name']) is None
+        assert import_module('importlib.util').find_spec('flask') is None
+        try:
+            metadata.distribution(LIVE_PACKAGE['distribution'])
+        except metadata.PackageNotFoundError:
+            pass
+        else:
+            raise AssertionError('core install unexpectedly includes eidetic-live-tools')
+    for specification in packages:
+        name = specification['import_name']
         package = import_module(name)
         if not Path(package.__file__).resolve().is_relative_to(installed):
             raise AssertionError(f'{name} must be installed from a wheel, not an editable checkout')
-        distribution = metadata.distribution(name)
+        distribution = metadata.distribution(specification['distribution'])
         if hasattr(package, '__version__'):
             assert package.__version__ == distribution.version
         commands = [entry for entry in distribution.entry_points if entry.group == 'console_scripts']
@@ -136,6 +198,13 @@ def main():
         for entry in commands:
             subprocess.run([str(Path(sys.executable).parent / entry.name), '--help'],
                            check=True, stdout=subprocess.DEVNULL)
+    if not args.core_only:
+        from eideticlive import LiveClient, LiveError
+        from eideticlive.edits import apply_plan, plan_edits, reconcile, restore_parameters
+
+        assert issubclass(LiveError, RuntimeError)
+        assert callable(LiveClient) and callable(plan_edits)
+        assert callable(apply_plan) and callable(reconcile) and callable(restore_parameters)
     assert shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg and FFprobe are required'
 
     from librarytools import find_cli, profiles, tag_cli, tagging
@@ -152,6 +221,8 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix='eidetic-wheel-check-') as directory:
         scratch = Path(directory).resolve()
+        if not args.core_only:
+            check_live_stage(scratch)
         root = scratch / 'first-mount'
         source = root / 'CATALOGUE/kick.wav'
         source.parent.mkdir(parents=True)
@@ -194,6 +265,9 @@ def main():
         invoke(export_main, [*export, '--root', str(root)])
         assert len(list((root / '_EXPORT').rglob('*.wav'))) == 1
         collection, parent_files, receipt = check_collection(root, scratch, source)
+        if not args.core_only:
+            plan_path = next(path for path in parent_files if path.name == 'plan.json')
+            check_plan_audition(root, scratch, plan_path)
 
         remounted = scratch / 'second-mount'
         root.rename(remounted)
@@ -217,7 +291,7 @@ def main():
         assert next((scratch / 'restored').rglob('labels.tsv')).read_bytes() == (evidence / 'labels.tsv').read_bytes()
     checks = 'commands, resources, onboarding, approval, export, collection planning, offline regeneration, handoff and restore'
     if not args.core_only:
-        checks += ', audition'
+        checks += ', legacy and plan audition, Live-control API and staged device resources'
     print(f'Installed-package checks passed: {checks}.')
 
 

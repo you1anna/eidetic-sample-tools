@@ -5,7 +5,8 @@
 Find and audition samples, keep the ones that work, and prepare collections for
 **Octatrack MKII, Digitakt MKI and TR-8S**. Built for electronic musicians working
 with large sample folders and hardware samplers. Includes tools for exploring
-saved Ableton Live projects without opening Live.
+saved Ableton Live projects without opening Live. An optional experimental bridge
+can inspect a running Set and apply a narrowly reviewed edit plan.
 
 [![macOS and Linux tests](https://github.com/you1anna/eidetic-sample-tools/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/you1anna/eidetic-sample-tools/actions/workflows/tests.yml)
 
@@ -55,18 +56,27 @@ undo records. See the [safety guide](docs/SAFETY.md) before changing a library.
 | [Library tools](library-tools/README.md) | Find, audition and collect sounds; organise packs and exact duplicates. |
 | [Sample export](sample-tools/README.md) | Prepare selected collections for your sampler and supported card transfers. |
 | [Ableton tools](ableton-tools/README.md) | Rediscover saved projects and check their sample references. |
+| [Live tools](live-tools/README.md) | Inspect a running Live Set and apply guarded edits through an explicitly staged Max for Live device. |
 
 Each package can be installed independently.
+
+Live control is opt-in. Installing or importing the Python package does not place
+anything inside Live. You stage the device files yourself, build or reload the
+`.amxd`, inspect the attached Set, then apply an exact plan against that Set's
+identity. [Start with the Live control guide](docs/LIVE.md).
 
 ## What's ready
 
 Inspection, organisation and conversion are established; search and curation are
 beta. Collection planning, browser audition and local AI grouping are experimental.
+A guarded Live-control runtime and plan/receipt workflow are implemented and
+experimental; operation in the target Live version, browser-to-Live audition and studio routing
+remain to be qualified on the target Mac and Set.
 A [guided trial](docs/SET-GENERATION-TRIAL.md) produced 19 approved, software-verified
 Octatrack exports from 24 auditions; that export's hardware check remains pending.
 
 Local AI is central to the planned musical-brief workflow. Whole-library AI
-selection, automatic device-space budgets and plan-to-browser handoff remain
+selection, preference-informed ranking and automatic device-space budgets remain
 unfinished. [Current progress and limits](STATUS.md).
 
 ## Architecture
@@ -74,12 +84,13 @@ unfinished. [Current progress and limits](STATUS.md).
 <details>
 <summary>View the overall system diagram</summary>
 
-![Architecture: the sample library flows through indexing, search, local AI suggestions and human curation into device exports. Ableton inspection produces separate project reports. Library state travels with the sample drive.](docs/images/architecture.svg)
+![Architecture: the sample library flows through indexing, search, local AI suggestions and human curation into device exports. Saved Ableton Sets produce independent reports; an optional bridge inspects and edits a running Set through explicit plans. Library state travels with the sample drive.](docs/images/architecture.svg)
 
 </details>
 
 [System overview](docs/TECHNOLOGY.md) · [Library internals](library-tools/ARCHITECTURE.md) ·
-[Export internals](sample-tools/ARCHITECTURE.md) · [Ableton internals](ableton-tools/ARCHITECTURE.md)
+[Export internals](sample-tools/ARCHITECTURE.md) · [Ableton internals](ableton-tools/ARCHITECTURE.md) ·
+[Live control](docs/LIVE.md)
 
 ## Help improve it
 

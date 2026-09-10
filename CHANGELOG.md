@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Add the optional `eidetic-live-tools` package: an explicitly staged Max for
+  Live bridge, loopback inspection, versioned Set snapshots, profile checks and
+  checkpointed allowlisted edit plans with readback and receipts. Installation
+  alone does not touch Live; real Live 12.4 and studio qualification remain pending.
+- Connect saved collection plans to resumable browser audition in lazy 12-sample
+  batches. Keep/Skip stays keyed to source identity; favourite labels, promotion
+  and export approval remain separate gates. The optional Live attachment uses
+  two dedicated managed audition tracks and never changes tempo automatically.
+- Build and test all four wheels in CI. The first installed-wheel pass retains the
+  dependency-light three-package core and proves Flask/Live control are absent;
+  the optional pass adds browser review and Live control explicitly.
 - Rework the root and package READMEs around musical use, with a real audition
   screenshot, clear setup links and contribution guidance. Add detailed package
   architecture and shared-state contracts, including recovery and scaling limits.

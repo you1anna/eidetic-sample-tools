@@ -185,3 +185,9 @@
   .choices button:not(.quiet) { flex: 1; }
   .play-key { display: none; }
 }
+
+.playback-options { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0; }
+.playback-options label { display: flex; gap: .5rem; align-items: center; }
+#live-panel input[type="text"] { width: 100%; margin: .5rem 0; padding: .5rem; }
+#live-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+#batches { align-items: center; justify-content: space-between; }

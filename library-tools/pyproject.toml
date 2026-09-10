@@ -19,6 +19,7 @@ dev = ["pytest>=8", "flask>=3.1,<4"]
 classifier = ["torch>=2.2", "librosa>=0.10"]
 audio-classifier = ["torch>=2.6,<3", "librosa>=0.11,<0.12", "transformers>=4.57,<5"]
 review-ui = ["flask>=3.1,<4"]
+live = ["flask>=3.1,<4", "eidetic-live-tools==0.2.0"]
 
 [project.scripts]
 sample-classify = "librarytools.classify:main"

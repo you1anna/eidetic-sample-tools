@@ -65,6 +65,8 @@ def validate_identifier(value: object) -> str:
 def load_session(session_dir: Path) -> dict:
     path = contained_path(session_dir, session_dir / 'session.json')
     state = read_json(path)
+    if state.get('schema_version') == 2:
+        return _validate_v2(state, session_dir)
     if state.get('schema_version') != 1:
         raise VibeError('Unsupported audition session version')
     if not isinstance(state.get('sources'), dict) or not isinstance(state.get('root'), str):
@@ -105,6 +107,10 @@ def verify_source(state: dict, source_id: str) -> Path:
     if not isinstance(source, dict) or not isinstance(source.get('path'), str):
         raise VibeError('Source is not registered in this audition')
     root = Path(state['root'])
+    if state.get('schema_version') == 2:
+        from .state import library_identity
+        if library_identity(root) != state['library_id']:
+            raise VibeError('Library identity changed or its drive is unavailable')
     path = contained_path(root, root / source['path'])
     if not path.is_file():
         raise VibeError('Source is missing; connect its drive before auditioning')
@@ -117,19 +123,24 @@ def source_audio(session_dir: Path, source_id: str) -> Path:
     state = load_session(session_dir)
     verify_source(state, source_id)
     path = contained_path(session_dir, session_dir / 'sources' / f'{source_id}.wav')
-    if not path.is_file() or hash_file(path) != state['sources'][source_id]['preview_hash']:
+    if not path.is_file() or hash_file(path) != state['sources'][source_id].get('preview_hash'):
         raise VibeError('Prepared source preview is missing or changed')
     return path
 
 
 def source_ids(state: dict) -> list[str]:
     """Distinct candidates in their explicitly supplied listening order."""
+    if state['schema_version'] == 2:
+        return list(state['candidate_ids'])
     return list(dict.fromkeys(state['anchors'] + state['vocals']))
 
 
 def source_state(session_dir: Path) -> dict:
     """Only the source fields the chooser displays; no vocal-lab history."""
     state = load_session(Path(session_dir))
+    if state['schema_version'] == 2:
+        from .vibe_collection import batch_state
+        return batch_state(Path(session_dir))
     anchors = set(state['anchors'])
     sources = []
     for source_id in source_ids(state):
@@ -140,3 +151,38 @@ def source_state(session_dir: Path) -> dict:
             'waveform': [round(peak, 3) for peak in item['waveform']],
         })
     return {'sources': sources}
+
+
+def _validate_v2(state: dict, session_dir: Path) -> dict:
+    import uuid
+    try:
+        uuid.UUID(state['library_id'])
+        validate_identifier(state['plan_id'])
+        root = Path(state['root']).resolve()
+        if Path(session_dir).resolve().is_relative_to(root):
+            raise VibeError('Working audio must be outside the source library')
+        ids, sources = state['candidate_ids'], state['sources']
+        if (not isinstance(ids, list) or not ids or len(ids) != len(set(ids))
+                or not isinstance(sources, dict) or set(ids) != set(sources)
+                or state['batch_size'] != 12 or type(state['batch_index']) is not int
+                or not 0 <= state['batch_index'] < (len(ids) + 11) // 12):
+            raise VibeError('Invalid collection audition structure')
+        for sid in ids:
+            validate_identifier(sid)
+            item = sources[sid]
+            if item['id'] != sid or item['sample_id'] != sid:
+                raise VibeError('Invalid sample identity in session')
+            if not all(isinstance(item[key], str) for key in ('path', 'name', 'role', 'history_status', 'timing_status')):
+                raise VibeError('Invalid collection source evidence')
+            raw = Path(item['path'])
+            if raw.is_absolute() or '..' in raw.parts:
+                raise VibeError('Invalid collection source path')
+            if 'preview_hash' in item:
+                validate_identifier(item['preview_hash'])
+                if (not finite_number(item['duration_s']) or not 0 < item['duration_s'] <= 120
+                        or not isinstance(item['waveform'], list) or not 1 <= len(item['waveform']) <= 512
+                        or not all(finite_number(p) and p >= 0 for p in item['waveform'])):
+                    raise VibeError('Invalid working audio evidence')
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise VibeError('Invalid collection audition session') from exc
+    return state

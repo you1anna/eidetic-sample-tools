@@ -23,19 +23,19 @@ jobs:
         run: |
           python -m venv "$RUNNER_TEMP/eidetic-tests"
           "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install -r requirements-dev.txt
-          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install --no-deps -e ./library-tools -e ./sample-tools -e ./ableton-tools
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip install --no-deps -e ./library-tools -e ./sample-tools -e ./ableton-tools -e ./live-tools
           "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip check
       - name: Test
         run: |
-          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pytest library-tools sample-tools ableton-tools -q -rs
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pytest library-tools sample-tools ableton-tools live-tools -q -rs
       - name: Build and verify installed packages
         run: |
-          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/eidetic-wheels" ./library-tools ./sample-tools ./ableton-tools
+          "$RUNNER_TEMP/eidetic-tests/bin/python" -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/eidetic-wheels" ./library-tools ./sample-tools ./ableton-tools ./live-tools
           python -m venv "$RUNNER_TEMP/eidetic-installed"
-          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c requirements-dev.txt "$RUNNER_TEMP/eidetic-wheels/"*.whl
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c requirements-dev.txt "$RUNNER_TEMP/eidetic-wheels/"/librarytools-*.whl "$RUNNER_TEMP/eidetic-wheels/"/sampletools-*.whl "$RUNNER_TEMP/eidetic-wheels/"/abletontools-*.whl
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
           cd "$RUNNER_TEMP"
           env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py" --core-only
-          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c "$GITHUB_WORKSPACE/requirements-dev.txt" --find-links "$RUNNER_TEMP/eidetic-wheels" 'librarytools[review-ui]'
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c "$GITHUB_WORKSPACE/requirements-dev.txt" --find-links "$RUNNER_TEMP/eidetic-wheels" 'librarytools[review-ui,live]'
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
           env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py"

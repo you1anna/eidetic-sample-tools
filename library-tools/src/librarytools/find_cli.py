@@ -153,7 +153,7 @@ def _run(args) -> int:
             print(f"  crate requires review: {unapproved} of {len(results)} row(s) lack a recorded active promotion and favourite decision; "
                   "complete listening labels and sample-curate promotion before exporting this search crate")
         else:
-            print(f"  next:  sample-export octatrack --root '{args.root}' --crate '{args.crate}' --list")
+            print("  next:  sample-export --help  # choose a device, then preview this crate with --list")
     if args.kit_id:
         for match in results:
             database.record_pick(match.sample_id, args.kit_id, query.describe())

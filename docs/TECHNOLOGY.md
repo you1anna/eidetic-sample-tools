@@ -1,6 +1,6 @@
 # Technology and architecture
 
-Eidetic Sample Tools is a local pipeline with three independently installable
+Eidetic Sample Tools is a local pipeline with four independently installable
 Python packages. Files and versioned records connect the stages; there is no
 central service coordinating the whole workflow.
 
@@ -11,9 +11,9 @@ central service coordinating the whole workflow.
 
 ![System architecture: sample audio passes through library discovery, human curation and device conversion; saved Ableton Sets produce independent reports. Portable library state underpins the sample workflow.](images/architecture.svg)
 
-The diagram shows the search, listening and export path. Saved collection plans
-are a separate implemented branch: they freeze candidates and export history,
-but do not yet feed the listening interface automatically.
+The diagram shows the search, listening and export path, the read-only saved-Set
+branch and the optional running-Set bridge. Saved collection plans freeze candidates
+and export history, then feed lazy browser batches without granting approval.
 
 ## Package boundaries
 
@@ -22,6 +22,7 @@ but do not yet feed the listening interface automatically.
 | `library-tools` | Inventory, metadata, search, collection plans, listening, approval and organisation | Python 3.12; SQLite, NumPy and SoundFile; Flask for browser review; PyTorch/Transformers for local AI | [Library architecture](../library-tools/ARCHITECTURE.md) |
 | `sample-tools` | Crate validation, conversion, export receipts and card-copy evidence | Python 3.12 standard library plus FFmpeg/FFprobe executables | [Export architecture](../sample-tools/ARCHITECTURE.md) |
 | `ableton-tools` | Saved Set traversal, XML extraction and report history | Python 3.12 standard library | [Ableton architecture](../ableton-tools/ARCHITECTURE.md) |
+| `live-tools` | Loopback transport, running-Set snapshots, profile checks, isolated device staging and guarded edit plans/receipts | Python 3.12 standard library; an explicitly built/loaded Max for Live device | [Live control](LIVE.md) |
 
 CLI entry points are declared in each package's `pyproject.toml`. Device and
 studio TOML profiles, tag vocabulary and browser assets are bundled with the
@@ -32,17 +33,22 @@ The exporter consumes a crate without importing `library-tools` or requiring its
 database. When portable library state is present, it validates compatible state
 and participates in the same writer lock. Ableton inspection has no dependency
 on either sample package or a running Live process.
+The Live package has no library-database dependency and does nothing to Live when
+installed or imported. `library-tools[live]` adds it and Flask only when the user
+chooses browser-to-Live audition.
 
 ## What crosses each boundary
 
 | From → to | Evidence carried forward | What still needs to happen |
 |---|---|---|
 | Inventory → search or planner | Content identity, current locations, metadata and complete-scan identity | Select useful candidates. |
-| Planner → saved revision | Frozen matching population, history coverage, seed, pins and unreviewed choices | A listening handoff; currently a separate step. |
+| Planner → browser audition | Frozen matching population, history coverage, plan/library identity and candidate IDs | Listen in lazy batches and choose Keep/Skip. |
 | Audition → curation packet | Kept original identities and paths | Explicit favourite approval, roles and descriptors. |
 | Curation → export | Approved copies and a five-column crate; generated crates add approval metadata | Revalidate source bytes and device constraints. |
 | Export → card | Verified converted bytes and a copy journal | Instrument playback, assignment and save/reload. |
 | Ableton scan → library review | Saved references, input hashes and completeness metadata | Interpret dependencies in the context of available project roots. |
+| Running Live → edit plan | Exact build/instance/Set identity, transport and inspected properties | Review allowlisted operations and expected values. |
+| Edit plan → running Live | Exact checkpoint, mutation token, readback and receipt | Audible routing and Set save/reload checks in Live. |
 
 See [State and data contracts](STATE-AND-CONTRACTS.md) for formats, ownership,
 path rebinding, locks and interruption handling.
@@ -71,6 +77,7 @@ installation and resource controls.
 | Listening and approval | Human attention and decisions about musical fit | Saved shortlist and review decisions. |
 | Export and transfer | Hash reads, FFmpeg conversion, storage writes and copy verification | Outputs whose receipts still match; matching files already on the card. |
 | Ableton reports | Reading/decompressing Sets, XML parsing and checking reference paths | Earlier reports provide history, but each command scans again. |
+| Running-Set control | Loopback requests, Live's event loop and readback | Saved snapshots and receipts; mutations are not automatically retried. |
 
 The [trial](SET-GENERATION-TRIAL.md) separates measured stage timings from estimates.
 The [planner benchmark](DEVELOPMENT.md#compare-collection-planner-performance) isolates
@@ -87,9 +94,15 @@ metadata planning; it cannot predict model, conversion or listening time.
   drive-handoff design, not concurrent database synchronisation between machines.
 - **Explicit evidence:** a saved candidate, a favourite, a converted file and a
   played instrument sound represent different decisions and checks.
+- **Guarded Live edits:** inspection and planning are separate from apply; a plan
+  is bound to one exact Set checkpoint and uncertain mutation acknowledgements
+  require receipt reconciliation.
 - **Bounded progress:** current scale limitations include full plan snapshots,
   manually supplied audition candidates, model worker timeouts and per-file
   transfer journals. Per-device free-space budgets remain unimplemented.
+
+The Live bridge's software contracts are implemented, while the target Live runtime,
+managed audition tracks and studio hardware/routing qualification remain pending.
 
 [Current status](../STATUS.md) records the next bounded work; dated assessments
 and experiments remain evidence rather than guarantees about current behaviour.

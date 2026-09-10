@@ -5,6 +5,11 @@ observations below describe that session. Use the
 [Ableton package guide](ableton-tools/README.md) for current supported commands
 and [project status](STATUS.md) for the active work queue.
 
+The failed community-script experiment described below has since been replaced
+in the repository by an isolated, explicitly staged `live-tools` bridge. See the
+[current Live control guide](docs/LIVE.md). Its software boundaries are
+implemented; real Live 12.4 and studio qualification remain pending.
+
 Plain-English record of a session that set out to let Claude drive Ableton Live directly (build
 tracks, load plugins, set routing) to support the studio workflow described in
 `Production/eidetic-session-guide-method-a-v1_1.md`. Part of it worked and is now committed. Part

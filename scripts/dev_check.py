@@ -13,15 +13,18 @@ import shutil
 import subprocess
 import sys
 
+from package_catalog import ALL_PACKAGES
+
 
 REPO = Path(__file__).resolve().parents[1]
-PACKAGES = ('library-tools', 'sample-tools', 'ableton-tools')
-SOURCES = [str(REPO / package / 'src') for package in PACKAGES]
+PACKAGE_PATHS = tuple(package['path'] for package in ALL_PACKAGES)
+IMPORT_NAMES = tuple(package['import_name'] for package in ALL_PACKAGES)
+SOURCES = [str(REPO / package / 'src') for package in PACKAGE_PATHS]
 PROBE = '''
 import importlib.util, json, platform, sys
 sys.path[:0] = json.loads(sys.argv[1])
 names = ('pytest', 'numpy', 'soundfile', 'flask')
-packages = ('librarytools', 'sampletools', 'abletontools')
+packages = tuple(json.loads(sys.argv[2]))
 print(json.dumps({
     'version': platform.python_version(),
     'virtualenv': sys.prefix != sys.base_prefix,
@@ -45,7 +48,8 @@ def probe(python):
     # Do not resolve symlinks: doing so bypasses the virtualenv's pyvenv.cfg.
     python = str(Path(shutil.which(python) or python).expanduser().absolute())
     try:
-        result = subprocess.run([python, '-I', '-c', PROBE, json.dumps(SOURCES)],
+        result = subprocess.run([python, '-I', '-c', PROBE, json.dumps(SOURCES),
+                                 json.dumps(IMPORT_NAMES)],
                                 cwd=REPO, env=clean_environment(), text=True,
                                 capture_output=True, timeout=10)
         if result.returncode:
@@ -61,7 +65,7 @@ def probe(python):
     if missing:
         raise ValueError(f'{python}: missing test dependencies: {", ".join(missing)}')
     expected = {name: str(Path(path) / name / '__init__.py') for path, name in
-                zip(SOURCES, ('librarytools', 'sampletools', 'abletontools'))}
+                zip(SOURCES, IMPORT_NAMES)}
     if report['sources'] != expected:
         raise ValueError(f'{python}: source imports do not point to this checkout')
     return dict(report, python=python, repository=str(REPO))
@@ -112,14 +116,14 @@ def main(argv=None):
             print(json.dumps(report, indent=2, sort_keys=True))
         else:
             print(f"Python {report['version']}: {report['python']}")
-            print(f'Source imports: {REPO} (all three packages)')
+            print(f'Source imports: {REPO} (all four packages)')
             print('Available: pytest, numpy, soundfile, flask, ffmpeg, ffprobe')
         return 0
     arguments = args.pytest_args if args.command == 'test' else args.benchmark_args
     if arguments[:1] == ['--']:
         arguments = arguments[1:]
     if args.command == 'test':
-        arguments = ['-m', 'pytest', *(arguments or [*PACKAGES, '-q', '-rs'])]
+        arguments = ['-m', 'pytest', *(arguments or [*PACKAGE_PATHS, '-q', '-rs'])]
         print(f"Testing checkout with {report['python']}", flush=True)
     else:
         arguments = [str(REPO / 'scripts/benchmark_collection_planner.py'), *arguments]

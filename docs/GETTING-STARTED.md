@@ -73,6 +73,23 @@ neither; export needs both. On Linux, install FFmpeg through the system package
 manager; if SoundFile cannot load libsndfile, install that system library too
 (`libsndfile1` on Debian/Ubuntu).
 
+### Optional Live control
+
+The normal three-package install has no Live-control or Flask dependency. To add
+the experimental running-Set bridge and browser integration explicitly:
+
+```bash
+python -m pip install -e ./live-tools -e './library-tools[live]'
+python -m pip check
+eidetic-live doctor
+```
+
+This installs the tools but does not modify Ableton Live. Device staging and Set
+attachment are deliberate later steps. Follow the [Live control guide](LIVE.md)
+before staging anything. A staged device still has to be built or reloaded in Max
+for Live, and the current implementation has not completed its target Live runtime or
+studio-hardware qualification.
+
 ## Inspect a folder
 
 Select the parent of your sample-pack folders. For example, this layout is
@@ -205,6 +222,7 @@ schema; rehearse recovery using a separate restored backup.
 - [Collection planner](COLLECTION-PLANNER.md): save candidates, control repeats and retain choices.
 - [Export reference](../sample-tools/REFERENCE.md): device formats and transfer.
 - [Ableton reports](../ableton-tools/README.md): inspect Sets and sample dependencies.
+- [Live control](LIVE.md): inspect a running Set and review explicit edit plans.
 - [Architecture](TECHNOLOGY.md): understand identity, search and model review.
 
 Before moving audio, read the [safety model](SAFETY.md) and verify your library

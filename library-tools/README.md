@@ -17,6 +17,9 @@ the tools' suggestions.
   known repeats for a device, and retain chosen sounds when generating another version.
 - **Decide by ear.** Play candidates in a browser, Keep or Skip, undo a choice
   and return to the shortlist later. [See the interface](../README.md#listen-before-you-export).
+- **Optionally audition in Live.** Install the `live` extra, prepare a saved-plan
+  session, attach it to a saved Set and explicitly apply creation of two managed
+  audition tracks. Browser decisions remain keyed to the original sample identity.
 - **Use local AI to organise listening.** Get suggested groups for supplied
   candidates, with uncertain classifications brought forward for review.
 - **Build an approved collection.** Give favourites useful roles and names,
@@ -40,8 +43,10 @@ configured Macs. Follow the [safety](../docs/SAFETY.md) and
 
 Core organisation is established; search and curation are beta. Saved collection
 plans, browser listening and AI grouping are experimental. Plans currently use
-metadata and need a separate listening handoff. Local AI selection from a musical
-brief across the whole library is still in development.
+metadata; saved plans can now feed bounded browser batches, while Live attachment
+is optional and still requires real-runtime qualification. Local AI selection
+from a musical brief across the whole library is still in development.
 
+[Live audition](../docs/LIVE.md#audition-a-saved-plan-in-live) ·
 [Local AI setup](../docs/AI-SETUP.md) · [Progress and limits](../STATUS.md) ·
 [Contributing](../CONTRIBUTING.md)

@@ -31,6 +31,11 @@
       <button id="all" class="quiet small" aria-pressed="true">All samples</button>
       <button id="kept" class="quiet small" aria-pressed="false">Kept (0)</button>
     </div>
+    <div id="batches" class="filters" hidden>
+      <button id="batch-prev" class="small">Previous batch</button>
+      <span id="batch-label" class="hint"></span>
+      <button id="batch-next" class="small">Next batch</button>
+    </div>
     <ul id="samples" aria-label="Samples"></ul>
     <p id="empty" class="hint empty" hidden>No samples kept yet. Play a sample and choose Keep.</p>
   </section>
@@ -40,6 +45,30 @@
       <h2 id="sample-name">Loading…</h2>
       <p id="sample-meta" class="meta num">—</p>
     </div>
+
+    <div class="playback-options">
+      <label>Playback <select id="playback-mode"><option value="browser">Browser</option><option value="live">Ableton Live</option></select></label>
+      <label>Gain <input id="gain" type="range" min="0" max="1" step="0.01" value="1"></label>
+      <span id="gain-label" class="hint">Browser 100%</span>
+    </div>
+    <section id="live-panel" class="handoff" hidden aria-label="Ableton Live attachment">
+      <p id="live-status" class="hint">Live is not connected.</p>
+      <label>Open saved Set <input id="saved-set" type="text" placeholder="/path/to/Project/Set.als"></label>
+      <button id="attach-preview" class="small">Preview attachment</button>
+      <div class="handoff-actions">
+        <button id="load-candidate" class="small">Preview candidate load</button>
+        <button id="load-reference" class="small">Preview reference load</button>
+      </div>
+      <label><input id="with-reference" type="checkbox"> Play with managed reference</label>
+      <label><input id="warp" type="checkbox"> Warp candidate</label>
+      <label>Warp mode <select id="warp-mode"><option value="">Load a candidate first</option></select></label>
+      <button id="live-reconcile" class="small">Read recovery report</button>
+      <button id="live-stop" class="small">Stop managed tracks</button>
+      <pre id="live-preview" hidden></pre>
+      <button id="live-confirm" class="primary" hidden>Confirm this change in Live</button>
+      <p id="live-timing" class="hint">Beat grid is unknown. Check and correct Warp and loop boundaries manually in Live. Set tempo is read from Live and never changed. Save the Set manually after checking.</p>
+      <p class="hint">Playback controls affect only these two managed tracks. Other Set tracks may still be audible.</p>
+    </section>
 
     <audio id="player" preload="none" loop></audio>
 

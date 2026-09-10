@@ -27,14 +27,15 @@ flowchart TD
     Promote --> Crate[Crate for sample-tools]
     DB --> Snapshot[Frozen metadata and supplied export history]
     Snapshot --> Plan[Unreviewed collection plan]
+    Plan --> Listen
     Plan --> Revision[New revision with seed and retained pins]
     classDef evidence fill:#edf2e8,stroke:#53674a,color:#172016;
     class DB,Packet,Groups,Crate,Plan,Revision evidence;
 ```
 
-The two branches stop at different boundaries. Search and explicit candidates
-can feed listening and curation today. Collection plans do not yet have an
-automatic browser handoff; a pin retains membership without approving a sample.
+Search results, explicit candidates and saved plans can feed listening and
+curation. A plan opens as lazy 12-sample browser batches; a pin or browser Keep
+retains an identity without approving it as a favourite or export.
 
 ## Module map
 
@@ -45,6 +46,7 @@ automatic browser handoff; a pin retains membership without approving a sample.
 | Measurements | [audiofeatures.py](src/librarytools/audiofeatures.py), [features.py](src/librarytools/features.py) | Decode audio, compute measurements and retain extraction provenance. |
 | Collection planning | [collection_snapshot.py](src/librarytools/collection_snapshot.py), [collection_history.py](src/librarytools/collection_history.py), [collection_plan.py](src/librarytools/collection_plan.py) | Freeze candidates, interpret explicit history and generate validated revisions. |
 | Audition | [vibe_session.py](src/librarytools/vibe_session.py), [vibe_shortlist.py](src/librarytools/vibe_shortlist.py), [vibe_server.py](src/librarytools/vibe_server.py) | Verified playback, saved Keep/Skip choices and curation handoff. |
+| Optional Live audition | `eideticlive.audition` in the independently installable `live-tools` package | Exact saved-Set attachment, managed audition tracks and guarded sample preview operations. |
 | Classification | [packet_classifier.py](src/librarytools/packet_classifier.py), [classification/](src/librarytools/classification/) | Acoustic form, local model votes, caching, review and grouped playlists. |
 | Curation | [curate.py](src/librarytools/curate.py), [curation_policy.py](src/librarytools/curation_policy.py), [promotion_health.py](src/librarytools/promotion_health.py) | Validate favourite labels, copy approved bytes and track promotion health. |
 | Lifecycle | [locking.py](src/librarytools/locking.py), [operations.py](src/librarytools/operations.py), [onboarding.py](src/librarytools/onboarding.py), [lifecycle.py](src/librarytools/lifecycle.py) | Writer coordination, recovery, historical capture, backups and upgrades. |
@@ -116,6 +118,9 @@ musical quotas and total device-space constraints are not part of this planner.
 `parent_plan_id` connects revisions. Loading verifies the digest and reconstructs
 the canonical choices. Regeneration changes count, seed or pins against the
 same snapshot; inherited pins remain, and each chosen decision is `unreviewed`.
+`sample-vibe prepare --plan` validates that snapshot against the selected library,
+then records the library, plan and candidate identities in a version 2 audition
+session. It prepares working WAVs only for the active 12-sample batch.
 See the [planner guide](../docs/COLLECTION-PLANNER.md) for the exact commands.
 
 ## Local AI and review
@@ -176,6 +181,14 @@ descriptors. Promotion preflights the selection and copies approved bytes into
 current favourite and active-promotion evidence for the specific curated copy.
 Existing curated folders alone do not supply that approval.
 
+With the optional `live` extra, the same browser can inspect attachment to a saved
+Set and prepare two dedicated managed audition tracks through `live-tools`. Track
+creation and sample loading use the Live package's explicit preview/confirm
+boundary with Set, bridge, track and file identity checks; they do not infer
+approval, alter tempo or turn Keep into a favourite.
+Warp/grid interpretation remains visible for manual checking in Live. This path
+still needs qualification against the target Live runtime and studio routing.
+
 ## Recovery and performance boundaries
 
 Library mutations share the library writer lock. Moves and promotions retain
@@ -190,7 +203,7 @@ can block other library writes. See [interruption handling](../docs/STATE-AND-CO
 | Large metadata population | Planning materialises candidates and aliases, sorts eligible IDs and validates full snapshots; memory grows with the population. |
 | Many plan revisions | Each stores the matching population again. Snapshot storage grows with population size and revision count. Plans are capped at 128 MiB; each history file at 32 MiB. |
 | Cold models | Model loading, decoding and new embeddings dominate. Cached embeddings avoid inference but do not eliminate acoustic checks or human review. |
-| Large audition | The current session format allows up to 12 groove and 12 vocal inputs, each at most 120 seconds. It is not a whole-library browser. |
+| Large audition | Plan sessions retain the full candidate identity list but prepare working WAVs lazily in batches of 12; each source is still capped at 120 seconds. |
 | Long-term state | Embeddings, decision histories and run artifacts accumulate. Backups and maintenance need to preserve human evidence separately from derived data. |
 
 The [measured trial](../docs/SET-GENERATION-TRIAL.md) and

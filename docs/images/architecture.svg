@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="824" viewBox="0 0 1120 824" role="img" aria-labelledby="title description">
   <title id="title">Eidetic Sample Tools architecture</title>
-  <desc id="description">Sample audio feeds library-tools for content-hash indexing, tag and acoustic search, and listening. Local AI suggests groups for review. Human decisions approve favourites, copied into CURATED with TSV crates. sample-tools validates crates and uses FFmpeg to create device WAV exports. Separately, ableton-tools reads saved Live Sets and reports their structure and sample references without editing them. The sample drive carries the index, listening decisions and recovery records under .eidetic.</desc>
+  <desc id="description">Sample audio feeds library-tools for content-hash indexing, tag and acoustic search, and listening. Local AI suggests groups for review. Human decisions approve favourites, copied into CURATED with TSV crates. sample-tools validates crates and uses FFmpeg to create device WAV exports. Separately, ableton-tools reads saved Live Sets without editing them. The optional experimental live-tools bridge inspects a running Set and applies an exact reviewed plan. The sample drive carries the index, listening decisions and recovery records under .eidetic.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L8 4L0 8Z" fill="#565b58"/>
@@ -24,14 +24,16 @@
   <text class="name" x="56" y="105">Sample library</text>
   <text class="detail" x="56" y="132">Source packs and catalogue audio</text>
   <rect class="box" x="752" y="72" width="336" height="82"/>
-  <text class="name" x="776" y="105">Saved Ableton Live Sets</text>
-  <text class="detail" x="776" y="132">.als project files</text>
+  <text class="name" x="776" y="105">Ableton Live</text>
+  <text class="detail" x="776" y="132">Saved Sets · optional running Set</text>
 
   <!-- Package boundaries -->
   <rect class="boundary" x="32" y="202" width="664" height="318"/>
   <text class="label" x="56" y="230">LIBRARY-TOOLS</text>
-  <rect class="boundary" x="752" y="202" width="336" height="318"/>
+  <rect class="boundary" x="752" y="202" width="336" height="136"/>
   <text class="label" x="776" y="230">ABLETON-TOOLS</text>
+  <rect class="boundary experimental" x="752" y="366" width="336" height="154"/>
+  <text class="label" x="776" y="394">LIVE-TOOLS · OPTIONAL</text>
   <rect class="boundary" x="32" y="576" width="664" height="140"/>
   <text class="label" x="56" y="604">SAMPLE-TOOLS</text>
 
@@ -45,7 +47,8 @@
   <path class="flow" d="M336 656H392"/>
   <path class="flow" d="M672 656H752"/>
   <path class="flow" d="M920 154V250"/>
-  <path class="flow" d="M920 338V392"/>
+  <path class="flow experimental" d="M1040 154V348H920V408"/>
+  <path class="flow experimental" d="M672 294H724V452H776"/>
 
   <!-- Library components -->
   <rect class="box" x="56" y="250" width="280" height="88"/>
@@ -62,12 +65,12 @@
   <text class="detail" x="412" y="455">CURATED/ copies + crate TSVs</text>
 
   <!-- Independent read-only project inspection -->
-  <rect class="box" x="776" y="250" width="288" height="88"/>
+  <rect class="box" x="776" y="250" width="288" height="64"/>
   <text class="name" x="796" y="285">Read saved Sets</text>
-  <text class="detail" x="796" y="313">gzip / XML · read-only</text>
-  <rect class="box" x="776" y="392" width="288" height="88"/>
-  <text class="name" x="796" y="427">Project + sample reports</text>
-  <text class="detail" x="796" y="455">Tracks · devices · missing media</text>
+  <text class="detail" x="796" y="307">.als reports · read-only</text>
+  <rect class="box experimental" x="776" y="408" width="288" height="88"/>
+  <text class="name" x="796" y="443">Inspect running Set</text>
+  <text class="detail" x="796" y="471">Checkpoint · plan · apply · receipt</text>
 
   <!-- Export components and device output -->
   <rect class="box" x="56" y="624" width="280" height="64"/>

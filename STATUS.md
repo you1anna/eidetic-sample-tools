@@ -22,14 +22,17 @@ sounds had unsuitable tempo or a poorer musical fit.
 | Available | Current scope |
 |---|---|
 | Library, export and Ableton packages | Search, listening, approved-copy export and read-only saved-Set reports. |
+| Experimental Live package | Loopback inspection, versioned snapshots, profile checks, explicit device staging and identity-bound allowlisted edit plans with receipts. |
 | Portable library state | Identity, onboarding, history capture, guarded writes, backup and recovery. |
 | [Collection planner](docs/COLLECTION-PLANNER.md) | Saved metadata selections, explicit export history, repeat handling, retained pins and visible shortages. Regeneration works offline. |
 | [Development tools](docs/DEVELOPMENT.md) | Environment discovery, tests against the checkout, installed-command checks and a repeatable synthetic scale benchmark. |
 | [Documentation](docs/README.md) | Functionality-first READMEs, a real interface example, contribution guidance and detailed package/state architecture. |
 
-The planner is experimental. It does not yet connect to browser decisions,
-interpret the musical brief, enforce tempo or sound-family variety, or calculate
-device storage budgets. Pins retain candidates; they do not approve them for export.
+The planner is experimental. It now connects to lazy 12-sample browser batches
+whose Keep/Skip decisions persist by sample identity. It does not interpret the
+musical brief, enforce tempo or sound-family variety, or calculate device storage
+budgets. Pins and browser Keep retain candidates; neither approves them for export.
+Live attachment is optional and experimental.
 The [roadmap](docs/ROADMAP.md) distinguishes established features from planned work.
 
 ## Trial and verification
@@ -55,17 +58,28 @@ The [roadmap](docs/ROADMAP.md) distinguishes established features from planned w
   without changing audio or creating state; its folder scope is now explicit.
   The README layout and three package diagrams were rendered and inspected.
   This refresh changes documentation and its image only, not application behaviour.
+- The new Live transport, snapshot and edit-plan behavior has focused synthetic
+  coverage. Installed-wheel checks now exercise a dependency-light three-package
+  core first, then all four packages with optional browser/Live integration.
+  Final implementation verification: **891 tests passed, two model-download checks
+  skipped**; core-first and optional installed-wheel checks passed. A synthetic
+  browser trial verified 12+2 batches and Keep/Skip persistence after server restart.
+  A running Set in the target Live version, the staged Max device and physical studio routing have
+  not yet been used to qualify these claims.
 
 ## Next bounded increments
 
-1. Connect collection plans to manageable listening batches with saved decisions,
-   visible repeat information and progress that survives interruption.
+1. Qualify collection-plan listening with a representative large plan: saved
+   decisions, visible repeat information, lazy previews and interruption recovery.
 2. Prepare resumable local-AI retrieval and combine it with tempo and variety
    controls. Report analysed, cached, failed and unanalysed coverage; measure useful
    new sounds per listening minute with the user.
 3. Add aggregate device budgets, free-space checks and reliable larger transfers.
    Complete the existing 19-file Octatrack hardware round trip before a substantially
    larger transfer; validate other devices separately.
+4. Complete the target Live runtime gate: build/load the staged device, inspect a
+   saved test Set, exercise acknowledgement-loss reconciliation, audition through
+   the two managed tracks, and verify audible routing plus save/reload.
 
 The [collection assessment](docs/COLLECTION-PLANNING-ASSESSMENT.md) records the
 remaining performance and workflow risks. It is a staged design, not a claim

@@ -11,6 +11,7 @@ references document commands; architecture guides explain the systems underneath
 | Save a selection, control repeats and regenerate it | [Collection planner](COLLECTION-PLANNER.md) |
 | Set up local AI and understand its costs | [AI setup](AI-SETUP.md) |
 | Understand how the tools fit together | [Architecture](TECHNOLOGY.md) |
+| Inspect or cautiously edit a running Ableton Set | [Live control](LIVE.md) |
 | Move between Macs, back up state or recover work | [Library lifecycle](LIFECYCLE.md) |
 | Check device configuration | [Profiles](SAMPLE-FOUNDATION-WORKFLOW.md) |
 | Develop or verify a change | [Development](DEVELOPMENT.md) |
@@ -19,6 +20,8 @@ references document commands; architecture guides explain the systems underneath
 
 Command references: [library tools](../library-tools/REFERENCE.md),
 [sample export](../sample-tools/REFERENCE.md), [Ableton tools](../ableton-tools/REFERENCE.md).
+The experimental running-Set bridge is documented in the
+[Live control guide](LIVE.md) and [Live package reference](../live-tools/REFERENCE.md).
 Read the [safety model](SAFETY.md) before changing library audio.
 
 ## Architecture and systems
@@ -32,6 +35,7 @@ part of the system you need to understand:
 | [Library architecture](../library-tools/ARCHITECTURE.md) | Database and scans, search versus planning, model workers/caches, browser decisions and curation. |
 | [Export architecture](../sample-tools/ARCHITECTURE.md) | Crate validation, conversion, receipts, copy journals and large-collection costs. |
 | [Ableton architecture](../ableton-tools/ARCHITECTURE.md) | Set traversal, parsing, reference resolution, completeness and report publication. |
+| [Live control](LIVE.md) | Loopback transport, explicit device staging, snapshots, edit plans, receipts and qualification limits. |
 
 These guides map responsibilities to source modules and distinguish current
 behaviour from unfinished integrations. The [README design standard](README-DESIGN.md)

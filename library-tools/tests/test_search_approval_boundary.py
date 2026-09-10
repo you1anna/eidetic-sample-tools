@@ -91,6 +91,22 @@ def test_find_cli_warns_about_unverified_curated_history(tmp_path, capsys):
     assert 'requires review' in capsys.readouterr().out.lower()
 
 
+def test_find_cli_does_not_guess_an_export_device(tmp_path, capsys):
+    root = tmp_path / 'SAMPLES'
+    _source(root / 'CURATED/KICK/approved.wav')
+    database = LibraryDatabase(tmp_path / 'library.sqlite')
+    scan_library(root, database)
+    location = database.current_locations()[0]
+    database.record_review(location.sample_id, 'heard', 'favourite', 'KICK', 'short', '')
+    database.record_promotion(location.sample_id, location.path, Path('PACKS/original.wav'), 'heard')
+
+    assert find_cli.main(['--root', str(root), '--library-db', str(database.path),
+                          '--curated-only', '--crate', str(tmp_path / 'kit.tsv')]) == 0
+    output = capsys.readouterr().out
+    assert 'sample-export --help' in output
+    assert 'sample-export octatrack' not in output
+
+
 def test_promotion_row_without_listening_decision_still_requires_review(tmp_path):
     root = tmp_path / 'SAMPLES'
     _source(root / 'CURATED/KICK/old.wav')

@@ -21,7 +21,7 @@ def validate_bind_host(host: str) -> str:
     return host
 
 
-def create_vibe_app(session_dir: Path, *, write_token: str | None = None):
+def create_vibe_app(session_dir: Path, *, write_token: str | None = None, live_client=None):
     from flask import Flask, abort, jsonify, render_template_string, request, send_file, Response
     session_dir = Path(session_dir).resolve()
     load_session(session_dir)
@@ -59,6 +59,8 @@ def create_vibe_app(session_dir: Path, *, write_token: str | None = None):
 
     @app.get('/vocal-lab')
     def vocal_lab():
+        if load_session(session_dir)['schema_version'] != 1:
+            raise VibeError('The vocal lab requires a legacy anchor/vocal session')
         resource = files('librarytools').joinpath('resources/vibe.html')
         return render_template_string(resource.read_text(encoding='utf-8'), token=token)
 
@@ -77,6 +79,8 @@ def create_vibe_app(session_dir: Path, *, write_token: str | None = None):
 
     @app.get('/api/state')
     def state():
+        if load_session(session_dir)['schema_version'] != 1:
+            return jsonify(source_state(session_dir))
         from .vibe import session_state
         return jsonify(session_state(session_dir))
 
@@ -92,6 +96,67 @@ def create_vibe_app(session_dir: Path, *, write_token: str | None = None):
         if not isinstance(raw, dict):
             raise VibeError('A JSON object is required')
         return raw
+
+    @app.post('/api/batch')
+    def batch():
+        raw = body()
+        if set(raw) != {'batch_index'} or load_session(session_dir)['schema_version'] != 2:
+            raise VibeError('Batch navigation requires a collection session and batch_index')
+        from .vibe_collection import batch_state
+        return jsonify(batch_state(session_dir, raw['batch_index']))
+
+    live = None
+
+    def live_operation(method, **kwargs):
+        nonlocal live
+        try:
+            from eideticlive.audition import LiveAudition
+            if live is None:
+                live = LiveAudition(session_dir, client=live_client)
+            return getattr(live, method)(**kwargs)
+        except ImportError as exc:
+            raise VibeError('Live playback is unavailable. Install library-tools[live] explicitly in this environment') from exc
+        except (RuntimeError, OSError) as exc:
+            raise VibeError(f'Live unavailable or operation refused: {exc}. Browser playback remains disabled in Live mode.') from exc
+
+    @app.get('/api/live/status')
+    def live_status():
+        return jsonify(live_operation('status'))
+
+    @app.get('/api/live/reconcile')
+    def live_reconcile():
+        return jsonify(live_operation('reconcile'))
+
+    @app.post('/api/live/attach-preview')
+    def live_attach():
+        raw = body()
+        if set(raw) != {'saved_set'} or not isinstance(raw['saved_set'], str):
+            raise VibeError('Supply the open saved .als Set path')
+        return jsonify(live_operation('preview_attachment', saved_set=raw['saved_set']))
+
+    @app.post('/api/live/load-preview')
+    def live_load():
+        raw = body()
+        if set(raw) != {'source_id', 'role'} or raw['role'] not in ('reference', 'candidate'):
+            raise VibeError('Choose a source and reference or candidate role')
+        state = load_session(session_dir)
+        path = source_audio(session_dir, raw['source_id'])
+        return jsonify(live_operation('preview_load', role=raw['role'], sample_id=raw['source_id'],
+                       path=str(path), sha256=state['sources'][raw['source_id']]['preview_hash']))
+
+    @app.post('/api/live/confirm')
+    def live_confirm():
+        raw = body()
+        if set(raw) != {'preview_id'} or not isinstance(raw['preview_id'], str):
+            raise VibeError('Supply the explicit preview identifier')
+        return jsonify(live_operation('confirm', preview_id=raw['preview_id']))
+
+    @app.post('/api/live/control')
+    def live_control():
+        raw = body()
+        if 'action' not in raw or set(raw) - {'action', 'with_reference', 'gain', 'loop', 'warping', 'warp_mode'}:
+            raise VibeError('Unexpected Live control fields')
+        return jsonify(live_operation('control', **raw))
 
     @app.get('/api/shortlist')
     def shortlist():

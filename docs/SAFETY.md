@@ -17,6 +17,8 @@ and record successful moves. Export and curation work with copies.
 | **Writes derived files** | Creates manifests, databases, reports or audition packets; source audio stays in place. |
 | **Moves audio after `--apply`** | Previews by default; moves only after explicit approval and records successful moves. |
 | **Copies approved audio** | Creates curated or converted copies; source audio stays in place. |
+| **Inspects a running Set** | Reads the attached Live runtime into a versioned snapshot; does not edit the Set. |
+| **Applies a Live edit plan** | Sends only allowlisted operations after exact runtime/Set identity and expected-value checks plus an explicit `--apply`. |
 
 Representative commands:
 
@@ -36,6 +38,12 @@ Representative commands:
 | `sample-export --dry-run` | Prints planned conversions | No conversion |
 | `sample-export` | Writes converted copies under the export root | Running without a preview flag |
 | `sample-export --sync` | Copies a built export to mounted media | Explicit destination path |
+| `eidetic-live inspect` | Writes or prints a running-Set snapshot | Never edits Live |
+| `eidetic-live plan` | Writes an inspectable edit plan | Never edits Live |
+| `eidetic-live apply` | Applies an allowlisted plan to the exact planned Set | Exact runtime/Set identity plus `--apply`; structural plans also require a matching saved `.als` checkpoint |
+| `eidetic-live restore-parameters` | Prepares a plan from a complete parameter receipt | Read-only; refuses values changed again since apply |
+| `eidetic-live stage-device` | Copies isolated bridge source files to a chosen folder | Explicit destination; the user builds or reloads the `.amxd` |
+| Browser Live attachment/load | Previews exact Set, tracks and working WAV before changing managed audition slots | Separate preview and confirm; retains a saved-Set checkpoint copy in the session |
 
 ## Preview before apply
 
@@ -104,6 +112,19 @@ exports.
 Device validation is narrower and more reliable: it can check format, duration,
 capacity, hash, role and path rules. It still cannot choose the right sounds for
 a performance.
+
+Running-Set automation has a separate boundary. It listens only on loopback,
+requires a token for mutations and checks the inspected Set identity before an
+edit. The tool does not retry a mutation after an uncertain acknowledgement,
+because a lost reply does not prove that Live rejected the first request. Inspect
+and reconcile the receipt instead. A partial inspection is `complete: false`; it
+is not a safe checkpoint. A successful software receipt does not prove audible
+routing, timing, Warp behaviour, plugin state or saved recall in Live.
+Parameter restoration creates another plan for review and explicit apply; it is
+not an undo command. Structural changes require manual recovery.
+The browser's recovery report is read-only. After an uncertain operation it can
+recognise verified managed tracks and clips on a new attachment preview, but it
+never retries the failed operation automatically.
 
 ## Backup responsibilities
 

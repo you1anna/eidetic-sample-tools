@@ -1,7 +1,8 @@
 # Documentation images
 
 - `architecture.svg`: the overall system diagram, shown in the architecture
-  guide and the root README's expandable overview.
+  guide and the root README's expandable overview. It distinguishes read-only
+  saved-Set reports from the optional experimental running-Set bridge.
 - `audition.png`: the working browser chooser captured at a 960-pixel viewport
   on 10 September 2026. Four synthetic percussive files were prepared using the
   application's normal session builder; one demonstration Keep choice is visible.

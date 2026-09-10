@@ -18,7 +18,7 @@ python3 scripts/dev_check.py test
 ```
 
 `doctor` reports the selected Python 3.12 virtual environment, dependency
-availability, FFmpeg/FFprobe and all three source import paths. It does not load
+availability, FFmpeg/FFprobe and all four source import paths. It does not load
 models, install dependencies or inspect the sample drive. The helper tries the
 current/active environment, then `~/.venvs/eidetic-sample-tools-dev`, `eidetic-ai`
 and `library-tools`. Set `EIDETIC_PYTHON` or put `--python /path/to/venv/bin/python`
@@ -26,7 +26,7 @@ before the subcommand to choose explicitly; a broken explicit choice is an error
 `doctor --json` provides the same information for local tooling.
 
 `test` works from any working directory when the script path is absolute. It uses
-this checkout's three source directories even if older wheels are installed.
+this checkout's four source directories even if older wheels are installed.
 Arguments after `--` replace the default combined suite; pytest's exit status is
 preserved. Use focused checks while editing, then run the relevant final suite
 once. Repeat checks after a change or failure, not merely to accumulate passes.
@@ -39,9 +39,9 @@ From the repository root:
 python3.12 -m venv "$HOME/.venvs/eidetic-sample-tools-dev"
 source "$HOME/.venvs/eidetic-sample-tools-dev/bin/activate"
 python -m pip install -r requirements-dev.txt
-python -m pip install --no-deps -e ./library-tools -e ./sample-tools -e ./ableton-tools
+python -m pip install --no-deps -e ./library-tools -e ./sample-tools -e ./ableton-tools -e ./live-tools
 python -m pip check
-python -m pytest library-tools sample-tools ableton-tools -q -rs
+python -m pytest library-tools sample-tools ableton-tools live-tools -q -rs
 ```
 
 The combined environment exercises the handoff between packages. Existing
@@ -51,20 +51,23 @@ Hardware playback and save/reload checks remain separate from software tests.
 
 ## Verify installed packages
 
-Build all three wheels, install them in a separate environment, and run the same
+Build all four wheels, install the core and optional layers separately in a fresh
+environment, and run the same
 smoke check used by CI:
 
 ```bash
 CHECKOUT_DIR="$PWD"
 WHEEL_DIR="$(mktemp -d)"
-python -m pip wheel --no-deps --wheel-dir "$WHEEL_DIR" ./library-tools ./sample-tools ./ableton-tools
+python -m pip wheel --no-deps --wheel-dir "$WHEEL_DIR" ./library-tools ./sample-tools ./ableton-tools ./live-tools
 python3.12 -m venv "$WHEEL_DIR/venv"
 CHECK_PYTHON="$WHEEL_DIR/venv/bin/python"
-"$CHECK_PYTHON" -m pip install -c "$CHECKOUT_DIR/requirements-dev.txt" "$WHEEL_DIR/"*.whl
+"$CHECK_PYTHON" -m pip install -c "$CHECKOUT_DIR/requirements-dev.txt" \
+  "$WHEEL_DIR/"/librarytools-*.whl "$WHEEL_DIR/"/sampletools-*.whl "$WHEEL_DIR/"/abletontools-*.whl
 "$CHECK_PYTHON" -m pip check
 cd "$WHEEL_DIR"
 env -u PYTHONPATH -u PYTHONHOME "$CHECK_PYTHON" "$CHECKOUT_DIR/scripts/check_installed_packages.py" --core-only
-"$CHECK_PYTHON" -m pip install -c "$CHECKOUT_DIR/requirements-dev.txt" --find-links "$WHEEL_DIR" 'librarytools[review-ui]'
+"$CHECK_PYTHON" -m pip install -c "$CHECKOUT_DIR/requirements-dev.txt" \
+  --find-links "$WHEEL_DIR" 'librarytools[review-ui,live]'
 "$CHECK_PYTHON" -m pip check
 env -u PYTHONPATH -u PYTHONHOME "$CHECK_PYTHON" "$CHECKOUT_DIR/scripts/check_installed_packages.py"
 cd "$CHECKOUT_DIR"
@@ -72,8 +75,10 @@ cd "$CHECKOUT_DIR"
 
 Use a fresh wheel-check environment; reusing one with development dependencies
 can hide undeclared runtime imports. Constraints limit versions without installing
-unused packages. The base check must pass before installing `review-ui`, so browser
-dependencies cannot accidentally become mandatory for ordinary CLI use.
+unused packages. The base check must pass before installing `review-ui` and `live`;
+it asserts that neither Flask nor `eidetic-live-tools` leaked into the ordinary CLI
+install. The second check imports all four installed packages, exercises browser
+resources and probes the Live API and command help without requiring a running Set.
 
 The check rejects editable imports. It verifies installed commands and resources,
 onboards two synthetic machines in sequence, scans generated audio, checks approval
@@ -118,10 +123,11 @@ metadata planning, not AI inference, musical quality, listening time or exports.
 ## Dependency ownership and updates
 
 Each package's `pyproject.toml` owns its runtime requirements and optional extras.
-`sampletools` and `abletontools` have no third-party Python runtime dependencies;
+`sampletools`, `abletontools` and `eideticlive` have no third-party Python runtime dependencies;
 `librarytools` needs NumPy and SoundFile. FFmpeg/FFprobe remain system dependencies.
 The library's `dev` extra includes pytest and Flask for browser tests; model
-dependencies are separate and are not needed for the standard suite.
+dependencies are separate and are not needed for the standard suite. Its `live`
+extra adds Flask and the exactly matched `eidetic-live-tools` distribution.
 
 The [AI setup](AI-SETUP.md) has a separate, hash-verified Apple Silicon
 snapshot, generated from package extras, and an explicitly triggered real-model
@@ -132,7 +138,7 @@ dependencies. It is not a hash-verified lockfile or a model-environment lock. Do
 maintain a second runtime dependency list in `sample-tools/requirements.txt`.
 
 To refresh the snapshot, create a fresh local environment, install
-`-e './library-tools[dev]' -e './sample-tools[dev]' -e './ableton-tools[dev]'`, and run
+`-e './library-tools[dev,live]' -e './sample-tools[dev]' -e './ableton-tools[dev]' -e './live-tools[dev]'`, and run
 `python -m pip check` and the combined test suite. Capture
 `python -m pip freeze --exclude-editable` as the candidate `requirements-dev.txt`.
 Review version changes and rerun the fresh wheel checks on macOS and Linux before

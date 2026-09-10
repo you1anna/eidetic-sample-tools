@@ -65,9 +65,29 @@ control known repeats and retain choices while trying a new seed. It writes a
 saved plan and a readable summary from existing metadata. The brief is recorded
 context at this stage; it does not rank the audio.
 
-Saved plans are not yet connected to browser listening or export crates. Use the
-existing [audition workflow](GROOVE-AUDITION-PILOT.md) for explicit source candidates,
-then the approval and export steps below. Never treat a planner pin as a favourite.
+Feed a saved plan to the browser in bounded groups of 12 without treating its
+membership as approval:
+
+```bash
+sample-vibe prepare --root "$SAMPLES_ROOT" --plan /path/to/plan.json \
+  --output-dir "$RUNS/plan-audition"
+sample-vibe serve --session-dir "$RUNS/plan-audition" --open
+```
+
+The session records the library, plan and candidate identities. It prepares each
+working WAV only when its batch is needed; source files remain in place. Keep and
+Skip decisions use `sample_id`, so moving between batches does not change a choice.
+If the portable library remounts at a different path, rebind only after selecting
+the same library UUID:
+
+```bash
+sample-vibe rebind-root --session-dir "$RUNS/plan-audition" \
+  --root /new/path/to/SAMPLES
+```
+
+This preserves decisions and verifies source bytes when their next batch is used.
+The explicit-candidate flags remain available for the older
+[audition workflow](GROOVE-AUDITION-PILOT.md). Never treat a planner pin as a favourite.
 
 ## 1. Inspect without changing audio
 
@@ -125,6 +145,19 @@ and before preparing a new listening packet.
 ## 3. Curate by ear
 
 **Action level:** Writes review files, then copies approved audio.
+
+You can use the saved-plan browser above to make a shortlist, then create a normal
+curation packet from its kept originals:
+
+```bash
+sample-vibe packet --session-dir "$RUNS/plan-audition" \
+  --output-dir "$RUNS/plan-audition-packet"
+```
+
+The packet still needs explicit favourite labels, canonical roles and descriptors
+before promotion. A Keep decision means “retain for this shortlist”, not “export”.
+If you want to hear the bounded batches in a saved Ableton Set, use the optional
+[Live audition workflow](LIVE.md#audition-a-saved-plan-in-live).
 
 Set collection targets in `$RUNS/kit-quotas.toml`:
 

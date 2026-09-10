@@ -7,14 +7,15 @@ Entry point for Codex/ChatGPT, Claude Code, and any other agent working in this 
 1. `README.md` — what the product is and its safety model.
 2. `docs/WORKFLOWS.md` — the canonical inspect → organise → curate → export sequence.
 3. `docs/SAFETY.md` — preview-first / `--apply` / undo rules. Non-negotiable.
-4. The relevant package `README.md` (`library-tools/`, `sample-tools/`, `ableton-tools/`).
+4. The relevant package `README.md` (`library-tools/`, `sample-tools/`, `ableton-tools/`, `live-tools/`).
 
 ## What this repo is
 
 `Eidetic Sample Tools` — a **public**, personal-first CLI toolkit for hardware electronic
-musicians. Three Python packages: `library-tools` (index/curate/dedupe a sample library),
+musicians. Four independently installable Python packages: `library-tools` (index/curate/dedupe a sample library),
 `sample-tools` (validate + convert approved samples for Octatrack/Digitakt/TR-8S), and
-`ableton-tools` (read-only `.als` introspection).
+`ableton-tools` (read-only `.als` introspection), plus the optional experimental
+`live-tools` bridge for inspecting and applying guarded edits to a running Live Set.
 
 This repo is **not** the studio setup source of truth. Physical studio wiring, MIDI
 sync, and session workflow live in the **private** `eidetic-studio` repo

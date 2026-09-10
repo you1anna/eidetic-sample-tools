@@ -5,7 +5,8 @@ and how their lifecycle differs from source audio. For commands, use the
 [workflow](WORKFLOWS.md) and [library lifecycle](LIFECYCLE.md) guides.
 
 [System overview](TECHNOLOGY.md) · [Library](../library-tools/ARCHITECTURE.md) ·
-[Export](../sample-tools/ARCHITECTURE.md) · [Ableton](../ableton-tools/ARCHITECTURE.md)
+[Export](../sample-tools/ARCHITECTURE.md) · [Ableton](../ableton-tools/ARCHITECTURE.md) ·
+[Live control](LIVE.md)
 
 ## Ownership and storage
 
@@ -20,11 +21,15 @@ database paths can live elsewhere and need their own backup arrangements.
 | Captured older state | Under `.eidetic/`, recorded by onboarding | Preserve machine histories without replacing newer active decisions. |
 | Reports, packets and crates | `.eidetic/runs/` in the guide examples | Explicit command outputs; retain the evidence used for decisions. |
 | Collection revisions | User-selected new directory per revision | `plan.json` and `REVIEW.md`; self-contained, unreviewed metadata selections. |
-| Browser audition | User-selected session directory outside the source library | Prepared previews, `session.json` and `shortlist.json`. |
+| Browser audition | User-selected session directory outside the source library | Plan/library/candidate identities, lazy prepared previews, `session.json` and `shortlist.json`. |
+| Live audition attachment | Inside the audition session | Managed-track/clip evidence in `live-attachment.json` and retained saved-Set copies under `live-checkpoints/`. |
 | Curated copies | `SAMPLES/CURATED/` | Approved source-format copies; tracked as promotions. |
 | Converted output | `SAMPLES/_EXPORT/` by default | `sample-tools`; device WAVs and adjacent `.wav.receipt.json` files. |
 | Card-copy evidence | `.eidetic/transfers/` | `sample-tools`; per-run copy status and output hashes. |
 | Ableton reports | Explicit report directory | TSV, `.tsv.metadata.json` and retained `.history/` reports. |
+| Running-Set snapshots | Explicit user-selected path | `live-tools`; versioned Set identity, transport, track/device/clip-slot observations and completeness. |
+| Live edit plans and receipts | Explicit user-selected paths | Runtime/Set-bound allowlisted operations, expected-before values, readback and reconciliation evidence. |
+| Staged Max device source | Explicit user-selected destination | Fresh isolated bridge source plus build manifest; staging alone does not install or load a device in Live. |
 | Python environments and model files | Each machine's local disk | Installation/runtime state, separate from the portable library. |
 
 The [state resolver](../library-tools/src/librarytools/state.py) prefers an
@@ -44,6 +49,11 @@ a library UUID and can resolve source-relative paths against an explicitly
 selected current root. A packet without a UUID cannot be rebound to a different
 root. Audition sessions retain their prepared root and verify both original and
 preview bytes; they are not automatically portable just because the index is.
+Version 2 also binds the library UUID, plan ID and complete ordered candidate ID
+set. Working WAVs are prepared lazily in batches of 12, while shortlist decisions
+remain keyed to the original `sample_id` independent of batch position.
+`sample-vibe rebind-root` accepts a changed mount path only for the same library
+UUID; it preserves decisions and rechecks source hashes on next use.
 
 A complete inventory scan describes an observation, not a continuously monitored
 filesystem. Operations that promote, convert or serve audio recheck the relevant
@@ -58,11 +68,15 @@ availability or approve those sounds.
 | Library marker | `format_version: 1` | Library UUID and creation metadata; SQLite schema 5 has a matching identity row. |
 | Collection plan | `eidetic-collection-plan`, version 1 | Full snapshot, history, policy, pins, choices, counts and content digests. Every selected decision is `unreviewed`. |
 | Audition state | `schema_version: 1` | Registered originals, verified previews and separate `keep` / `skip` / `unreviewed` shortlist decisions. |
+| Plan audition state | `schema_version: 2` | Library UUID, plan ID, candidate IDs/hashes, lazy preview state and identity-keyed Keep/Skip decisions. Version 1 remains readable. |
 | Curation packet | `packet_format_version: 1`; supported packet schemas 1–3 | Candidate evidence, editable listening labels and identity-aware root resolution where available. |
 | Generated crate | Five-column TSV + `eidetic-crate`, version 1 sidecar | `sample_id`, `source_path`, `role`, `descriptor`, `reason`; TSV hash and approval evidence when supplied. |
 | Export receipt | `eidetic-export`, version 1 | Original and converted hashes, settings, tool/runtime versions, output size and software verification. |
 | Transfer journal | `eidetic-transfer`, version 1 | Device, destination, selected output hashes and per-file copy status. |
 | Ableton report metadata | `eidetic-ableton-report`, version 1 | Roots, input hashes, errors, exclusions, report hash, row count and completeness. |
+| Live snapshot | Versioned JSON | Exact build, bridge instance and saved-Set identity plus observed transport/tracks; `complete: false` on partial inspection. |
+| Live edit plan | Versioned JSON | Allowlisted operations bound to exact runtime/Set identity and expected-before values; structural plans add a separate matching saved `.als` checkpoint. |
+| Live edit receipt | Versioned JSON | Applied/read-back results and enough evidence to reconcile an uncertain acknowledgement without blindly retrying. |
 
 These are versioned application formats, not interchangeable JSON documents.
 Loaders validate the formats they accept. A digest detects changed content; it is
@@ -84,6 +98,8 @@ from SQLite; see the [export boundary](../sample-tools/ARCHITECTURE.md#input-con
 | Favourite and active promotion | Approved identity and curated copy for the curation workflow | Device compatibility or current hardware contents. |
 | Verified export receipt | Matching source, settings, runtime and output bytes | A successful card transfer or instrument test. |
 | Completed transfer | Selected copied bytes matched their expected hashes | Continued presence on the card or playable instrument state. |
+| Complete Live snapshot | The bridge returned a coherent observation of one exact Set identity | Audible routing, saved recall or approval to mutate the Set. |
+| Live edit receipt | Recorded requests and readback for the identity-bound plan | Musical correctness, timing/Warp quality, physical routing or saved recall. |
 
 Freshness uses original sample IDs from supplied export receipts or supported
 delegated history, scoped to one device. Converted output hashes identify
@@ -121,6 +137,8 @@ changing audio or make a cloud-synchronised live database safe.
 | Conversion | Verified temporary WAV is renamed, then its receipt is published. | A WAV without its receipt is unverified and requires an explicit rebuild. |
 | Card transfer | Each file is copied and verified through a temporary destination; the journal advances per file. | Completed files remain. A rerun can reuse matching card bytes and records a new transfer. |
 | Ableton report | Previous files are archived; TSV and metadata are replaced separately. | A mismatched report/sidecar pair can be detected using the report hash. |
+| Live edit plan | Plan file is written before any Set mutation. | Review or discard it; planning has not changed the Set. |
+| Live edit apply | Each allowlisted operation checks expected-before state and reads back before receipt publication. | Do not retry after an uncertain acknowledgement; inspect and reconcile the receipt against the same Set. |
 
 Atomic replacement applies to individual files, not entire collections. The
 operation journal's purpose is to make partial work inspectable and recoverable.
