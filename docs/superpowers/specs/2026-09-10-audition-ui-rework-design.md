@@ -29,9 +29,11 @@ Add `library-tools/src/librarytools/resources/tokens.css`, wrapped in `@layer ba
 and linked first by both pages. It holds custom properties — surfaces, text, accents,
 status colours, a 4/8/12/16/24/32/48 spacing scale, 4/8/12 radii, an 11/12/13/15/19/24
 type scale, 40px and 32px control heights and one motion duration — together with
-element primitives for buttons, inputs, selects, focus rings, panels, notices, hints
-and screen-reader text. Both page stylesheets remain unlayered so page composition wins
-without specificity contests. The packaging glob at `library-tools/pyproject.toml:46`
+element primitives for buttons, inputs, selects, focus rings, panels, notices, hints,
+keyboard chips and screen-reader text, and it carries the `prefers-reduced-motion` guard
+that currently sits at the bottom of `vibe.css` so both pages inherit a single copy.
+Both page stylesheets remain unlayered so page composition wins without specificity
+contests. The packaging glob at `library-tools/pyproject.toml:46`
 already covers `resources/*.css`; only the asset allowlist in `vibe_server.py` needs the
 new entry. A token file that leaves the duplicates in place changes nothing, so the
 existing primitives and colour literals are removed from both page stylesheets as part
@@ -46,9 +48,26 @@ choice, status lines return to plain ink, and the Loop control becomes a neutral
 Rebuild the audition page as a two-pane workstation. A sticky application bar carries
 the product name, review progress and an information button. The marketing headline is
 replaced: `Choose samples.` and its subtitle give way to an accessible `Sample audition`
-heading rendered as the application bar title. The decision buttons keep their current
-`Keep & next` and `Skip & next` wording, because the "& next" tells the listener that the
-following candidate loads, and they gain `kbd` chips rather than shorter labels. Below it, a
+heading. The bar's product name and the page heading are the same node: a single `h1`
+reading `Eidetic · Sample audition`, with no separate eyebrow above it and no subtitle
+sentence beside it, so the page carries one label rather than three near-duplicates. The
+existing intro sentence moves into the information panel with the disclaimers. The
+decision buttons keep their current `Keep & next` and `Skip & next` wording, because the
+"& next" tells the listener that the following candidate loads, and they gain `kbd` chips
+rather than shorter labels.
+
+Give the status region a defined home. `#status` is currently a full-width accent line
+above the card and is the element that produces the shouted "Kept: Demo_rhythm_A.wav";
+`audition.js` writes load state, save confirmations and errors to it. It moves into the
+player pane directly above the transport, keeping its id, `role="status"` and
+`aria-live="polite"` so the script needs no change. Ordinary confirmations render as
+quiet ink and clear themselves; errors keep the shared `.notice.error` treatment, which
+stays deliberately unmissable. Quieter applies to routine confirmation, not to failure.
+
+Preserve the remove affordance the pilot guide documents. In the Kept view the row's
+state column carries a quiet Remove control in place of the Kept badge; in the All view
+that column shows the state badge alone. The capability is not dropped, and `li .remove`
+keeps a defined slot in the new row grid. Below it, a
 `minmax(280px, 360px) 1fr` grid places the candidate list on the left and the player on
 the right, both reachable without scrolling; sessions cap at twelve candidates per role,
 so the whole list fits. List rows gain aligned columns — ordinal, name, kind,
@@ -130,7 +149,10 @@ at 45 percent opacity is not expected to pass and is re-specified.
 Recapture `docs/images/audition.png` to the recipe recorded in `docs/images/README.md`:
 the running application at a 960-pixel viewport, four synthetic demonstration files
 prepared through the normal session builder, one Keep choice visible, and no private
-library data. Chrome is available on this machine for a headless capture. Update the
+library data. Capture with Chrome headless against the running local
+server, using `--window-size=960,<height>` and `--hide-scrollbars` so the capture matches
+a 960-pixel viewport rather than Chrome's default window, and allow the page to settle
+before the shot so the waveform and list have rendered. Update the
 README caption if the controls it names have changed.
 
 Update `docs/GROOVE-AUDITION-PILOT.md`, whose "Listen and choose" steps describe using
