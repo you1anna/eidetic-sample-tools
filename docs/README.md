@@ -34,8 +34,8 @@ part of the system you need to understand:
 | [Ableton architecture](../ableton-tools/ARCHITECTURE.md) | Set traversal, parsing, reference resolution, completeness and report publication. |
 
 These guides map responsibilities to source modules and distinguish current
-behaviour from unfinished integrations. [README design notes](README-DESIGN.md)
-record the public-facing documentation choices and comparison examples.
+behaviour from unfinished integrations. The [README design standard](README-DESIGN.md)
+sets the baseline for future documentation and records the comparison examples.
 
 ## Evidence and history
 

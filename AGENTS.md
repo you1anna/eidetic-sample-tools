@@ -48,6 +48,10 @@ run artifacts into this repository.
 
 ## Documentation structure
 
+This is Robin's required standard for future documentation, established in the
+September 10 README refresh. Follow the [design standard](docs/README-DESIGN.md)
+when adding features or changing existing documentation.
+
 Root and package READMEs explain functionality and value in plain language for
 musicians. Give readers a concrete example and a clear starting link. Keep command
 inventories, configuration, schemas and implementation details in linked guides,
@@ -55,6 +59,12 @@ package references and architecture documents. Architecture guides should explai
 module ownership, data flow, state contracts, failure handling and performance
 limits, with source links. Keep current capability separate from planned work and
 dated experimental results. The documentation index is [docs/README.md](docs/README.md).
+
+Update affected guides, references, diagrams and status alongside the change they
+describe. Keep interface examples current and use synthetic data for public
+screenshots. Verify affected links and examples; render changed diagrams and
+visually inspect presentation changes before finalising. Preserve this standard
+without allowing command inventories or session history to crowd the READMEs.
 
 ## Sensitive / generated (do not commit)
 

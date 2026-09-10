@@ -1,4 +1,10 @@
-# README design notes
+# README design standard
+
+**Standing standard for future work, confirmed by Robin on 10 September 2026.**
+Maintain this quality and structure as the tools evolve. Update the relevant
+documentation alongside product changes, keeping examples, diagrams, capabilities
+and limitations accurate. The repository's [agent instructions](../AGENTS.md#documentation-structure)
+carry this requirement into future sessions.
 
 **Reviewed 10 September 2026.** The README is the entry point for a musician
 deciding whether to try the tools. Detailed operational and engineering material
