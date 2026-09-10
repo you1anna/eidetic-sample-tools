@@ -1,6 +1,7 @@
 # Library tools reference
 
-[Package overview](README.md) · [Workflow guide](../docs/WORKFLOWS.md)
+[Package overview](README.md) · [Workflow guide](../docs/WORKFLOWS.md) ·
+[Architecture](ARCHITECTURE.md)
 
 ## Install
 
@@ -73,6 +74,12 @@ sample-review --root "$SAMPLES_ROOT" --no-probe \
 ```
 
 The summary writes nothing; the second command writes TSV review material.
+The review reader walks source subdirectories of `--root`, not files placed
+directly in that root. Choose the parent of pack folders. It excludes hidden
+top-level directories, `CURATED`, `MIDI`, `_EXPORT`, `_TO-DELETE`, `_QUARANTINE`
+and the existing role folders listed in
+[`REVIEW_SKIP_TOP`](src/librarytools/review.py); `_REVIEW` remains included.
+
 Fields include proposed role, loop/one-shot type, explicit BPM/key evidence,
 tempo group, compact name and warnings. Indexes split by role, tempo and review
 priority. Omit `--no-probe` for FFprobe duration fallback.

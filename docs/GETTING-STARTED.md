@@ -75,12 +75,29 @@ manager; if SoundFile cannot load libsndfile, install that system library too
 
 ## Inspect a folder
 
+Select the parent of your sample-pack folders. For example, this layout is
+readable without reorganising or copying the pack:
+
+```text
+SAMPLES/
+└── ExamplePack/
+    ├── drum_loop_140.wav
+    └── vocal_phrase.wav
+```
+
+Point `SAMPLES_ROOT` at `SAMPLES`, then run:
+
 ```bash
 sample-review --root "$SAMPLES_ROOT" --no-probe --summary
 ```
 
-This reads names and paths, prints counts and writes nothing. To inspect the
-proposed roles, sample types, BPM/key evidence and naming warnings in a table:
+This reads names and paths, prints counts and writes nothing. Files directly in
+the selected root are not included; the reader walks its source subfolders and
+skips curated, export and other excluded areas. If the report says zero files,
+check the selected parent folder and [review scope](../library-tools/REFERENCE.md#sample-review).
+
+To inspect proposed roles, sample types, BPM/key evidence and naming warnings
+in a table:
 
 ```bash
 sample-review --root "$SAMPLES_ROOT" --no-probe \

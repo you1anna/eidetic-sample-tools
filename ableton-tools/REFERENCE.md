@@ -1,6 +1,6 @@
 # Ableton tools reference
 
-[← Ableton tools](README.md)
+[← Ableton tools](README.md) · [Architecture](ARCHITECTURE.md)
 
 Inspect a project archive without opening each Live Set. `ableton-tools` reads
 saved `.als` files to report Set structure and sample dependencies, helping you

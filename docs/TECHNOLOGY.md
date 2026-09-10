@@ -1,208 +1,95 @@
 # Technology and architecture
 
-Discovery, listening and export share a content identity. Each stage produces
-inspectable data so the commands can work independently.
+Eidetic Sample Tools is a local pipeline with three independently installable
+Python packages. Files and versioned records connect the stages; there is no
+central service coordinating the whole workflow.
 
-[Architecture diagram](../README.md#architecture) · [Command workflow](WORKFLOWS.md) ·
-[Safety model](SAFETY.md)
+[User guides](README.md) · [Commands in sequence](WORKFLOWS.md) ·
+[State and data contracts](STATE-AND-CONTRACTS.md) · [Development](DEVELOPMENT.md)
 
-## Three packages, explicit boundaries
+## System overview
 
-| Package | Responsibility | Stack |
+![System architecture: sample audio passes through library discovery, human curation and device conversion; saved Ableton Sets produce independent reports. Portable library state underpins the sample workflow.](images/architecture.svg)
+
+The diagram shows the search, listening and export path. Saved collection plans
+are a separate implemented branch: they freeze candidates and export history,
+but do not yet feed the listening interface automatically.
+
+## Package boundaries
+
+| Package | Owns | Runtime and dependencies | Detailed design |
+|---|---|---|---|
+| `library-tools` | Inventory, metadata, search, collection plans, listening, approval and organisation | Python 3.12; SQLite, NumPy and SoundFile; Flask for browser review; PyTorch/Transformers for local AI | [Library architecture](../library-tools/ARCHITECTURE.md) |
+| `sample-tools` | Crate validation, conversion, export receipts and card-copy evidence | Python 3.12 standard library plus FFmpeg/FFprobe executables | [Export architecture](../sample-tools/ARCHITECTURE.md) |
+| `ableton-tools` | Saved Set traversal, XML extraction and report history | Python 3.12 standard library | [Ableton architecture](../ableton-tools/ARCHITECTURE.md) |
+
+CLI entry points are declared in each package's `pyproject.toml`. Device and
+studio TOML profiles, tag vocabulary and browser assets are bundled with the
+packages that use them. Installed-wheel checks exercise the commands outside the
+checkout so missing resources cannot hide behind editable installs.
+
+The exporter consumes a crate without importing `library-tools` or requiring its
+database. When portable library state is present, it validates compatible state
+and participates in the same writer lock. Ableton inspection has no dependency
+on either sample package or a running Live process.
+
+## What crosses each boundary
+
+| From → to | Evidence carried forward | What still needs to happen |
 |---|---|---|
-| [`library-tools`](../library-tools/README.md) | Inventory, provenance, search, collection planning, analysis and curation | Python 3.12+, SQLite, NumPy, SoundFile; PyTorch for local AI, Flask for browser review |
-| [`sample-tools`](../sample-tools/README.md) | Resolve crates, validate constraints, convert and stage audio | Python 3.12+, FFmpeg and FFprobe |
-| [`ableton-tools`](../ableton-tools/README.md) | Inspect saved Sets and resolve sample references | Python 3.12+ standard-library gzip and XML parsing |
+| Inventory → search or planner | Content identity, current locations, metadata and complete-scan identity | Select useful candidates. |
+| Planner → saved revision | Frozen matching population, history coverage, seed, pins and unreviewed choices | A listening handoff; currently a separate step. |
+| Audition → curation packet | Kept original identities and paths | Explicit favourite approval, roles and descriptors. |
+| Curation → export | Approved copies and a five-column crate; generated crates add approval metadata | Revalidate source bytes and device constraints. |
+| Export → card | Verified converted bytes and a copy journal | Instrument playback, assignment and save/reload. |
+| Ableton scan → library review | Saved references, input hashes and completeness metadata | Interpret dependencies in the context of available project roots. |
 
-- **Entry points:** each package declares its CLI commands in `pyproject.toml`.
-- **Exchange formats:** SQLite data, TSV manifests and labels, JSON review state,
-  and M3U8 playlists.
-- **Configuration:** TOML holds tag vocabulary, collection targets and device settings.
-- **Export boundary:** a crate needs neither `library-tools` nor a database. When
-  portable state is present, the exporter validates it and joins its writer protocol.
-
-## Portable state and upgrades
-
-Release 0.2 binds the database to a library UUID under `SAMPLES/.eidetic/`.
-
-### Across machines
-
-- The SSD carries the active database and `.eidetic/runs/` evidence; Python
-  environments and models stay on each Mac.
-- Each Mac can onboard independently. Usable current state is separate from
-  incomplete historical coverage.
-- Later databases and human files are captured with content fingerprints in
-  state-relative archives. Active SSD decisions stay intact.
-- Secondary history remains visible for reconciliation; it never silently
-  becomes active approval.
-
-### During writes and upgrades
-
-- Schema 5 records staged scans, feature versions, tag provenance and decision history.
-- Historical schemas need explicit, validated migrations and verified backups.
-  Opening a database cannot upgrade or relabel it.
-- Single-writer locks and durable journals coordinate filesystem and SQLite changes.
-- Classifier subprocesses inherit the held lock for embedding-cache writes;
-  review sessions keep it until the server exits.
-- Read-only diagnostics use settled evidence without creating sidecars.
-
-See the [lifecycle guide](LIFECYCLE.md) for adoption and recovery.
-
-## Identity survives a folder change
-
-The [inventory](../library-tools/src/librarytools/inventory.py) separates a sample
-from its locations.
-
-- **Identity:** `sample_id` is the SHA-256 hash of file bytes. Exact copies share
-  an identity; re-encoding or changing embedded metadata creates a new one.
-- **Locations:** paths, library zones and scans point to that identity.
-- **History:** SQLite attaches provenance, features, tags, reviews, promotions and
-  kit picks to the bytes. Measurements can be reused across paths.
-- **Search:** duplicate collapsing prefers curated locations; crates preserve
-  canonical roles and approved descriptions. Promotion and undo update locations.
-- **Approval:** generated search crates record active promotion and favourite
-  evidence for the exact curated copy. Missing evidence requires review, even for
-  files already in `CURATED/` before onboarding.
-- **Verification:** promotion preflights the whole selection; promotion and export
-  recheck bytes before copying or converting.
-
-A matching hash establishes byte identity. Perceptual similarity is a separate
-search problem.
-
-## Search by intent or by sound
-
-### Musical tags
-
-- [Origin recovery](../library-tools/src/librarytools/origin.py) combines surviving
-  pack folders, recognised filename tokens and identical copies with known origins.
-- [`vocabulary.toml`](../library-tools/vocabulary.toml) maps origins, names and
-  measurements to role, style, gear and character tags. Rules can retag without
-  modifying audio.
-- `sample-find` combines terms with AND; `--any` uses OR.
-- Default results spread across filename-derived families to reduce repeated variants.
-- `--kit-id` records selections; `--preferred` ranks by those picks.
-
-### Acoustic similarity
-
-For `--like`, [feature extraction](../library-tools/src/librarytools/audiofeatures.py)
-decodes with SoundFile and an FFmpeg fallback, then measures:
-
-| Feature group | Measurements |
-|---|---|
-| Envelope | Attack, tail, duration, leading/trailing silence |
-| Dynamics | Peak, RMS, crest factor |
-| Spectrum and rhythm | Centroid, flatness, band energy, zero-crossing rate, onset density |
-
-[Ranking](../library-tools/src/librarytools/find.py) uses min-max normalised
-Euclidean distance over measurements shared with the reference. No learned
-embedding model is required. Results can become playlists or, after promotion,
-export crates.
-
-## Saved collection plans
-
-`sample-collection` captures an indexed candidate population, its original aliases
-and supplied export history in a portable JSON plan. Metadata filters determine
-eligibility; a seed makes the order reproducible. Regeneration reuses that snapshot
-without the source drive and retains pinned choices. Each revision has a new
-directory and a link to its parent.
-
-History is scoped to a device and the supplied records; it does not establish
-current device contents. Plans remain unreviewed and are not export crates.
-Publication inside `.eidetic/` coordinates with backups through the existing
-writer lock. External plan outputs remain independent of the library drive.
-
-The [planner guide](COLLECTION-PLANNER.md) covers commands and limits. Browser
-decisions, audio-model ranking, tempo policy, sound-family variety and aggregate
-device budgets are subsequent integrations. The overview diagram shows the
-implemented search/listening/export path; a saved plan does not yet feed that
-listening path automatically.
+See [State and data contracts](STATE-AND-CONTRACTS.md) for formats, ownership,
+path rebinding, locks and interruption handling.
 
 ## Local AI for listening packets
 
-Local AI is part of the intended musical-brief selection workflow. The implemented
-model path currently classifies supplied packets; it does not yet search all
-indexed audio from a brief. Ordinary inspection and metadata planning can run
-without model dependencies. See the [trial](SET-GENERATION-TRIAL.md) for the
-measured contribution and remaining retrieval work.
+Local AI is central to the intended musical-brief workflow. The current model
+pipeline groups supplied candidates using acoustic form checks and two pinned
+CLAP models. It includes cached embeddings and human review of uncertain results.
+It does not yet retrieve a musically coherent set from all indexed audio.
 
-The classifier separates **form** from **content**:
+There are currently three distinct selection mechanisms: metadata filtering,
+measured acoustic similarity and model-based packet grouping. They have different
+inputs and costs; a metadata planner's seeded ordering is not an AI score.
+The [library architecture](../library-tools/ARCHITECTURE.md#local-ai-and-review)
+explains these mechanisms and their boundaries. [AI setup](AI-SETUP.md) covers
+installation and resource controls.
 
-- **Form:** onset, periodicity, duration and beat rules distinguish one-shots,
-  loops and longer sources.
-- **Content:** two CLAP audio-language models compare audio embeddings with prompts.
-- **Filename influence:** zero decision weight in this ensemble.
-- **Scope:** nine groups cover percussion, drum loops, vocal material and
-  out-of-brief audio. This remains experimental.
+## Where work and waiting occur
 
-### Model execution and caching
+| Stage | Main cost | What can be reused |
+|---|---|---|
+| Inventory | File traversal and reading bytes for content hashes | Unchanged-file hash observations. |
+| Audio analysis and AI | Decoding, acoustic measurements, model loading and inference | Versioned features, audio embeddings and prompt embeddings. |
+| Collection planning | Reading metadata, sorting candidates, validating and writing a full snapshot | A saved population permits offline regeneration. |
+| Listening and approval | Human attention and decisions about musical fit | Saved shortlist and review decisions. |
+| Export and transfer | Hash reads, FFmpeg conversion, storage writes and copy verification | Outputs whose receipts still match; matching files already on the card. |
+| Ableton reports | Reading/decompressing Sets, XML parsing and checking reference paths | Earlier reports provide history, but each command scans again. |
 
-- [Adapters](../library-tools/src/librarytools/classification/models.py) pin
-  `laion/clap-htsat-unfused` and `laion/larger_clap_music_and_speech` to explicit revisions.
-- PyTorch and Transformers run on CPU; librosa loads 48 kHz mono excerpts from
-  bounded positions in longer files.
-- Models run sequentially in short-lived workers, releasing memory between runs.
-- SQLite caches audio embeddings by sample identity, model, revision and excerpt policy.
-- Separate prompt-policy keys let prompt changes reuse audio embeddings.
-- Checkpoints download on first use; audio processing and inference stay local.
+The [trial](SET-GENERATION-TRIAL.md) separates measured stage timings from estimates.
+The [planner benchmark](DEVELOPMENT.md#compare-collection-planner-performance) isolates
+metadata planning; it cannot predict model, conversion or listening time.
 
-### Review controls playlist publication
+## Design trade-offs
 
-1. Disagreements, weak scores and acoustic boundary cases enter a review queue.
-2. Each accepted group contributes a blind sentinel. A failed sentinel opens
-   the rest of that group for review.
-3. A [local Flask interface](../library-tools/src/librarytools/classification/review_server.py)
-   provides playback, decisions, notes, undo and resume on `127.0.0.1`.
-4. Atomic JSON state ties decisions to a classification digest. Changed decisions
-   withdraw stale publications.
-5. Grouped playlists require completed review and a passing 24-row benchmark:
-   at least **22 form** and **19 joint content/group** matches.
+- **Independent commands:** each stage is inspectable and can be rerun, while
+  the user or an assistant still coordinates the end-to-end session.
+- **Content identity:** exact copies share history even after moving folders;
+  edited tags or re-encoded audio produce a different identity.
+- **Local state and inference:** library state travels with its drive; each Mac
+  maintains its own Python environment and model files. This is a sequential
+  drive-handoff design, not concurrent database synchronisation between machines.
+- **Explicit evidence:** a saved candidate, a favourite, a converted file and a
+  played instrument sound represent different decisions and checks.
+- **Bounded progress:** current scale limitations include full plan snapshots,
+  manually supplied audition candidates, model worker timeouts and per-file
+  transfer journals. Per-device free-space budgets remain unimplemented.
 
-Those are packet acceptance thresholds, not general accuracy claims.
-
-**Musical approval is separate:** `labels.tsv` must contain validated favourites
-with a canonical role and descriptor before promotion.
-[Collection roles and quotas](../library-tools/src/librarytools/curation_policy.py)
-let a small kit use its own targets without changing hardware profiles.
-
-## Hardware export as a build step
-
-### Validate the input
-
-- A crate records `sample_id`, `source_path`, `role`, `descriptor` and `reason`.
-- Generated crates add versioned metadata bound to the TSV hash. Export rejects
-  explicit review-required metadata.
-- Legacy standalone five-column crates remain compatible as separately reviewed
-  inputs; legacy path/glob manifests use a separate planning path.
-- The [planner](../sample-tools/src/sampletools/export.py) checks current hashes,
-  paths inside `CURATED/`, accepted roles, compact names, and device count or
-  duration limits from the resolved configuration.
-
-### Convert and transfer
-
-- FFprobe reads media properties. FFmpeg writes PCM WAV copies to temporary
-  files, then renames them after successful conversion.
-- Reuse requires matching source, settings, runtime and output hashes in a
-  versioned receipt. Rebuilding stale outputs requires `--force`.
-- With `--crate`, card sync copies only that crate's planned files, including
-  existing staged conversions.
-- Digitakt uses Elektron Transfer; Octatrack and TR-8S support mounted-media copying.
-
-See the [export reference](../sample-tools/REFERENCE.md) for formats and limits.
-Playback, assignment and save/reload still need an
-[instrument test](WORKFLOWS.md#first-device-smoke-test).
-
-## Saved Ableton Sets as structured data
-
-The [reader](../ableton-tools/src/abletontools/read.py) parses gzip-compressed XML
-without running Live.
-
-- **Reports:** tempo, tracks, scenes, devices and sample references.
-- **Read-only boundary:** no Set edits or media relinking.
-- **Migration preflight:** checks saved Sets for `CURATED` references;
-  this is not a complete dependency analysis.
-- **Evidence:** report metadata records input hashes, roots, failures and completeness.
-  Regeneration archives earlier reports under `.history/`.
-- **Incomplete observations:** a missing root or failed parse cannot establish
-  that a sample has no project dependencies.
-
-[Verification conventions](../AGENTS.md) · [Roadmap](ROADMAP.md)
+[Current status](../STATUS.md) records the next bounded work; dated assessments
+and experiments remain evidence rather than guarantees about current behaviour.

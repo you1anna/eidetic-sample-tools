@@ -25,6 +25,7 @@ sounds had unsuitable tempo or a poorer musical fit.
 | Portable library state | Identity, onboarding, history capture, guarded writes, backup and recovery. |
 | [Collection planner](docs/COLLECTION-PLANNER.md) | Saved metadata selections, explicit export history, repeat handling, retained pins and visible shortages. Regeneration works offline. |
 | [Development tools](docs/DEVELOPMENT.md) | Environment discovery, tests against the checkout, installed-command checks and a repeatable synthetic scale benchmark. |
+| [Documentation](docs/README.md) | Functionality-first READMEs, a real interface example, contribution guidance and detailed package/state architecture. |
 
 The planner is experimental. It does not yet connect to browser decisions,
 interpret the musical brief, enforce tempo or sound-family variety, or calculate
@@ -49,6 +50,11 @@ The [roadmap](docs/ROADMAP.md) distinguishes established features from planned w
   installed-wheel checks and the default scale benchmark passed. The
   [macOS and Linux CI run](https://github.com/you1anna/eidetic-sample-tools/actions/runs/34459559476)
   passed. Earlier real-model installation checks are recorded in [AI setup](docs/AI-SETUP.md).
+- The September 10 documentation refresh passed local link/anchor and shell-syntax
+  checks. The README inspection command was verified against four synthetic files
+  without changing audio or creating state; its folder scope is now explicit.
+  The README layout and three package diagrams were rendered and inspected.
+  This refresh changes documentation and its image only, not application behaviour.
 
 ## Next bounded increments
 

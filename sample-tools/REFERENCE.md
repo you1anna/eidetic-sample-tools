@@ -1,6 +1,6 @@
 # Sample export reference
 
-[← Sample export](README.md)
+[← Sample export](README.md) · [Architecture](ARCHITECTURE.md)
 
 Prepare a reviewed collection for Octatrack MKII, Digitakt MKI or TR-8S.
 `sample-export` resolves a manifest or curated crate, validates the selection and

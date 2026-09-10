@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Rework the root and package READMEs around musical use, with a real audition
+  screenshot, clear setup links and contribution guidance. Add detailed package
+  architecture and shared-state contracts, including recovery and scaling limits.
+  Clarify the sample-folder layout expected by the first inspection command.
 - Refresh the documentation index, current roadmap and handoff status; keep
   earlier operational findings separately and clarify local AI's intended role.
 - Add local test-environment discovery and a synthetic collection-planner scale

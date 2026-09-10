@@ -1,40 +1,40 @@
 # Ableton tools
 
-**Find saved Live Sets and check their sample dependencies without opening Live.**
-Read `.als` files to see tracks, devices and missing media before reorganising
-an archive or changing sample-library paths. Sets and audio are never edited.
+**Rediscover saved Live projects without opening every Set.**
 
-## Install
+See what's in a project archive and which samples its Sets refer to before
+reorganising folders or returning to an old session. Sets and audio stay unchanged.
 
-In an activated Python 3.12 environment, from the repository root:
+[Get started](../docs/GETTING-STARTED.md) · [Generate reports](REFERENCE.md#generate-reports) ·
+[Command reference](REFERENCE.md) · [Architecture](ARCHITECTURE.md)
 
-```bash
-python -m pip install -e ./ableton-tools
-```
+## Explore your archive
 
-See [setup](../docs/GETTING-STARTED.md) for the Python environment.
+- **Find a project worth reopening.** Browse saved tempo, track names, scenes
+  and devices across a folder of Live Sets.
+- **Spot missing media.** List sample references and see which paths are
+  available during the scan.
+- **Check before moving samples.** Identify saved references that could be
+  affected by a library change.
+- **Compare later.** Regenerating a report preserves its previous version
+  alongside a record of what was scanned.
 
-## Generate reports
+## What you get
 
-Choose the project tree to inspect and a directory for the reports:
-
-```bash
-als-index --root /path/to/ABLETON_PROJECTS --out /path/to/reports
-als-samples --root /path/to/ABLETON_PROJECTS --out /path/to/reports
-```
-
-| Report | What it tells you |
+| Report | Useful for… |
 |---|---|
-| `als-index.tsv` | Each Set's tempo, tracks, scenes, devices and modification time. |
-| `als-samples.tsv` | Each Set's sample references, resolved paths and present/missing status. |
+| Project overview | Finding a Set by its tempo, tracks or devices. |
+| Sample references | Investigating missing media and checking library dependencies. |
 
-Reports reflect saved Sets and files accessible during the scan. Malformed Sets
-are skipped with errors on stderr. Check each report's `.metadata.json` sidecar:
-`complete: false` means the scan is incomplete. Earlier reports remain in `.history/`.
+Reports open as tables in a spreadsheet or text editor. Follow the
+[report guide](REFERENCE.md#generate-reports) to choose your project folders and
+output location. This package runs independently of the sample-library tools.
 
-`--root` selects Ableton projects. To scan several project trees, use
-[`ALS_ROOTS`](REFERENCE.md#scan-multiple-roots) instead.
+## What a report can tell you
 
-[Report metadata and storage](REFERENCE.md#generate-reports) ·
-[Development checks](REFERENCE.md#verify) ·
-[Full reference](REFERENCE.md)
+Reports describe saved Sets and files accessible during that scan. Unavailable
+folders or unreadable Sets leave an incomplete report; the
+[report guide](REFERENCE.md#generate-reports) explains how to check completeness.
+The tools do not edit Sets, repair references or inspect an unsaved Live session.
+
+[System overview](../docs/TECHNOLOGY.md) · [Contributing](../CONTRIBUTING.md)

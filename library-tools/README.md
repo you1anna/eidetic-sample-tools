@@ -1,71 +1,47 @@
 # Library tools
 
-Find samples by musical tags or acoustic similarity, audition a shortlist, and
-copy your favourites into a collection ready for export.
+**Find the sounds worth taking out of your sample folders.**
 
-[Setup](../docs/GETTING-STARTED.md) · [Workflow](../docs/WORKFLOWS.md) ·
-[Command reference](REFERENCE.md)
+Search a large library, listen to a manageable shortlist and collect your
+favourites for a hardware session. Your listening decisions stay separate from
+the tools' suggestions.
 
-## What it does
+[Get started](../docs/GETTING-STARTED.md) · [Listening workflow](../docs/WORKFLOWS.md#3-curate-by-ear) ·
+[Command reference](REFERENCE.md) · [Architecture](ARCHITECTURE.md)
 
-| Task | Commands |
-|---|---|
-| Inspect sample names, roles, BPM/key evidence and warnings | [`sample-review`](REFERENCE.md#sample-review) |
-| Search tags, pack origins and similar sounds; write playlists | [`sample-tag`](REFERENCE.md#sample-tag), [`sample-find`](REFERENCE.md#sample-find) |
-| Save a selection, control repeats and retain chosen sounds | [Collection planner](../docs/COLLECTION-PLANNER.md) |
-| Preview sorting, exact deduplication and pack intake | [`sample-sort`, `sample-dedupe`, `sample-intake`](REFERENCE.md#sample-sort-sample-dedupe-sample-intake) |
-| Audition explicit candidates in a browser and save a shortlist | [`sample-vibe`](REFERENCE.md#sample-vibe) |
-| Record listening decisions, promote favourites and check copies | [`sample-curate`](REFERENCE.md#sample-curate) |
-| Suggest listening groups with local AI | [Packet classification](REFERENCE.md#packet-classification) |
-| Measure audio and evaluate similar loops or model suggestions | [Analysis and experiments](REFERENCE.md#analysis-and-experiments) |
-| Onboard a library, back up its state and recover interrupted work | [`sample-library`](REFERENCE.md#long-lived-and-shared-drive-installations) |
-| Inspect resolved device capabilities | [`sample-profile`](REFERENCE.md#sample-profile) |
+## Find, listen, collect
 
-Core organisation is stable; search and curation are beta. Collection planning,
-browser audition, AI classification and near-duplicate detection are experimental.
-See the [reference](REFERENCE.md#command-map) for command maturity.
+- **Search in musical terms.** Combine tags, sample roles and pack origins,
+  or find sounds that resemble an indexed reference.
+- **Make a selection you can revisit.** Save candidates, choose how to handle
+  known repeats for a device, and retain chosen sounds when generating another version.
+- **Decide by ear.** Play candidates in a browser, Keep or Skip, undo a choice
+  and return to the shortlist later. [See the interface](../README.md#listen-before-you-export).
+- **Use local AI to organise listening.** Get suggested groups for supplied
+  candidates, with uncertain classifications brought forward for review.
+- **Build an approved collection.** Give favourites useful roles and names,
+  then copy them into a collection for [device export](../sample-tools/README.md).
 
-## Try it
+For example, find tribal percussion, compare it with a loop that already works,
+audition the candidates and save the grooves you want to use. The
+[step-by-step guide](../docs/GETTING-STARTED.md#search-and-listen) takes you through
+the first search; the [collection guide](../docs/COLLECTION-PLANNER.md) explains
+saved selections and repeat handling.
 
-Follow [environment setup](../docs/GETTING-STARTED.md#install), then install from
-the repository root in the activated Python 3.12 environment:
+## Keep the library usable
 
-```bash
-python -m pip install -e ./library-tools
-export SAMPLES_ROOT=/path/to/SAMPLES
-export RUNS="$SAMPLES_ROOT/.eidetic/runs"
-```
+Inspect names and tempo evidence, preview pack organisation, and stage exact
+duplicates for review. Moves retain undo records; favourites are copied.
+The library's index and decisions can travel with its drive between independently
+configured Macs. Follow the [safety](../docs/SAFETY.md) and
+[backup and recovery](../docs/LIFECYCLE.md) guides before reorganising audio.
 
-Inspect a folder without writing files:
+## Current scope
 
-```bash
-sample-review --root "$SAMPLES_ROOT" --no-probe --summary
-```
+Core organisation is established; search and curation are beta. Saved collection
+plans, browser listening and AI grouping are experimental. Plans currently use
+metadata and need a separate listening handoff. Local AI selection from a musical
+brief across the whole library is still in development.
 
-For search, [onboard the library](../docs/GETTING-STARTED.md#search-and-listen)
-first, then build its index and write an audition playlist:
-
-```bash
-sample-tag --root "$SAMPLES_ROOT" --rescan --apply
-sample-find --root "$SAMPLES_ROOT" perc tribal analog --limit 20 \
-  --m3u8 "$RUNS/percussion.m3u8"
-```
-
-Tagging writes measurements and generated tags to the index; audio stays in place.
-Search terms combine with AND. Use `--any` to broaden a query, or
-`--like SAMPLE_ID` to rank by acoustic similarity without AI models.
-
-Next, [audition explicit candidates in the browser](REFERENCE.md#sample-vibe) or
-[prepare a listening packet and promote favourites](../docs/WORKFLOWS.md#3-curate-by-ear).
-Approved collections pass to [sample-tools](../sample-tools/README.md) for export.
-
-## Before changing a library
-
-- Organisation previews moves; `--apply` executes them and records undo mappings.
-  Exact duplicates are staged, never deleted.
-- Promotion copies favourites after complete listening labels and hash checks.
-  `undo-promotion` moves curated copies to quarantine immediately, without `--apply`.
-- Back up source audio and retain labels, manifests and undo records together.
-  Follow the [safety model](../docs/SAFETY.md) and [lifecycle guide](../docs/LIFECYCLE.md).
-
-[Full command reference](REFERENCE.md) · [Local AI setup](../docs/AI-SETUP.md)
+[Local AI setup](../docs/AI-SETUP.md) · [Progress and limits](../STATUS.md) ·
+[Contributing](../CONTRIBUTING.md)

@@ -46,6 +46,16 @@ the checkpoint, and ask when they affect the next increment. Report completed
 behaviour, actual verification and the next bounded step without copying private
 run artifacts into this repository.
 
+## Documentation structure
+
+Root and package READMEs explain functionality and value in plain language for
+musicians. Give readers a concrete example and a clear starting link. Keep command
+inventories, configuration, schemas and implementation details in linked guides,
+package references and architecture documents. Architecture guides should explain
+module ownership, data flow, state contracts, failure handling and performance
+limits, with source links. Keep current capability separate from planned work and
+dated experimental results. The documentation index is [docs/README.md](docs/README.md).
+
 ## Sensitive / generated (do not commit)
 
 - Sample library data lives at `/Volumes/Extreme SSD/Production/SAMPLES` — never copy it in.
