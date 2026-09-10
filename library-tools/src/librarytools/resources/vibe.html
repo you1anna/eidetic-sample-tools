@@ -5,23 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="vibe-token" content="{{ token }}">
   <title>Groove audition · Eidetic</title>
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/vibe.css">
   <script src="/static/vibe.js" defer></script>
 </head>
 <body>
+  <header class="appbar">
+    <h1><span class="wordmark">Eidetic</span> Vocal lab</h1>
+    <span class="badge">Experimental</span>
+    <p class="session-tag"><span class="status-dot"></span> Local audition <span class="muted">/ 4/4 · 8 bars</span></p>
+  </header>
   <main class="workspace">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">Eidetic Sample Tools <span class="badge">Experimental</span></p>
-        <h1>Find it by ear.</h1>
-        <p class="intro">Choose a groove. Cut a vocal. Hear them together.</p>
-      </div>
-      <div class="session-tag"><span class="status-dot"></span> Local audition <span class="muted">/ 4/4 · 8 bars</span></div>
-    </header>
-
-    <p class="scope-note">These candidates were supplied manually and are unranked. Automatic vibe matching is not available yet.</p>
+    <p class="scope-note">Choose a groove, cut a vocal and hear them together. These candidates were
+      supplied manually and are unranked; automatic vibe matching is not available yet.</p>
     <noscript><p class="notice error">Enable JavaScript to use the local audition controls.</p></noscript>
-    <div id="status" class="notice" role="status" aria-live="polite">Loading the session…</div>
+    <p id="status" class="notice" role="status" aria-live="polite">Loading the session…</p>
     <button id="retry-load" class="secondary" type="button" hidden>Retry loading session</button>
 
     <form id="recipe-form">

@@ -17,12 +17,12 @@ def audition(tmp_path):
 def test_main_screen_is_source_audition_and_vocal_editor_is_separate(audition):
     client, _, _, _ = audition
     page = client.get('/')
-    assert b'Choose samples.' in page.data
+    assert b'Sample audition' in page.data
     assert b'Keep &amp; next' in page.data
     assert b'audition.js' in page.data
     assert b'Render audition' not in page.data
     assert b'Render audition' in client.get('/vocal-lab').data
-    for asset in ('audition.js', 'audition.css'):
+    for asset in ('audition.js', 'audition.css', 'tokens.css'):
         response = client.get('/static/' + asset)
         assert response.status_code == 200
         assert response.headers['X-Content-Type-Options'] == 'nosniff'
@@ -97,9 +97,11 @@ def test_source_chooser_is_independent_of_optional_vocal_feedback(audition):
     (output / 'feedback.json').write_text('broken optional vocal experiment')
     response = client.get('/api/sources')
     assert response.status_code == 200
+    peaks = response.json['sources'][0]['waveform']
+    assert peaks and all(0 <= peak <= 1 and round(peak, 3) == peak for peak in peaks)
     assert response.json['sources'][0] == {
         'id': source_id, 'name': 'groove.wav', 'duration_s': 2,
-        'kind': 'Groove candidate',
+        'kind': 'Groove candidate', 'waveform': peaks,
     }
     assert len(response.json['sources']) == 2
     assert client.get('/api/shortlist').status_code == 200

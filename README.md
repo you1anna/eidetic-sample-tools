@@ -25,7 +25,7 @@ saved Ableton Live projects without opening Live.
 
 ## Listen before you export
 
-![Browser audition showing a sample player, Keep and Skip controls, and a list of groove and vocal candidates with saved choices.](docs/images/audition.png)
+![Browser audition: a list of groove and vocal candidates beside a player showing the selected sample's waveform, transport, and Keep and Skip controls, with one saved choice.](docs/images/audition.png)
 
 *The working audition interface with explicitly supplied, synthetic demonstration
 files.* [Follow the listening workflow](docs/WORKFLOWS.md#3-curate-by-ear).

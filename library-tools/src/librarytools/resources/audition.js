@@ -8,9 +8,52 @@
   let handoff = {available: false, reason: 'Checking the library index…'};
 
   const clock = value => {
-    const seconds = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    const seconds = Math.max(0, Number.isFinite(value) ? value : 0);
+    const whole = Math.floor(seconds);
+    const tenths = Math.floor((seconds - whole) * 10);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}.${tenths}`;
   };
+  const role = item => item.kind.replace(' candidate', '');
+  let played = '', unplayed = '';
+  function waveColours() {
+    const styles = getComputedStyle(document.documentElement);
+    played = styles.getPropertyValue('--ink').trim();
+    unplayed = styles.getPropertyValue('--line-strong').trim();
+  }
+  function drawWave() {
+    const canvas = $('wave');
+    const width = Math.max(1, canvas.clientWidth), height = 96;
+    const scale = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(width * scale)) {
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const peaks = current?.waveform || [];
+    if (!peaks.length) return;
+    if (!played) waveColours();
+    const progress = current.duration_s ? Math.min(1, player.currentTime / current.duration_s) : 0;
+    // Aggregate the stored peaks into legible bars rather than one hairline each.
+    const step = 4, bars = Math.max(1, Math.floor(width / step));
+    const loudest = Math.max(...peaks) || 1;
+    const split = progress * width;
+    // A continuous baseline keeps quiet passages a line rather than dots.
+    ctx.fillStyle = unplayed;
+    ctx.fillRect(0, height / 2 - .5, width, 1);
+    ctx.fillStyle = played;
+    ctx.fillRect(0, height / 2 - .5, split, 1);
+    for (let index = 0; index < bars; index += 1) {
+      const from = Math.floor(index * peaks.length / bars);
+      const to = Math.max(from + 1, Math.floor((index + 1) * peaks.length / bars));
+      const peak = Math.max(...peaks.slice(from, to));
+      const bar = Math.max(1, (peak / loudest) * (height - 12));
+      const x = index * step;
+      ctx.fillStyle = (x + step / 2) / width <= progress ? played : unplayed;
+      ctx.fillRect(x, (height - bar) / 2, step - 1, bar);
+    }
+  }
   function status(message, error = false) {
     $('status').textContent = message;
     $('status').classList.toggle('error', error);
@@ -29,17 +72,20 @@
   }
   const filtered = () => sources.filter(item => view === 'all' || decisions[item.id] === 'keep');
   function playbackState() {
-    $('play').textContent = player.paused ? (mediaFailed ? 'Retry play' : 'Play') : 'Pause';
+    const playing = !player.paused;
+    $('play-glyph').textContent = playing ? '❙❙' : '▶';
+    $('play').setAttribute('aria-label', playing ? 'Pause' : mediaFailed ? 'Retry play' : 'Play');
     $('time').textContent = `${clock(player.currentTime)} / ${clock(current?.duration_s || 0)}`;
     $('seek').value = Number.isFinite(player.currentTime) ? player.currentTime : 0;
     $('seek').disabled = !current || player.readyState < 1;
+    drawWave();
   }
   function controls() {
     $('play').disabled = !current;
     $('keep').disabled = busy || !current || (view === 'kept' && decisions[current.id] === 'keep');
     $('skip').disabled = busy || !current;
-    $('keep').textContent = view === 'kept' ? 'Kept' : 'Keep & next';
-    $('skip').textContent = view === 'kept' ? 'Skip' : 'Skip & next';
+    $('keep-label').textContent = view === 'kept' ? 'Kept' : 'Keep & next';
+    $('skip-label').textContent = view === 'kept' ? 'Skip' : 'Skip & next';
     $('undo').hidden = !lastChoice;
     $('undo').disabled = busy;
     $('all').disabled = $('kept').disabled = busy;
@@ -70,13 +116,21 @@
       const order = document.createElement('span');
       order.className = 'order'; order.textContent = String(sources.indexOf(item) + 1).padStart(2, '0');
       const name = document.createElement('span');
-      name.className = 'name'; name.textContent = item.name;
-      const detail = document.createElement('small');
-      detail.textContent = `${item.kind} · ${item.duration_s.toFixed(2)} seconds`;
-      name.append(detail);
+      name.className = 'name';
+      const title = document.createElement('span');
+      title.className = 'title'; title.textContent = item.name;
+      const detail = document.createElement('span');
+      detail.className = 'detail';
+      for (const text of [role(item), clock(item.duration_s)]) {
+        const part = document.createElement('span');
+        part.textContent = text;
+        detail.append(part);
+      }
+      name.append(title, detail);
       const badge = document.createElement('span');
       badge.className = 'badge';
-      badge.textContent = {keep: 'Kept', skip: 'Skipped', unreviewed: ''}[decisions[item.id]];
+      // The Kept view puts a Remove control in this column instead of a state word.
+      badge.textContent = view === 'kept' ? '' : {keep: 'Kept', skip: 'Skipped', unreviewed: ''}[decisions[item.id]];
       button.append(order, name, badge);
       button.addEventListener('click', () => {
         status(`Selected: ${item.name}`);
@@ -85,7 +139,7 @@
       row.append(button);
       if (view === 'kept') {
         const remove = document.createElement('button');
-        remove.className = 'remove'; remove.textContent = 'Remove';
+        remove.className = 'remove quiet'; remove.textContent = 'Remove';
         remove.setAttribute('aria-label', `Remove ${item.name} from shortlist`);
         remove.addEventListener('click', () => choose(item, 'unreviewed', false));
         row.append(remove);
@@ -102,7 +156,7 @@
     if (current) {
       player.src = `/source/${current.id}`;
       $('sample-name').textContent = current.name;
-      $('sample-meta').textContent = `${current.kind} · ${current.duration_s.toFixed(2)} seconds`;
+      $('sample-meta').textContent = `${role(current)} · ${clock(current.duration_s)}`;
       $('seek').max = current.duration_s;
     } else {
       player.removeAttribute('src');
@@ -185,7 +239,17 @@
     if (player.readyState >= 1) player.currentTime = Number($('seek').value);
     playbackState();
   });
-  $('loop').addEventListener('change', () => { player.loop = $('loop').checked; });
+  $('loop').addEventListener('click', () => {
+    const next = $('loop').getAttribute('aria-pressed') !== 'true';
+    $('loop').setAttribute('aria-pressed', String(next));
+    player.loop = next;
+  });
+  $('info-toggle').addEventListener('click', () => {
+    const opening = $('info').hidden;
+    $('info').hidden = !opening;
+    $('info-toggle').setAttribute('aria-expanded', String(opening));
+  });
+  window.addEventListener('resize', drawWave);
   for (const name of ['timeupdate', 'loadedmetadata', 'play', 'pause', 'ended', 'emptied'])
     player.addEventListener(name, playbackState);
   player.addEventListener('error', () => {

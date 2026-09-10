@@ -4,67 +4,81 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="vibe-token" content="{{ token }}">
-  <title>Choose samples · Eidetic</title>
+  <title>Sample audition · Eidetic</title>
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/audition.css">
   <script src="/static/audition.js" defer></script>
 </head>
 <body>
-<main>
-  <header>
-    <p class="eyebrow">Eidetic / Sample audition</p>
-    <h1>Choose samples.</h1>
-    <p class="intro">Listen. Keep what you want to use. Review before export.</p>
-  </header>
-  <p id="status" role="status" aria-live="polite">Loading samples…</p>
-  <section class="player-card" aria-labelledby="sample-name">
-    <p id="sample-meta" class="eyebrow">Sample</p>
-    <h2 id="sample-name">Loading…</h2>
-    <audio id="player" preload="none" loop></audio>
-    <div class="transport">
-      <button id="play" class="play" disabled>Play</button>
-      <div class="scrubber">
-        <label for="seek" class="sr-only">Playback position</label>
-        <input type="range" id="seek" min="0" max="1" step="0.01" value="0" disabled>
-        <span id="time">0:00 / 0:00</span>
-      </div>
-      <label class="loop"><input id="loop" type="checkbox" checked> Loop</label>
-    </div>
-    <div class="choices">
-      <button id="keep" class="primary" disabled>Keep &amp; next</button>
-      <button id="skip" disabled>Skip &amp; next</button>
-      <button id="undo" class="quiet" hidden>Undo last choice</button>
-    </div>
-    <p class="hint">Original timing. One sample at a time. <span class="keys">Space: play · K: keep · S: skip · ← →: browse</span></p>
-  </section>
-  <section class="library" aria-label="Sample choices">
-    <div class="list-header">
-      <div class="filters" role="group" aria-label="Show samples">
-        <button id="all" aria-pressed="true">All samples</button>
-        <button id="kept" aria-pressed="false">Kept (0)</button>
-      </div>
-      <span id="progress" class="hint"></span>
+<header class="appbar">
+  <h1><span class="wordmark">Eidetic</span> Sample audition</h1>
+  <p id="progress" class="progress num">—</p>
+  <button id="info-toggle" class="quiet small" type="button" aria-expanded="false" aria-controls="info">
+    About this screen
+  </button>
+</header>
+
+<div id="info" class="info" hidden>
+  <p>Listen, keep what you want to use, and review before export. Candidates are supplied
+     manually and unranked — there is no automatic vibe ranking yet.</p>
+  <p>Auditioning and Keep or Skip leave your source audio unchanged. Keeping a sample keeps
+     its complete original file.</p>
+</div>
+
+<main class="workspace">
+  <section class="list-pane panel" aria-label="Sample choices">
+    <div class="filters" role="group" aria-label="Show samples">
+      <button id="all" class="quiet small" aria-pressed="true">All samples</button>
+      <button id="kept" class="quiet small" aria-pressed="false">Kept (0)</button>
     </div>
     <ul id="samples" aria-label="Samples"></ul>
-    <p id="empty" hidden>No samples kept yet. Play a sample and choose Keep.</p>
+    <p id="empty" class="hint empty" hidden>No samples kept yet. Play a sample and choose Keep.</p>
   </section>
-  <section id="handoff" class="handoff" aria-labelledby="handoff-title" hidden>
-    <h2 id="handoff-title">Use your shortlist</h2>
-    <p>Your choices are saved on this Mac. Keeping a source adds its complete original file to this shortlist.</p>
-    <div class="handoff-actions">
-      <a id="playlist" class="button" href="/api/shortlist/playlist" download="eidetic-shortlist.m3u8">Download playlist</a>
-      <button id="prepare">Prepare curation sheet</button>
+
+  <section class="player-pane panel" aria-labelledby="sample-name">
+    <div class="now-playing">
+      <h2 id="sample-name">Loading…</h2>
+      <p id="sample-meta" class="meta num">—</p>
     </div>
-    <p id="handoff-status" class="hint"></p>
-    <div id="packet-result" hidden>
-      <p id="packet-message"></p>
-      <pre id="packet-command"></pre>
+
+    <audio id="player" preload="none" loop></audio>
+
+    <div class="waveform">
+      <canvas id="wave" height="96" aria-hidden="true"></canvas>
+      <label for="seek" class="sr-only">Playback position</label>
+      <input type="range" id="seek" min="0" max="1" step="0.01" value="0" disabled>
     </div>
-    <p class="hint">The playlist plays originals on this Mac. Export still requires approved roles and names through the existing curation workflow.</p>
+
+    <div class="transport">
+      <button id="play" class="play" disabled aria-label="Play" aria-keyshortcuts="Space"><span id="play-glyph" aria-hidden="true">▶</span></button>
+      <kbd class="play-key">Space</kbd>
+      <span id="time" class="num">0:00.0 / 0:00.0</span>
+      <button id="loop" type="button" aria-pressed="true" class="small">Loop</button>
+    </div>
+
+    <p id="status" class="status" role="status" aria-live="polite">Loading samples…</p>
+
+    <div class="choices">
+      <button id="keep" class="primary" disabled><span id="keep-label">Keep &amp; next</span> <kbd>K</kbd></button>
+      <button id="skip" disabled><span id="skip-label">Skip &amp; next</span> <kbd>S</kbd></button>
+      <button id="undo" class="quiet small" hidden>Undo last choice</button>
+    </div>
+
+    <section id="handoff" class="handoff" aria-labelledby="handoff-title" hidden>
+      <h2 id="handoff-title" class="eyebrow">Use your shortlist</h2>
+      <p class="hint">Your choices are saved on this Mac. The playlist plays the original files;
+         export still requires approved roles and names through the curation workflow.</p>
+      <div class="handoff-actions">
+        <a id="playlist" class="button-link" href="/api/shortlist/playlist" download="eidetic-shortlist.m3u8">Download playlist</a>
+        <button id="prepare" class="small">Prepare curation sheet</button>
+      </div>
+      <p id="handoff-status" class="hint"></p>
+      <div id="packet-result" hidden>
+        <p id="packet-message" class="hint"></p>
+        <pre id="packet-command"></pre>
+      </div>
+    </section>
   </section>
-  <footer>
-    <p>Manually supplied candidates · No automatic vibe ranking yet.</p>
-    <p>Auditioning and Keep/Skip leave your source audio unchanged.</p>
-  </footer>
 </main>
 </body>
 </html>

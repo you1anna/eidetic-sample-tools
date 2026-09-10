@@ -1,0 +1,191 @@
+/* Shared tokens and element primitives for both audition pages.
+   Loaded first; page stylesheets stay unlayered so page composition wins
+   without specificity contests. Page files must hold no colour literals. */
+@layer base {
+  :root {
+    color-scheme: dark;
+
+    --bg: #0e100f;
+    --surface: #151816;
+    --surface-raised: #1c201e;
+    /* --line divides surfaces; --line-strong bounds controls and draws the
+       waveform, so it holds 3:1 against the page while --line stays quiet. */
+    --line: #262b28;
+    --line-strong: #5e6661;
+
+    --ink: #e9ede8;
+    --ink-muted: #a2ada5;
+    --ink-dim: #7f8983;
+
+    /* Green marks a listening decision or the current selection. Nothing else. */
+    --accent: #b6e08a;
+    --accent-ink: #101c07;
+    --accent-soft: #232e1b;
+
+    /* The vocal lab's second track colour. */
+    --vocal: #e3ac7e;
+    --vocal-soft: #2d2620;
+    --vocal-line: #6d5540;
+
+    /* A system affordance, deliberately not the decision colour. */
+    --focus: #7fb0ff;
+
+    --danger: #f0a48d;
+    --danger-soft: #2f1f1b;
+    --danger-line: #7d4b3c;
+    --ok-line: #4d6b3c;
+
+    --s1: 4px;
+    --s2: 8px;
+    --s3: 12px;
+    --s4: 16px;
+    --s5: 24px;
+    --s6: 32px;
+
+    --r1: 4px;
+    --r2: 8px;
+    --r3: 12px;
+
+    --t1: 11px;
+    --t2: 12px;
+    --t3: 13px;
+    --t4: 15px;
+    --t5: 19px;
+
+    --h-control: 40px;
+    --h-control-sm: 32px;
+
+    --dur: 120ms;
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+    font-family: var(--font);
+    font-size: var(--t4);
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; }
+  figure, h1, h2, h3, p, ul, ol { margin: 0; }
+  ul, ol { padding: 0; list-style: none; }
+
+  h1 { font-size: var(--t5); font-weight: 600; letter-spacing: -.01em; }
+  h2 { font-size: var(--t4); font-weight: 600; letter-spacing: -.01em; }
+
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button, select { cursor: pointer; }
+
+  button, .button-link {
+    min-height: var(--h-control);
+    padding: 0 var(--s4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    background: var(--surface-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r2);
+    font-size: var(--t3);
+    font-weight: 550;
+    transition: background var(--dur), border-color var(--dur), color var(--dur);
+  }
+  button:hover:not(:disabled), .button-link:hover { background: var(--surface); border-color: var(--ink-dim); }
+  .button-link { text-decoration: none; font-size: var(--t2); min-height: var(--h-control-sm); padding: 0 var(--s3); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 650;
+  }
+  button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--ink); }
+
+  button.quiet {
+    background: none;
+    border-color: transparent;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+  button.quiet:hover:not(:disabled) { background: var(--surface-raised); color: var(--ink); }
+
+  button.small { min-height: var(--h-control-sm); padding: 0 var(--s3); font-size: var(--t2); }
+
+  /* A pressed toggle is a mode, not a decision: raised, never accent-filled. */
+  button[aria-pressed="true"] { background: var(--surface-raised); border-color: var(--ink-dim); color: var(--ink); }
+
+  input, select, textarea {
+    min-height: var(--h-control);
+    padding: 0 var(--s3);
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r2);
+    font-size: var(--t3);
+  }
+  input:not([type="range"]), select, textarea { width: 100%; }
+  textarea { padding: var(--s2) var(--s3); resize: vertical; line-height: 1.55; }
+  select { text-overflow: ellipsis; }
+  input[type="number"] { font-variant-numeric: tabular-nums; }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  fieldset:disabled { opacity: .65; }
+  label { display: block; font-size: var(--t2); font-weight: 550; color: var(--ink-muted); }
+
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  a { color: inherit; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r3);
+    min-width: 0;
+  }
+
+  .notice {
+    padding: var(--s3) var(--s4);
+    border: 1px solid var(--line-strong);
+    border-left: 3px solid var(--ok-line);
+    border-radius: var(--r1);
+    background: var(--surface-raised);
+    font-size: var(--t3);
+    overflow-wrap: anywhere;
+  }
+  .notice.error { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger); }
+  .notice.pending { background: var(--vocal-soft); border-color: var(--vocal-line); color: var(--vocal); }
+
+  .hint { color: var(--ink-muted); font-size: var(--t2); line-height: 1.6; }
+  .eyebrow { color: var(--ink-muted); font-size: var(--t1); letter-spacing: .12em; text-transform: uppercase; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ink-muted); }
+
+  kbd {
+    font-family: var(--font);
+    font-size: var(--t1);
+    font-weight: 600;
+    min-width: 18px;
+    padding: 2px var(--s1);
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: var(--r1);
+    opacity: .65;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  [hidden] { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+}

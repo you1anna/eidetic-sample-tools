@@ -135,8 +135,15 @@
     }
   }
 
+  const paint = {};
+  function waveColours() {
+    const styles = getComputedStyle(document.documentElement);
+    for (const name of ["accent", "accent-soft", "vocal", "vocal-soft", "line-strong"])
+      paint[name] = styles.getPropertyValue(`--${name}`).trim();
+  }
   function drawWaveform(role) {
     if (!session) return;
+    if (!paint.accent) waveColours();
     const source = currentSource(role);
     if (!source) return;
     const canvas = $(`${role}-waveform`);
@@ -155,7 +162,7 @@
     const left = Math.max(0, Math.min(width, start / source.duration_s * width));
     const right = Math.max(0, Math.min(width, end / source.duration_s * width));
     if (valid) {
-      ctx.fillStyle = role === "anchor" ? "#263627" : "#392c23";
+      ctx.fillStyle = role === "anchor" ? paint["accent-soft"] : paint["vocal-soft"];
       ctx.fillRect(left, 0, right - left, height);
     }
     const peaks = source.waveform || [];
@@ -163,11 +170,12 @@
     peaks.forEach((peak, i) => {
       const x = i * stride;
       const amplitude = Math.max(0.01, Math.min(1, Number(peak) || 0)) * 39;
-      ctx.fillStyle = valid && x >= left && x <= right ? (role === "anchor" ? "#c1e6a0" : "#eeb990") : "#53635a";
+      ctx.fillStyle = valid && x >= left && x <= right
+        ? (role === "anchor" ? paint.accent : paint.vocal) : paint["line-strong"];
       ctx.fillRect(x, height / 2 - amplitude, Math.max(1, stride * 0.72), amplitude * 2);
     });
     if (valid) {
-      ctx.fillStyle = role === "anchor" ? "#c1e6a0" : "#eeb990";
+      ctx.fillStyle = role === "anchor" ? paint.accent : paint.vocal;
       ctx.fillRect(left, 0, 1, height);
       ctx.fillRect(Math.min(width - 1, right), 0, 1, height);
     }

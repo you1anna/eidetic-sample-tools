@@ -27,7 +27,7 @@ information affordance, and a two-pane workstation layout for the audition page.
 
 Add `library-tools/src/librarytools/resources/tokens.css`, wrapped in `@layer base`
 and linked first by both pages. It holds custom properties — surfaces, text, accents,
-status colours, a 4/8/12/16/24/32/48 spacing scale, 4/8/12 radii, an 11/12/13/15/19/24
+status colours, a 4/8/12/16/24/32 spacing scale, 4/8/12 radii, an 11/12/13/15/19
 type scale, 40px and 32px control heights and one motion duration — together with
 element primitives for buttons, inputs, selects, focus rings, panels, notices, hints,
 keyboard chips and screen-reader text, and it carries the `prefers-reduced-motion` guard

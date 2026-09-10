@@ -65,7 +65,8 @@ def create_vibe_app(session_dir: Path, *, write_token: str | None = None):
     @app.get('/static/<name>')
     def asset(name):
         types = {'vibe.js': 'text/javascript', 'vibe.css': 'text/css',
-                 'audition.js': 'text/javascript', 'audition.css': 'text/css'}
+                 'audition.js': 'text/javascript', 'audition.css': 'text/css',
+                 'tokens.css': 'text/css'}
         if name not in types:
             abort(404)
         return Response(files('librarytools').joinpath(f'resources/{name}').read_text(encoding='utf-8'), mimetype=types[name])

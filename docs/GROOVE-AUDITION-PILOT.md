@@ -33,10 +33,15 @@ database. Source audio remains unchanged.
 ## Listen and choose
 
 1. Start `sample-vibe serve --session-dir PATH --open` with the source drive attached.
-2. Click any sample to play it. Use Play/Pause, seek and Loop to inspect it.
+2. Pick any candidate from the list on the left. The player on the right shows its
+   waveform; play or pause it, drag anywhere on the waveform to move through the sample,
+   and use Loop to keep it repeating.
 3. Choose Keep or Skip. The next unreviewed sample loads; playback continues only if
    it was still playing when the choice finished saving. Undo restores the last choice.
 4. Open Kept to compare, remove choices or download a playlist of the original files.
+
+Space plays or pauses, `K` keeps, `S` skips, and the arrow keys move through the list.
+About this screen, in the top bar, holds the scope and safety notes.
 
 Choices save automatically to the session's `shortlist.json`.
 Keeping a sample means keeping the **complete original source**, including a whole

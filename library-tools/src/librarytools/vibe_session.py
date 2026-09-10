@@ -136,5 +136,7 @@ def source_state(session_dir: Path) -> dict:
         item = state['sources'][source_id]
         sources.append({key: item[key] for key in ('id', 'name', 'duration_s')} | {
             'kind': 'Groove candidate' if source_id in anchors else 'Vocal candidate',
+            # Three decimals is finer than the audition waveform strip can draw.
+            'waveform': [round(peak, 3) for peak in item['waveform']],
         })
     return {'sources': sources}

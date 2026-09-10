@@ -95,8 +95,8 @@ def check_audition(root: Path, scratch: Path, source: Path):
     invoke(audition_main, ['prepare', '--root', str(root), '--anchor', str(source),
                           '--vocal', str(source), '--output-dir', str(session)])
     client = create_vibe_app(session, write_token='wheel-test').test_client()
-    assert b'Choose samples.' in client.get('/').data
-    for asset in ('audition.js', 'audition.css', 'vibe.js', 'vibe.css'):
+    assert b'Sample audition' in client.get('/').data
+    for asset in ('audition.js', 'audition.css', 'vibe.js', 'vibe.css', 'tokens.css'):
         assert client.get(f'/static/{asset}').status_code == 200
     sources = client.get('/api/sources').get_json()['sources']
     assert len(sources) == 1  # The same original in both groups is one choice.
