@@ -34,8 +34,8 @@ jobs:
           python -m venv "$RUNNER_TEMP/eidetic-installed"
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c requirements-dev.txt "$RUNNER_TEMP/eidetic-wheels/"*.whl
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
-          "$RUNNER_TEMP/eidetic-installed/bin/python" scripts/check_installed_packages.py --core-only
-          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c requirements-dev.txt --find-links "$RUNNER_TEMP/eidetic-wheels" 'librarytools[review-ui]'
-          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
           cd "$RUNNER_TEMP"
-          "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py"
+          env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py" --core-only
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c "$GITHUB_WORKSPACE/requirements-dev.txt" --find-links "$RUNNER_TEMP/eidetic-wheels" 'librarytools[review-ui]'
+          "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
+          env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py"

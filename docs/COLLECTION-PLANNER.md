@@ -96,6 +96,9 @@ These are one-run measurements on the current Mac, not latency guarantees or
 musical-quality results. Plan JSON has a 128 MiB limit; each history file is limited
 to 32 MiB. Preview audio is not generated.
 
+For repeatable performance comparisons without the sample drive, use the
+[synthetic planner benchmark](DEVELOPMENT.md#compare-collection-planner-performance).
+
 Device names scope history only at this stage. Capacity, format eligibility,
 tempo compatibility and sound-family diversity are not checked by this planner.
 Its JSON is not an export crate. The next increments connect plans to listening,

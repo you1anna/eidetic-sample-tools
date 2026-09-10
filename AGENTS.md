@@ -22,14 +22,29 @@ sync, and session workflow live in the **private** `eidetic-studio` repo
 
 ## Verify a change
 
-Each package has its own venv under `~/.venvs/<pkg>` (never install globally; target
-Python 3.12 at `/opt/homebrew/bin/python3.12`). Run its tests:
+Use the existing local Python 3.12 environment; never install globally. The helper
+finds a ready environment and forces imports from this checkout:
 
 ```bash
-~/.venvs/library-tools/bin/python -m pytest library-tools -q
-~/.venvs/sample-tools/bin/python -m pytest sample-tools -q
-~/.venvs/ableton-tools/bin/python -m pytest ableton-tools -q
+python3 scripts/dev_check.py doctor
+python3 scripts/dev_check.py test -- library-tools/tests/test_collection_plan.py -q
+python3 scripts/dev_check.py test
 ```
+
+Use `--python /path/to/venv/bin/python` before the subcommand to override discovery.
+Run focused checks during edits, then the relevant final suite once. Packaging
+changes also need the separate installed-wheel check; a source test run cannot
+establish wheel correctness. Commands and the repeatable scale benchmark are in
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Resume a bounded increment
+
+Read [STATUS.md](STATUS.md) and the linked feature guide before reconstructing
+history. Dated assessments describe their original checkout; check current code
+before treating a listed gap as still open. Preserve unresolved user choices in
+the checkpoint, and ask when they affect the next increment. Report completed
+behaviour, actual verification and the next bounded step without copying private
+run artifacts into this repository.
 
 ## Sensitive / generated (do not commit)
 

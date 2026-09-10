@@ -11,6 +11,7 @@ import argparse
 import hashlib
 from importlib import import_module, metadata
 import io
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -26,6 +27,62 @@ def invoke(function, arguments, expected=0):
         result = function(arguments)
     if result != expected:
         raise AssertionError(f'{arguments}: expected exit {expected}, got {result}\n{output.getvalue()}')
+
+
+def collection_command(*arguments):
+    """Run the installed console script, rather than importing its Python main."""
+    executable = Path(sys.executable).parent / 'sample-collection'
+    result = subprocess.run([str(executable), *map(str, arguments), '--json'],
+                            capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f'sample-collection {arguments}: exit {result.returncode}\n{result.stderr}')
+    return json.loads(result.stdout)
+
+
+def check_collection(root: Path, scratch: Path, source: Path):
+    """Check alias identity and explicit export history through the installed CLI."""
+    before = (root / '.eidetic/library.sqlite').read_bytes()
+    source_id = hashlib.sha256(source.read_bytes()).hexdigest()
+    first = collection_command('plan', '--root', root, '--device', 'octatrack',
+                               '--count', 3, '--freshness', 'allow', '--output-dir', scratch / 'collection-all')
+    plan = collection_command('show', first['plan_path'])
+    assert first['summary']['selected'] == 2 and first['summary']['shortage'] == 1
+    assert len({row['sample_id'] for row in plan['selected']}) == 2
+    original = next(row for row in plan['snapshot']['candidates'] if row['sample_id'] == source_id)
+    assert {alias['path'] for alias in original['aliases']} == {'CATALOGUE/kick.wav', 'CURATED/KICK/kick.wav'}
+    assert all(row['decision'] == 'unreviewed' for row in plan['selected'])
+    receipts = list((root / '_EXPORT').rglob('*.wav.receipt.json'))
+    assert len(receipts) == 1
+    fresh = collection_command('plan', '--root', root, '--device', 'octatrack', '--count', 2,
+                               '--freshness', 'exclude', '--history', receipts[0],
+                               '--output-dir', scratch / 'collection-fresh')
+    plan = collection_command('show', fresh['plan_path'])
+    assert fresh['summary']['selected'] == 1 and fresh['summary']['shortage'] == 1
+    assert fresh['summary']['excluded_previous'] == 1 and fresh['summary']['known_repeats'] == 0
+    assert plan['history']['sample_ids'] == [source_id]
+    assert plan['history']['coverage'] == 'provided_records_only'
+    assert plan['selected'][0]['sample_id'] != source_id
+    assert plan['selected'][0]['decision'] == 'unreviewed'
+    assert (root / '.eidetic/library.sqlite').read_bytes() == before
+    parent_files = {Path(fresh[key]): Path(fresh[key]).read_bytes() for key in ('plan_path', 'review_path')}
+    return plan, parent_files, receipts[0]
+
+
+def check_collection_offline(parent: dict, parent_files: dict, old_receipt: Path,
+                             old_root: Path, remounted: Path, scratch: Path):
+    """Saved population/history and a retained pin survive losing original paths."""
+    assert not old_root.exists() and not old_receipt.exists()
+    before = (remounted / '.eidetic/library.sqlite').read_bytes()
+    plan_path = next(path for path in parent_files if path.name == 'plan.json')
+    pin = parent['selected'][0]['sample_id']
+    revised = collection_command('regenerate', '--from-plan', plan_path, '--seed', 99,
+                                 '--pin', pin, '--output-dir', scratch / 'collection-next')
+    plan = collection_command('show', revised['plan_path'])
+    assert plan['parent_plan_id'] == parent['plan_id'] and plan['pins'] == [pin]
+    assert plan['snapshot'] == parent['snapshot'] and plan['history'] == parent['history']
+    assert plan['selected'][0]['sample_id'] == pin and plan['selected'][0]['decision'] == 'unreviewed'
+    assert all(path.read_bytes() == original for path, original in parent_files.items())
+    assert (remounted / '.eidetic/library.sqlite').read_bytes() == before
 
 
 def check_audition(root: Path, scratch: Path, source: Path):
@@ -74,6 +131,8 @@ def main():
             assert package.__version__ == distribution.version
         commands = [entry for entry in distribution.entry_points if entry.group == 'console_scripts']
         assert commands, f'{name} did not install its commands'
+        if name == 'librarytools':
+            assert any(entry.name == 'sample-collection' for entry in commands), 'librarytools wheel omitted sample-collection'
         for entry in commands:
             subprocess.run([str(Path(sys.executable).parent / entry.name), '--help'],
                            check=True, stdout=subprocess.DEVNULL)
@@ -92,7 +151,7 @@ def main():
     assert manifest_path('octatrack').is_file()
 
     with tempfile.TemporaryDirectory(prefix='eidetic-wheel-check-') as directory:
-        scratch = Path(directory)
+        scratch = Path(directory).resolve()
         root = scratch / 'first-mount'
         source = root / 'CATALOGUE/kick.wav'
         source.parent.mkdir(parents=True)
@@ -104,6 +163,11 @@ def main():
         curated = root / 'CURATED/KICK/kick.wav'
         curated.parent.mkdir(parents=True)
         curated.write_bytes(source.read_bytes())
+        with wave.open(str(root / 'CATALOGUE/clap.wav'), 'wb') as audio:
+            audio.setnchannels(1)
+            audio.setsampwidth(2)
+            audio.setframerate(44100)
+            audio.writeframes(b'\x02\x00' * 4410)
         setup = ['onboard', '--root', str(root), '--machine', 'first', '--defer-machine', 'second']
         invoke(library_main, setup)
         assert not (root / '.eidetic').exists()
@@ -129,9 +193,11 @@ def main():
         invoke(export_main, [*export, '--root', str(root), '--dry-run'])
         invoke(export_main, [*export, '--root', str(root)])
         assert len(list((root / '_EXPORT').rglob('*.wav'))) == 1
+        collection, parent_files, receipt = check_collection(root, scratch, source)
 
         remounted = scratch / 'second-mount'
         root.rename(remounted)
+        check_collection_offline(collection, parent_files, receipt, root, remounted, scratch)
         before = (remounted / '.eidetic/library.sqlite').read_bytes()
         evidence = scratch / 'older-listening-files'
         evidence.mkdir()
@@ -149,7 +215,7 @@ def main():
         backup_bundle(remounted / '.eidetic/library.sqlite', scratch / 'backup', root=remounted)
         restore_bundle(scratch / 'backup', scratch / 'restored')
         assert next((scratch / 'restored').rglob('labels.tsv')).read_bytes() == (evidence / 'labels.tsv').read_bytes()
-    checks = 'commands, resources, onboarding, approval, export, handoff and restore'
+    checks = 'commands, resources, onboarding, approval, export, collection planning, offline regeneration, handoff and restore'
     if not args.core_only:
         checks += ', audition'
     print(f'Installed-package checks passed: {checks}.')

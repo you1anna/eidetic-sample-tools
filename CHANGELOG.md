@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add local test-environment discovery and a synthetic collection-planner scale
+  benchmark. Installed-wheel checks now cover planning and offline regeneration,
+  with both CI smoke passes isolated from the checkout's Python path.
 - Add experimental `sample-collection` plans with explicit per-device export
   history, freshness modes, deterministic regeneration, inherited pins and
   visible shortages. Plans freeze metadata and remain unreviewed; source audio,
