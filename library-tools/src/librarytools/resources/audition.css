@@ -72,6 +72,9 @@
   font-weight: 500;
 }
 .source:hover:not(:disabled) { background: none; }
+/* Same colour as the row highlight above, so the current sample stays
+   identifiable if :has() is unavailable. */
+.source[aria-current="true"] { background: var(--surface-raised); }
 .source[aria-current="true"] .order { color: var(--accent); }
 
 .order { color: var(--ink-dim); font-size: var(--t2); font-variant-numeric: tabular-nums; }
