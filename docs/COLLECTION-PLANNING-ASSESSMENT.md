@@ -7,6 +7,12 @@ adds immutable metadata plans, explicit history/freshness and retained pins.
 The larger listening, audio-retrieval and export changes assessed below remain
 separate increments.
 
+This completes only the metadata foundation of the first recommended stage.
+Tempo constraints, sound-family variety and saved listening decisions remain
+unfinished. A [repeatable synthetic benchmark](DEVELOPMENT.md#compare-collection-planner-performance)
+now replaces one-off scripts for future planning measurements. The assessment
+and timings below describe the September 9 checkout.
+
 The approach is viable at the current 21,689 unique samples. Proceed with a
 collection planner, but separate preparation, interactive selection, listening
 decisions and device execution. Increasing the existing 24-sound audition limit

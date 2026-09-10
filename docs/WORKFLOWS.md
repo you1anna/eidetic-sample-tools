@@ -56,7 +56,18 @@ sample-find --root "$SAMPLES_ROOT" --like YOUR_SAMPLE_ID --role PERC --limit 10
 ```
 
 See the [search reference](../library-tools/REFERENCE.md#sample-find) for vocabulary,
-filters and recording kit selections. For a new collection, continue below.
+filters and recording kit selections.
+
+## Save a candidate selection
+
+Use the [collection planner](COLLECTION-PLANNER.md) to choose a candidate count,
+control known repeats and retain choices while trying a new seed. It writes a
+saved plan and a readable summary from existing metadata. The brief is recorded
+context at this stage; it does not rank the audio.
+
+Saved plans are not yet connected to browser listening or export crates. Use the
+existing [audition workflow](GROOVE-AUDITION-PILOT.md) for explicit source candidates,
+then the approval and export steps below. Never treat a planner pin as a favourite.
 
 ## 1. Inspect without changing audio
 
@@ -137,7 +148,7 @@ for comparison. Keep the packet with its scan metadata and quota file. Choose a
 new output directory for each packet; preparation refuses to overwrite an existing
 packet. `sample-curate` global options, including `--root`, go before the subcommand.
 
-For optional audio-derived groups, follow
+For local-AI grouping of a prepared packet, follow
 [packet classification and review](../library-tools/REFERENCE.md#packet-classification).
 The browser resolves classification; musical favourite decisions still belong
 in `labels.tsv`. Grouped playlists require completed review and a passing

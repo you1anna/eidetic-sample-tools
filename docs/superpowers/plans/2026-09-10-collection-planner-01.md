@@ -1,5 +1,8 @@
 # Collection planner increment 1
 
+**Completed:** `8707b5f`. Later development-tool improvements are recorded in
+`39a4204`; use [project status](../../../STATUS.md) for the next increment.
+
 **Goal:** save reproducible, unreviewed candidate selections with explicit device
 history, freshness and shortages, then regenerate from frozen inputs while retaining pins.
 

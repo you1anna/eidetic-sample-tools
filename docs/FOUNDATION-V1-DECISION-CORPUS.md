@@ -1,8 +1,13 @@
 # Foundation v1 decision corpus
 
-Foundation v1 is the first closed-loop evidence run for Eidetic Sample Tools.
-It turns a reviewed sample library into a small, performance-tested collection
-while preserving the decisions that made it useful.
+Foundation v1 defines an earlier workflow for retaining evidence from listening
+through hardware use. Its 216-row packet has not produced a fully approved
+Foundation export. It is separate from the September 19-favourite
+[set-generation trial](SET-GENERATION-TRIAL.md).
+
+The design below remains a reference for recording outcomes, not the current work
+queue. Follow [project status](../STATUS.md) for the next bounded increment and
+preserve the original Foundation evidence described in [library history](LIBRARY-HISTORY.md).
 
 ## Purpose
 
@@ -110,4 +115,3 @@ against held-out, later human decisions before it influences review order.
 | Device complete | Reviewed Octatrack crate and successful export preflight | A hardware-ready copy. |
 | Session complete | Outcome rows from a real session | First closed-loop product evidence. |
 | Learning-ready | Multiple completed runs with consistent outcome records | Evaluate a private, suggestion-only ranker. |
-

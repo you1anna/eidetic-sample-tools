@@ -3,6 +3,11 @@
 **9 September 2026 — 19 approved favourites exported and software-verified;
 card transfer and hardware listening pending.**
 
+**10 September follow-up:** the first [collection planner](COLLECTION-PLANNER.md)
+now saves metadata selections with explicit repeat handling, shortages and pins.
+It does not yet connect to browser decisions, local-AI retrieval or device budgets.
+The observations below retain their original trial scope.
+
 Test whether a musical brief can become a useful Octatrack collection with less
 selection effort. The initial brief is hypnotic, groovy tribal techno with rap
 vocals, using 140 BPM as the trial's working tempo. Machine speed and musical
@@ -181,5 +186,6 @@ media or device usage is inspected. No profile limits were changed in this trial
 The main product gap is a reproducible brief-to-collection selection process.
 Other friction includes separate classification and favourite decisions,
 repeated command/file handoffs, and limited explicitly identified rap material.
-The trial should determine where local audio models reduce that work before
-making them the required selection route.
+Local AI is part of the intended selection workflow. Further trials need to
+establish how to combine it with source context, tempo and variety controls,
+and whether that combination reduces listening effort across the full pool.

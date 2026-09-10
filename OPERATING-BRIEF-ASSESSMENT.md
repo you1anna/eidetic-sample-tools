@@ -2,6 +2,14 @@
 
 Date: 2026-06-25 (desk review). Updated notes: 2026-07-09.
 
+**Historical assessment, superseded for current work.** Its build order,
+installation assumptions and backup conclusion are no longer operating guidance.
+Use [project status](STATUS.md) for priorities and the active backup gate, and
+[export formats](sample-tools/REFERENCE.md#output-formats) for the configured
+device targets. Digitakt export is now configured for 48 kHz; the older 44.1 kHz
+finding below describes the code at the time. The July 7 backup claim was later
+contradicted by the July 31 check retained in [library history](docs/LIBRARY-HISTORY.md).
+
 Robin produced an **Eidetic Studio — Claude Code Operating Brief**: a tiered automation
 plan for the Mac mini studio covering bounce analysis, sample prep, Ableton MCP
 scaffolding, an Extensions SDK Set auditor, and MIDI generation. This document
@@ -17,7 +25,7 @@ hands-on verification.
 
 For current project status, see **[`STATUS.md`](STATUS.md)**.
 
-## Bottom line
+## Assessment at the time
 
 The brief is well calibrated but was written without visibility into this repo.
 
@@ -98,7 +106,7 @@ These surfaced during the desk review and may still need reconciliation in
   against unofficial or reverse-engineered integrations. Same instinct applies to
   Tier B1's "treat community Ableton MCP servers as untrusted code."
 
-## Recommended order of work (updated)
+## Earlier recommended order (superseded)
 
 | Priority | Task | Status |
 |---|---|---|

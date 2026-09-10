@@ -1,5 +1,10 @@
 # Ableton tooling — what was attempted, 2026-07-18
 
+**Historical session record.** Installation commands, test counts and machine
+observations below describe that session. Use the
+[Ableton package guide](ableton-tools/README.md) for current supported commands
+and [project status](STATUS.md) for the active work queue.
+
 Plain-English record of a session that set out to let Claude drive Ableton Live directly (build
 tracks, load plugins, set routing) to support the studio workflow described in
 `Production/eidetic-session-guide-method-a-v1_1.md`. Part of it worked and is now committed. Part

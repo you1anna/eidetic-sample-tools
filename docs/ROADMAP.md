@@ -1,8 +1,11 @@
 # Roadmap
 
-The next milestone is a repeatable path from a fresh library to a tested hardware
-crate. Priorities are simpler setup, clearer configuration and evidence that the
-workflow transfers across libraries.
+The next milestone is a larger, varied collection that fits a musical brief and
+its target device. Build it in bounded increments: saved choices, manageable
+listening, prepared local-AI retrieval, then device budgets and larger transfers.
+
+The first metadata planner and reusable verification tools are implemented.
+See [project status](../STATUS.md) for the current checkpoint and unanswered choices.
 
 ## Capability status
 
@@ -10,25 +13,31 @@ workflow transfers across libraries.
 |---|---|
 | **Stable** | Library review, preview-based sorting, pack intake, exact deduplication, WAV conversion and read-only Ableton inspection. |
 | **Beta** | Content-hash inventory, origin recovery, tag and acoustic search, curation, promotion checks, profiles and selected-crate sync. |
-| **Experimental** | Explicit-candidate audition and shortlist UI, vocal-cut audition, CLAP grouping, drum-role benchmarks and conservative near-duplicate detection. |
+| **Experimental** | Saved collection plans with repeat controls and pins; explicit-candidate audition, vocal-cut audition, CLAP grouping, drum-role benchmarks and conservative near-duplicate detection. |
 | **Planned** | Preference-informed retrieval, cohesive set assembly, MIDI generation, bounce analysis and stem separation. |
 
 Stable capabilities have tests and operational use. Beta features are implemented
 but still being refined; experimental outputs require evaluation by ear. These
 labels are not compatibility or support guarantees.
 
-## Adoption priorities
+## Current priorities
 
-1. **Portable setup.** Establish a consistent installation and upgrade path;
-   replace remaining machine-specific defaults with explicit configuration.
-2. **A shorter first session.** Join indexing, search, audition and export with
-   clearer progress and actionable preflight reports.
-3. **Hardware validation.** Verify minimal crates through transfer, playback,
-   assignment and save/reload on each supported device.
-4. **Broader library coverage.** Test different pack structures, naming schemes
-   and formats; evaluate broader tag vocabularies and listening briefs.
-5. **Clear recovery.** Improve the path from manifests and integrity reports to
-   a reviewed recovery action, retaining preview and undo guarantees.
+1. **A manageable listening queue.** Connect frozen plans to small browser batches;
+   preserve decisions and progress, explain repeats, and bound preview storage.
+2. **Local AI within brief selection.** Prepare reusable audio representations with
+   resumable processing and explicit coverage. Combine model relevance with source
+   context, tempo suitability and variety; measure useful new sounds per listening minute.
+3. **Budgets for each device.** Distinguish browsing storage, project limits and
+   internal imports. Account for existing usage and temporary conversion space.
+4. **Larger exports with recovery.** Preserve output paths and transfer evidence;
+   support interruption without repeatedly rebuilding or copying completed work.
+5. **Hardware validation.** Complete the approved 19-file Octatrack trial before a
+   substantially larger transfer, then verify each additional device separately.
+
+Portable setup, explicit library selection and installed-package checks are
+already available. Broader library coverage and historical-state reconciliation
+remain ongoing work. The [collection assessment](COLLECTION-PLANNING-ASSESSMENT.md)
+contains the detailed performance risks and acceptance checks.
 
 ## Research with measurable outcomes
 
@@ -40,12 +49,13 @@ calibration and remains review-only.
 The [sample audition pilot](GROOVE-AUDITION-PILOT.md) now connects explicit
 candidates to a saved shortlist and the existing curation workflow. Its Keep/Skip
 choices do not influence retrieval, and no improvement in generated suggestions
-has been demonstrated. The next proposed evaluation is to capture the listening
-brief with decisions, reserve unseen examples for judging, and compare existing
-retrieval with a lightweight preference reranker using cached features or
-embeddings where appropriate. Keep this work only if it finds more useful samples
-with less auditioning. Reset decisions are not negative labels, and a skip in one
-brief must not become a universal rejection.
+has been demonstrated. The [first brief trial](SET-GENERATION-TRIAL.md) kept 19 of
+24 candidates, comparing contextual picks with model-ranked picks from a narrowed
+pool. It did not measure listening time or whole-library AI selection. Future
+preference ranking needs the brief attached to decisions and unseen examples for
+evaluation. Keep it only if it finds more useful samples with less auditioning.
+Reset decisions are not negative labels, and a skip in one brief must not become
+a universal rejection.
 
 [Decision records](../decisions/), [specifications](superpowers/specs/) and
 [plans](superpowers/plans/) retain that evidence. The dated

@@ -123,7 +123,7 @@ Each package's `pyproject.toml` owns its runtime requirements and optional extra
 The library's `dev` extra includes pytest and Flask for browser tests; model
 dependencies are separate and are not needed for the standard suite.
 
-The optional [AI setup](AI-SETUP.md) now has a separate, hash-verified Apple Silicon
+The [AI setup](AI-SETUP.md) has a separate, hash-verified Apple Silicon
 snapshot, generated from package extras, and an explicitly triggered real-model
 CI workflow. Keep this separate from the lightweight default test environment.
 

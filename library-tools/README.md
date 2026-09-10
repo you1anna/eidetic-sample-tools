@@ -12,7 +12,7 @@ copy your favourites into a collection ready for export.
 |---|---|
 | Inspect sample names, roles, BPM/key evidence and warnings | [`sample-review`](REFERENCE.md#sample-review) |
 | Search tags, pack origins and similar sounds; write playlists | [`sample-tag`](REFERENCE.md#sample-tag), [`sample-find`](REFERENCE.md#sample-find) |
-| Save candidate plans, control known repeats and retain pins | [Collection planner](../docs/COLLECTION-PLANNER.md) |
+| Save a selection, control repeats and retain chosen sounds | [Collection planner](../docs/COLLECTION-PLANNER.md) |
 | Preview sorting, exact deduplication and pack intake | [`sample-sort`, `sample-dedupe`, `sample-intake`](REFERENCE.md#sample-sort-sample-dedupe-sample-intake) |
 | Audition explicit candidates in a browser and save a shortlist | [`sample-vibe`](REFERENCE.md#sample-vibe) |
 | Record listening decisions, promote favourites and check copies | [`sample-curate`](REFERENCE.md#sample-curate) |
@@ -21,9 +21,9 @@ copy your favourites into a collection ready for export.
 | Onboard a library, back up its state and recover interrupted work | [`sample-library`](REFERENCE.md#long-lived-and-shared-drive-installations) |
 | Inspect resolved device capabilities | [`sample-profile`](REFERENCE.md#sample-profile) |
 
-Core organisation is stable; search and curation are beta. Browser audition, AI
-classification and near-duplicate detection are experimental. See the
-[reference](REFERENCE.md#command-map) for command maturity.
+Core organisation is stable; search and curation are beta. Collection planning,
+browser audition, AI classification and near-duplicate detection are experimental.
+See the [reference](REFERENCE.md#command-map) for command maturity.
 
 ## Try it
 

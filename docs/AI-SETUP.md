@@ -5,6 +5,11 @@ generate samples or train on your library. Inference runs on your CPU, uses RAM
 and takes time. No paid token API is involved and sample audio is not uploaded.
 Installing this environment does not start a background service.
 
+Local AI is part of the intended workflow for choosing a set from a musical brief.
+The implemented path currently groups supplied candidates. The
+[collection planner](COLLECTION-PLANNER.md) saves metadata selections; connecting
+it to whole-library AI retrieval remains a [planned increment](ROADMAP.md).
+
 ## Install once per Apple Silicon Mac
 
 This tested snapshot targets **Python 3.12 on macOS arm64**. Intel Macs and Linux

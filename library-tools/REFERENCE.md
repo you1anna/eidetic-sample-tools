@@ -16,7 +16,7 @@ share `$SAMPLES_ROOT/.eidetic/library.sqlite` by default; use the same
 `--library-db` wherever you override it.
 
 Commands that need a sample library reject missing selection before doing work.
-The [pinned AI setup](../docs/AI-SETUP.md) covers optional model installation,
+The [pinned AI setup](../docs/AI-SETUP.md) covers local model installation,
 offline verification, resource controls and reuse across a large library.
 
 The examples keep generated reports, packets and crates on the library drive:
@@ -52,6 +52,7 @@ retries failed measurements; successful results retain versioned provenance.
 | Plan sorting, exact deduplication and pack intake | `sample-sort`, `sample-dedupe`, `sample-intake` | Stable |
 | Recover origin, tag and search | `sample-tag`, `sample-find` | Beta |
 | Save candidate plans with explicit freshness and retained pins | `sample-collection` | Experimental; metadata selection |
+| Check and prepare the pinned local model environment | `sample-ai` | Experimental; Apple Silicon setup tested |
 | Prepare listening packets, promote favourites and check copies | `sample-curate` | Beta |
 | Inspect configuration | `sample-profile` | Beta |
 | Measure audio and build inventory | `sample-analyze` | Beta; interpretation experimental |
@@ -209,7 +210,7 @@ underscores. Defaults retain the Foundation quotas and `foundation-v1` prefix.
 
 ### Packet classification
 
-Install the optional local models and review UI:
+Install the local models and review UI:
 
 ```bash
 python -m pip install -e './library-tools[audio-classifier,review-ui]'
@@ -258,7 +259,7 @@ sample-curate --root "$SAMPLES_ROOT" playlists --labels "$RUNS/session-01/labels
 ```
 
 Missing or stale classification fails validation. Read the
-[architecture guide](../docs/TECHNOLOGY.md#optional-local-ai-for-listening-packets)
+[architecture guide](../docs/TECHNOLOGY.md#local-ai-for-listening-packets)
 for model execution and publication details.
 
 ### Promotion integrity checks

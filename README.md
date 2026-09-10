@@ -4,19 +4,21 @@ Search your sample library, audition sounds, and export your favourites for
 **Octatrack MKII, Digitakt MKI and TR-8S**. Inspect saved Ableton Live Sets to find
 projects and missing samples without opening Live.
 
-[Get started](docs/GETTING-STARTED.md) · [Full workflow](docs/WORKFLOWS.md)
+[Get started](docs/GETTING-STARTED.md) · [Full workflow](docs/WORKFLOWS.md) ·
+[Documentation](docs/README.md)
 
 ## What you can do
 
 | Tool | Functionality |
 |---|---|
-| [Library tools](library-tools/README.md) | Search by tags or acoustic similarity; audition in a browser; organise packs, stage exact duplicates and curate favourites. |
+| [Library tools](library-tools/README.md) | Search, save candidate selections, control repeats, audition in a browser and curate favourites; organise packs and stage exact duplicates. |
 | [Sample export](sample-tools/README.md) | Check a selected collection against device limits, create WAV copies with compact names, and transfer supported exports to cards. |
 | [Ableton tools](ableton-tools/README.md) | Report Set tempo, tracks and devices; list sample references and flag missing media. |
 
-Search uses filenames, pack origins and measured audio features. Local AI groups
-candidates for listening; selection from a musical brief is being tested in the
-[set-generation trial](docs/SET-GENERATION-TRIAL.md).
+Local AI is part of the intended workflow for selecting from a musical brief.
+Today it groups candidates for listening; the new planner uses metadata filters.
+The [set-generation trial](docs/SET-GENERATION-TRIAL.md) records the listening results
+and remaining work toward selection across the whole library.
 
 ## Architecture
 
@@ -49,8 +51,9 @@ you pass `--list` or `--dry-run`. Keep a backup and follow the
 ## Status
 
 Core review, organisation, conversion and Ableton inspection are established.
-Search and curation are beta; browser audition, AI grouping and near-duplicate
-detection are experimental. Broader library and hardware validation remains open.
+Search and curation are beta; collection planning, browser audition, AI grouping
+and near-duplicate detection are experimental. Broader library and hardware
+validation remains open.
 No software licence has been selected.
 
 [Roadmap](docs/ROADMAP.md) · [Release notes](CHANGELOG.md) ·

@@ -57,6 +57,7 @@ exporter retains the `SAMPLES_ROOT` and optional `EXPORT_ROOT` environment setti
 python --version
 python -m pip show librarytools sampletools abletontools
 sample-review --help
+sample-collection --help
 sample-export --help
 als-index --help
 ffmpeg -version
@@ -140,11 +141,14 @@ to `sample-tag`. Omit `--apply` to preview coverage. Scanning and feature extrac
 may still update derived data; `--apply` replaces generated tags while retaining
 human and unclassified legacy tags.
 
-## Optional listening assistant
+## Browser listening and local AI
 
 For a tested, reinstallable AI environment on an Apple Silicon Mac, use the
 [pinned AI setup](AI-SETUP.md). It includes an explicit model download and an
-offline check, plus guidance for large libraries. Ordinary commands need no models.
+offline check, plus guidance for large libraries. Local AI is part of the intended
+musical-brief workflow; complete brief selection across the library is still under
+development. Inspection, metadata search and saved candidate plans work without
+models. See the [trial](SET-GENERATION-TRIAL.md) for what has been evaluated so far.
 
 Browser audition alone needs only the small review extra:
 
@@ -181,6 +185,7 @@ schema; rehearse recovery using a separate restored backup.
 ## Next steps
 
 - [Workflows](WORKFLOWS.md): organise, approve favourites and export a crate.
+- [Collection planner](COLLECTION-PLANNER.md): save candidates, control repeats and retain choices.
 - [Export reference](../sample-tools/REFERENCE.md): device formats and transfer.
 - [Ableton reports](../ableton-tools/README.md): inspect Sets and sample dependencies.
 - [Architecture](TECHNOLOGY.md): understand identity, search and model review.

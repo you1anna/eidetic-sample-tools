@@ -13,4 +13,5 @@ same physical drive does not protect against drive failure; undo records are
 not backups. See the [safety model](SAFETY.md#backup-responsibilities).
 
 Continue with the canonical [workflow](WORKFLOWS.md). Historical observations
-about the reference library remain in [operational status](../STATUS.md).
+about the reference library remain in [library history](LIBRARY-HISTORY.md);
+[project status](../STATUS.md) records the current checkpoint.

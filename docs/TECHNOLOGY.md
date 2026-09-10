@@ -10,7 +10,7 @@ inspectable data so the commands can work independently.
 
 | Package | Responsibility | Stack |
 |---|---|---|
-| [`library-tools`](../library-tools/README.md) | Inventory, provenance, search, analysis and curation | Python 3.12+, SQLite, NumPy, SoundFile; optional PyTorch and Flask |
+| [`library-tools`](../library-tools/README.md) | Inventory, provenance, search, collection planning, analysis and curation | Python 3.12+, SQLite, NumPy, SoundFile; PyTorch for local AI, Flask for browser review |
 | [`sample-tools`](../sample-tools/README.md) | Resolve crates, validate constraints, convert and stage audio | Python 3.12+, FFmpeg and FFprobe |
 | [`ableton-tools`](../ableton-tools/README.md) | Inspect saved Sets and resolve sample references | Python 3.12+ standard-library gzip and XML parsing |
 
@@ -98,7 +98,32 @@ Euclidean distance over measurements shared with the reference. No learned
 embedding model is required. Results can become playlists or, after promotion,
 export crates.
 
-## Optional local AI for listening packets
+## Saved collection plans
+
+`sample-collection` captures an indexed candidate population, its original aliases
+and supplied export history in a portable JSON plan. Metadata filters determine
+eligibility; a seed makes the order reproducible. Regeneration reuses that snapshot
+without the source drive and retains pinned choices. Each revision has a new
+directory and a link to its parent.
+
+History is scoped to a device and the supplied records; it does not establish
+current device contents. Plans remain unreviewed and are not export crates.
+Publication inside `.eidetic/` coordinates with backups through the existing
+writer lock. External plan outputs remain independent of the library drive.
+
+The [planner guide](COLLECTION-PLANNER.md) covers commands and limits. Browser
+decisions, audio-model ranking, tempo policy, sound-family variety and aggregate
+device budgets are subsequent integrations. The overview diagram shows the
+implemented search/listening/export path; a saved plan does not yet feed that
+listening path automatically.
+
+## Local AI for listening packets
+
+Local AI is part of the intended musical-brief selection workflow. The implemented
+model path currently classifies supplied packets; it does not yet search all
+indexed audio from a brief. Ordinary inspection and metadata planning can run
+without model dependencies. See the [trial](SET-GENERATION-TRIAL.md) for the
+measured contribution and remaining retrieval work.
 
 The classifier separates **form** from **content**:
 

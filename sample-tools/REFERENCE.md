@@ -91,6 +91,10 @@ and output-name collisions. Default capacities are 127 samples for Digitakt and
 Both reject long-form roles. Disabled profile devices are rejected. These checks
 do not inspect samples already stored on the instrument.
 
+They also do not measure free card space or add up usage across multiple crates.
+A large browsing library needs separate storage and active-project budgets; those
+controls remain planned in the [collection roadmap](../docs/ROADMAP.md).
+
 ## Transfer to a card
 
 For Octatrack or TR-8S, preview the selected crate's transfer:

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh the documentation index, current roadmap and handoff status; keep
+  earlier operational findings separately and clarify local AI's intended role.
 - Add local test-environment discovery and a synthetic collection-planner scale
   benchmark. Installed-wheel checks now cover planning and offline regeneration,
   with both CI smoke passes isolated from the checkout's Python path.

@@ -17,5 +17,5 @@ missing-selection checks across sample commands; Ableton uses `--root`/`ALS_ROOT
 
 Implementation and local verification are complete. Both original real-model
 checks passed offline, as did the synthetic cold/cached resource check. See
-[AI setup](AI-SETUP.md) for measured results and reproduction. Remote CI and
+[AI setup](AI-SETUP.md) for measured results and reproduction. Remote AI CI and
 verification on the other Mac remain separate.
