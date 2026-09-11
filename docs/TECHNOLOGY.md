@@ -9,11 +9,12 @@ central service coordinating the whole workflow.
 
 ## System overview
 
-![System architecture: sample audio passes through library discovery, human curation and device conversion; saved Ableton Sets produce independent reports. Portable library state underpins the sample workflow.](images/architecture.svg)
+![Your sample library and its index sit together on the sample drive. Library tools find sounds, let you listen in a browser to keep or skip candidates, and approve favourites; optional local AI organises listening. The approved collection passes to sample tools, which create checked WAV copies for Octatrack MKII, Digitakt MKI and TR-8S. Separately, Ableton tools rediscover saved projects without changing them. Optional Live tools inspect a running Set and apply edits after review, and let browser listening audition sounds in Live.](images/architecture.svg)
 
 The diagram shows the search, listening and export path, the read-only saved-Set
-branch and the optional running-Set bridge. Saved collection plans freeze candidates
-and export history, then feed lazy browser batches without granting approval.
+branch and the optional running-Set bridge; dashed parts are optional. Saved
+collection plans freeze candidates and export history, then feed lazy browser
+batches without granting approval.
 
 ## Package boundaries
 

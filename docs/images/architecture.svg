@@ -1,92 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="824" viewBox="0 0 1120 824" role="img" aria-labelledby="title description">
-  <title id="title">Eidetic Sample Tools architecture</title>
-  <desc id="description">Sample audio feeds library-tools for content-hash indexing, tag and acoustic search, and listening. Local AI suggests groups for review. Human decisions approve favourites, copied into CURATED with TSV crates. sample-tools validates crates and uses FFmpeg to create device WAV exports. Separately, ableton-tools reads saved Live Sets without editing them. The optional experimental live-tools bridge inspects a running Set and applies an exact reviewed plan. The sample drive carries the index, listening decisions and recovery records under .eidetic.</desc>
-  <defs>
-    <marker id="arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0L8 4L0 8Z" fill="#565b58"/>
-    </marker>
-    <style>
-      text { font-family: Inter, Arial, sans-serif; fill: #171918; }
-      .label { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 14px; letter-spacing: 1.5px; fill: #565b58; }
-      .name { font-size: 20px; font-weight: 500; }
-      .detail { font-size: 16px; fill: #565b58; }
-      .box, .boundary { fill: #f2f3f1; stroke: #565b58; stroke-width: 1; }
-      .flow { fill: none; stroke: #565b58; stroke-width: 1; marker-end: url(#arrow); }
-      .experimental { stroke-dasharray: 4 4; }
-    </style>
-  </defs>
-  <rect width="1120" height="824" fill="#f2f3f1"/>
-  <text class="label" x="32" y="38">EIDETIC SAMPLE TOOLS</text>
-  <text class="label" x="1088" y="38" text-anchor="end">LOCAL AUDIO · LOCAL TOOLS</text>
-
-  <!-- Inputs -->
-  <rect class="box" x="32" y="72" width="664" height="82"/>
-  <text class="name" x="56" y="105">Sample library</text>
-  <text class="detail" x="56" y="132">Source packs and catalogue audio</text>
-  <rect class="box" x="752" y="72" width="336" height="82"/>
-  <text class="name" x="776" y="105">Ableton Live</text>
-  <text class="detail" x="776" y="132">Saved Sets · optional running Set</text>
-
-  <!-- Package boundaries -->
-  <rect class="boundary" x="32" y="202" width="664" height="318"/>
-  <text class="label" x="56" y="230">LIBRARY-TOOLS</text>
-  <rect class="boundary" x="752" y="202" width="336" height="136"/>
-  <text class="label" x="776" y="230">ABLETON-TOOLS</text>
-  <rect class="boundary experimental" x="752" y="366" width="336" height="154"/>
-  <text class="label" x="776" y="394">LIVE-TOOLS · OPTIONAL</text>
-  <rect class="boundary" x="32" y="576" width="664" height="140"/>
-  <text class="label" x="56" y="604">SAMPLE-TOOLS</text>
-
-  <!-- Data flow; orthogonal routes keep connections separate from labels. -->
-  <path class="flow" d="M196 154V250"/>
-  <path class="flow" d="M336 294H392"/>
-  <path class="flow experimental" d="M336 436H364V314H392"/>
-  <path class="flow" d="M532 338V392"/>
-  <text class="detail" x="546" y="370">Your approval</text>
-  <path class="flow" d="M532 480V548H196V624"/>
-  <path class="flow" d="M336 656H392"/>
-  <path class="flow" d="M672 656H752"/>
-  <path class="flow" d="M920 154V250"/>
-  <path class="flow experimental" d="M1040 154V348H920V408"/>
-  <path class="flow experimental" d="M672 294H724V452H776"/>
-
-  <!-- Library components -->
-  <rect class="box" x="56" y="250" width="280" height="88"/>
-  <text class="name" x="76" y="285">Index + search</text>
-  <text class="detail" x="76" y="313">Hashes · tags · audio features</text>
-  <rect class="box" x="392" y="250" width="280" height="88"/>
-  <text class="name" x="412" y="285">Audition + curate</text>
-  <text class="detail" x="412" y="313">Playlists · browser · your labels</text>
-  <rect class="box experimental" x="56" y="392" width="280" height="88"/>
-  <text class="name" x="76" y="427">Local AI</text>
-  <text class="detail" x="76" y="455">Experimental group suggestions</text>
-  <rect class="box" x="392" y="392" width="280" height="88"/>
-  <text class="name" x="412" y="427">Approved favourites</text>
-  <text class="detail" x="412" y="455">CURATED/ copies + crate TSVs</text>
-
-  <!-- Independent read-only project inspection -->
-  <rect class="box" x="776" y="250" width="288" height="64"/>
-  <text class="name" x="796" y="285">Read saved Sets</text>
-  <text class="detail" x="796" y="307">.als reports · read-only</text>
-  <rect class="box experimental" x="776" y="408" width="288" height="88"/>
-  <text class="name" x="796" y="443">Inspect running Set</text>
-  <text class="detail" x="796" y="471">Checkpoint · plan · apply · receipt</text>
-
-  <!-- Export components and device output -->
-  <rect class="box" x="56" y="624" width="280" height="64"/>
-  <text class="name" x="76" y="650">Validate crate</text>
-  <text class="detail" x="76" y="674">Hashes · paths · device limits</text>
-  <rect class="box" x="392" y="624" width="280" height="64"/>
-  <text class="name" x="412" y="650">Convert WAV copies</text>
-  <text class="detail" x="412" y="674">FFprobe + FFmpeg</text>
-  <rect class="box" x="752" y="576" width="336" height="140"/>
-  <text class="label" x="776" y="604">DEVICE EXPORTS</text>
-  <text class="name" x="776" y="634">Octatrack · Digitakt · TR-8S</text>
-  <text class="detail" x="776" y="666">_EXPORT/ staged WAVs</text>
-  <text class="detail" x="776" y="690">Card copy / Elektron Transfer</text>
-
-  <!-- Shared storage is a foundation, not a mandatory database dependency for export. -->
-  <rect class="boundary" x="32" y="756" width="1056" height="44"/>
-  <text class="label" x="56" y="784">.eidetic/</text>
-  <text class="detail" x="196" y="784">Portable library state: SQLite index · listening decisions · history + recovery records</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="832" height="658" viewBox="0 0 832 658" role="img" aria-labelledby="title description">
+<!-- Generated by scripts/generate_figures.py; edit the spec there, not this file. -->
+<title id="title">Eidetic Sample Tools architecture</title>
+<desc id="description">Your sample library and its index sit together on the sample drive. Library tools find sounds, let you listen in a browser to keep or skip candidates, and approve favourites; optional local AI organises listening. The approved collection passes to sample tools, which create checked WAV copies for Octatrack MKII, Digitakt MKI and TR-8S. Separately, Ableton tools rediscover saved projects without changing them. Optional Live tools inspect a running Set and apply edits after review, and let browser listening audition sounds in Live.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L8 4L0 8Z"/></marker>
+<style>
+text { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #565b58; }
+.frame-label { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.1em; }
+.name { font-size: 15px; font-weight: 500; fill: #171918; }
+.detail, .edge-label { font-size: 12px; }
+.frame, .box, .flow { fill: none; stroke: #565b58; stroke-width: 1; }
+.optional { stroke-dasharray: 4 4; }
+.arrowhead { fill: #565b58; }
+.port { fill: #f2f3f1; stroke: #565b58; stroke-width: 1; }
+</style>
+</defs>
+<rect width="832" height="658" fill="#f2f3f1"/>
+<g data-frame="SAMPLE DRIVE"><rect class="frame" x="24" y="24" width="404" height="100"/><text class="frame-label" x="40" y="45">SAMPLE DRIVE</text></g>
+<g data-box="Library index"><rect class="box" x="40" y="56" width="160" height="52"/><text class="name" x="120" y="79.5" text-anchor="middle">Library index</text><text class="detail" x="120" y="96" text-anchor="middle">with your decisions</text></g>
+<g data-box="Sample library"><rect class="box" x="224" y="56" width="188" height="52"/><text class="name" x="318" y="87.5" text-anchor="middle">Sample library</text></g>
+<g data-frame="LIBRARY-TOOLS"><rect class="frame" x="24" y="168" width="404" height="276"/><text class="frame-label" x="40" y="189">LIBRARY-TOOLS</text></g>
+<g data-box="Find sounds"><rect class="box" x="224" y="200" width="188" height="52"/><text class="name" x="318" y="223.5" text-anchor="middle">Find sounds</text><text class="detail" x="318" y="240" text-anchor="middle">by tag, pack or similar sound</text></g>
+<g data-box="Listen in a browser"><rect class="box" x="224" y="288" width="188" height="52"/><text class="name" x="318" y="311.5" text-anchor="middle">Listen in a browser</text><text class="detail" x="318" y="328" text-anchor="middle">keep or skip</text></g>
+<g data-box="Approve favourites"><rect class="box" x="224" y="376" width="188" height="52"/><text class="name" x="318" y="399.5" text-anchor="middle">Approve favourites</text><text class="detail" x="318" y="416" text-anchor="middle">roles and names</text></g>
+<g data-box="Local AI"><rect class="box optional" x="40" y="288" width="160" height="52"/><text class="name" x="120" y="311.5" text-anchor="middle">Local AI</text><text class="detail" x="120" y="328" text-anchor="middle">organises listening</text></g>
+<g data-frame="SAMPLE-TOOLS"><rect class="frame" x="24" y="480" width="404" height="100"/><text class="frame-label" x="40" y="501">SAMPLE-TOOLS</text></g>
+<g data-box="Create WAV copies"><rect class="box" x="224" y="512" width="188" height="52"/><text class="name" x="318" y="535.5" text-anchor="middle">Create WAV copies</text><text class="detail" x="318" y="552" text-anchor="middle">checked before transfer</text></g>
+<g data-box="Ableton Live"><rect class="box" x="560" y="56" width="232" height="52"/><text class="name" x="676" y="87.5" text-anchor="middle">Ableton Live</text></g>
+<g data-frame="ABLETON-TOOLS"><rect class="frame" x="560" y="140" width="232" height="100"/><text class="frame-label" x="576" y="161">ABLETON-TOOLS</text></g>
+<g data-box="Rediscover projects"><rect class="box" x="576" y="172" width="200" height="52"/><text class="name" x="676" y="195.5" text-anchor="middle">Rediscover projects</text><text class="detail" x="676" y="212" text-anchor="middle">saved Sets stay unchanged</text></g>
+<g data-frame="LIVE-TOOLS (OPTIONAL)"><rect class="frame optional" x="560" y="256" width="232" height="100"/><text class="frame-label" x="576" y="277">LIVE-TOOLS (OPTIONAL)</text></g>
+<g data-box="Inspect the running Set"><rect class="box optional" x="576" y="288" width="200" height="52"/><text class="name" x="676" y="311.5" text-anchor="middle">Inspect the running Set</text><text class="detail" x="676" y="328" text-anchor="middle">review edits before applying</text></g>
+<g data-frame="SUPPORTED DEVICES"><rect class="frame" x="560" y="426" width="232" height="208"/><text class="frame-label" x="576" y="447">SUPPORTED DEVICES</text></g>
+<g data-box="Octatrack MKII"><rect class="box" x="592" y="458" width="184" height="48"/><text class="name" x="684" y="479.5" text-anchor="middle">Octatrack MKII</text><text class="detail" x="684" y="496" text-anchor="middle">CompactFlash card</text></g>
+<g data-box="Digitakt MKI"><rect class="box" x="592" y="514" width="184" height="48"/><text class="name" x="684" y="535.5" text-anchor="middle">Digitakt MKI</text><text class="detail" x="684" y="552" text-anchor="middle">Elektron Transfer</text></g>
+<g data-box="TR-8S"><rect class="box" x="592" y="570" width="184" height="48"/><text class="name" x="684" y="591.5" text-anchor="middle">TR-8S</text><text class="detail" x="684" y="608" text-anchor="middle">SD card</text></g>
+<path class="flow" d="M318 108V200" marker-end="url(#arrow)"/>
+<path class="flow" d="M120 108V168" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<path class="flow" d="M318 252V288" marker-end="url(#arrow)"/>
+<text class="edge-label" x="326" y="274">candidates</text>
+<path class="flow" d="M318 340V376" marker-end="url(#arrow)"/>
+<text class="edge-label" x="326" y="362">kept sounds</text>
+<path class="flow optional" d="M200 314H224" marker-end="url(#arrow)"/>
+<path class="flow" d="M318 428V512" marker-end="url(#arrow)"/>
+<text class="edge-label" x="326" y="466">approved collection</text>
+<path class="flow" d="M412 538H576"/>
+<path class="flow" d="M576 482V594"/>
+<circle class="port" cx="576" cy="538" r="3"/>
+<path class="flow" d="M576 482H592" marker-end="url(#arrow)"/>
+<path class="flow" d="M576 538H592" marker-end="url(#arrow)"/>
+<path class="flow" d="M576 594H592" marker-end="url(#arrow)"/>
+<path class="flow" d="M724 108V172" marker-end="url(#arrow)"/>
+<path class="flow optional" d="M792 82H808V314H776" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<path class="flow optional" d="M412 314H576" marker-end="url(#arrow)"/>
+<text class="edge-label" x="494" y="306" text-anchor="middle">audition in Live</text>
 </svg>

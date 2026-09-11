@@ -81,12 +81,10 @@ unfinished. [Current progress and limits](STATUS.md).
 
 ## Architecture
 
-<details>
-<summary>View the overall system diagram</summary>
+![Your sample library and its index sit together on the sample drive. Library tools find sounds, let you listen in a browser to keep or skip candidates, and approve favourites; optional local AI organises listening. The approved collection passes to sample tools, which create checked WAV copies for Octatrack MKII, Digitakt MKI and TR-8S. Separately, Ableton tools rediscover saved projects without changing them. Optional Live tools inspect a running Set and apply edits after review, and let browser listening audition sounds in Live.](docs/images/architecture.svg)
 
-![Architecture: the sample library flows through indexing, search, local AI suggestions and human curation into device exports. Saved Ableton Sets produce independent reports; an optional bridge inspects and edits a running Set through explicit plans. Library state travels with the sample drive.](docs/images/architecture.svg)
-
-</details>
+*Each step saves files that the next step reads, so every stage can be inspected
+and rerun. Dashed parts are optional.*
 
 [System overview](docs/TECHNOLOGY.md) · [Library internals](library-tools/ARCHITECTURE.md) ·
 [Export internals](sample-tools/ARCHITECTURE.md) · [Ableton internals](ableton-tools/ARCHITECTURE.md) ·

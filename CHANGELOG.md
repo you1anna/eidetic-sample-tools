@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Redraw the architecture diagram around the sample path, from the sample drive
+  to supported devices, in the Eidetic Engineering figure style. It is generated
+  by `scripts/generate_figures.py`, checked for drift in CI and shown in full in
+  the README rather than collapsed.
 - Add the optional `eidetic-live-tools` package: an explicitly staged Max for
   Live bridge, loopback inspection, versioned Set snapshots, profile checks and
   checkpointed allowlisted edit plans with readback and receipts. Installation
