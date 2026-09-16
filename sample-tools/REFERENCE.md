@@ -110,12 +110,15 @@ The destination must already exist; the exporter checks every selected staged
 file and destination before copying.
 
 With `--crate`, sync includes only that plan's WAVs, including staged files whose
-conversion was skipped. Native paths such as `EIDETIC-CURATED/AUDIO/` and
+conversion was skipped. Keep `.receipt.json` sidecars beside the staged exports for reuse and
+provenance; they are not audio to import on the device. Native paths such as `EIDETIC-CURATED/AUDIO/` and
 `ROLAND/TR-8S/SAMPLE/` are copied directly below the card root. Legacy flat
 exports use an `EIDETIC-<DEVICE>/` wrapper.
 
 Digitakt does not support `--sync`; drag staged exports into Elektron Transfer.
-TR-8S may require front-panel import after copying. Complete a
+TR-8S requires front-panel sample import after copying; SD capacity does not enlarge its internal
+sample memory. Successful sync does not eject the card or establish import/playback/save success.
+Verify the transfer and eject through the operating system before disconnecting. Complete a
 [one-sample hardware test](../docs/WORKFLOWS.md#first-device-smoke-test) before
 expanding a crate.
 

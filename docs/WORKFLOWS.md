@@ -26,8 +26,9 @@ when the library mount path changes. No other Mac needs to be available.
 
 Search and analysis work before any reorganisation. Keep source audio, labels,
 run manifests and undo records backed up; see the [safety model](SAFETY.md).
-For the existing reference library, consult the dated
-[operational record](../STATUS.md#live-library-state) before applying changes.
+For the existing reference library, preserve the dated
+[operational record](../STATUS.md#live-library-state), then inspect the currently attached library
+and active run hand-off. Historical counts and old trial queues do not replace current state.
 
 ## Find a sound now
 

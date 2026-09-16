@@ -56,6 +56,8 @@ exporter retains the `SAMPLES_ROOT` and optional `EXPORT_ROOT` environment setti
 ```bash
 python --version
 python -m pip show librarytools sampletools abletontools
+command -v sample-find sample-export
+sample-find --help
 sample-review --help
 sample-collection --help
 sample-export --help
@@ -72,6 +74,21 @@ system executables and are not installed by pip. Base Ableton inspection needs
 neither; export needs both. On Linux, install FFmpeg through the system package
 manager; if SoundFile cannot load libsndfile, install that system library too
 (`libsndfile1` on Debian/Ubuntu).
+
+### Check which installation a helper will use
+
+Environment directory names are local choices, not a CLI contract. A desktop helper or a new
+terminal may have a different PATH from the shell where you installed the tools. Check
+`command -v sample-find sample-export` in the environment that will run the task; activate the
+intended environment or pass its absolute executable path to the helper. Stable launchers in
+`~/.local/bin` can point to that installation. Check their target after moving or replacing a venv.
+
+An executable file left by a removed editable checkout can still exist while its imports fail.
+Run the selected executable's `--help`, not only a file-existence check. If it fails, repair that
+installation explicitly rather than quietly falling through to an older release. A package
+version alone does not identify every source revision; retain the checkout revision as well.
+Non-editable installs need reinstalling after code updates. The development helper's checkout
+imports are separate from the installed commands used for library work.
 
 ### Optional Live control
 

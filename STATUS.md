@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-10
+**Updated:** 2026-09-16
 
 ## Current position
 
@@ -37,6 +37,12 @@ The [roadmap](docs/ROADMAP.md) distinguishes established features from planned w
 
 ## Trial and verification
 
+The counts and device outcomes below are dated trial evidence, not live library state or the
+next task for every collection. Current machine/library UUID, selected release, transfer reports
+and unreported hardware checks belong in that run's hand-off. A newer authorised collection may
+supersede the trial without changing its historical results. Keep private operational records
+outside this public repository.
+
 - The September 9 inventory recorded 23,927 source locations and 21,689 distinct
   file identities. Promotion later added 19 curated copies, not new identities.
 - The user reviewed 24 candidates, kept 19 and explicitly approved those 19 as
@@ -67,6 +73,10 @@ The [roadmap](docs/ROADMAP.md) distinguishes established features from planned w
   A running Set in the target Live version, the staged Max device and physical studio routing have
   not yet been used to qualify these claims.
 
+- September 16 maintenance clarified installed-command selection, dated trial state and the
+  distinction between staged receipts, card copy and device import. The exporter and collection-plan
+  regression suites passed **99 tests**. No runtime code, hardware profiles or safety defaults changed.
+
 ## Next bounded increments
 
 1. Qualify collection-plan listening with a representative large plan: saved
@@ -75,8 +85,9 @@ The [roadmap](docs/ROADMAP.md) distinguishes established features from planned w
    controls. Report analysed, cached, failed and unanalysed coverage; measure useful
    new sounds per listening minute with the user.
 3. Add aggregate device budgets, free-space checks and reliable larger transfers.
-   Complete the existing 19-file Octatrack hardware round trip before a substantially
-   larger transfer; validate other devices separately.
+   Validate transfer, playback and saved recall for the currently selected collection on each
+   device. The older 19-file trial is historical evidence, not a mandatory replacement for a
+   newer authorised run.
 4. Complete the target Live runtime gate: build/load the staged device, inspect a
    saved test Set, exercise acknowledgement-loss reconciliation, audition through
    the two managed tracks, and verify audible routing plus save/reload.
@@ -85,28 +96,36 @@ The [collection assessment](docs/COLLECTION-PLANNING-ASSESSMENT.md) records the
 remaining performance and workflow risks. It is a staged design, not a claim
 that those capabilities are already present.
 
-## Choices still requiring user input
+## Choices to record for each collection
 
 - Whether a fresh collection should exclude known exports, retain a favourite
-  core, or allow a controlled number of repeats. No default preference is assumed.
+  core, or allow a controlled number of repeats. Retain an already agreed policy in the run.
 - Whether the larger collection is mainly a browsing library or a cohesive
   performance set, and its desired size, tempo range and role balance.
 - Each device's actual available storage and the amount to reserve. Card space,
   project memory and internal import limits are different constraints.
 
-The existing 19 favourites remain approved; further choices do not require asking
-for that approval again. Listening time was not supplied and remains unmeasured.
+Historical approvals remain evidence; do not request the same approval again merely because a
+new task began. A fresh database does not automatically contain those decisions: preserve supplied
+history and record its coverage separately from the current promotion state. The trial did not
+measure listening time.
 
 ## Live-library state
 
-The SSD was onboarded on September 9. Available September selection history was
-preserved; the Mac mini's older database history remains deferred. It can be
-reconciled later without replacing current decisions.
+This section preserves the **September 9 historical snapshot**. It is not a current database
+inspection and must not trigger re-onboarding, a rescan or replaying an old export. Inspect the
+attached library with `sample-library doctor --root ... --json`, and read its current run record.
+A fresh library identity may have incomplete older-history coverage while new work remains usable.
 
-No source-library backup has been verified in the retained evidence. The existing
-block on `--apply` organisation, intake, deduplication and catalogue migration
-therefore remains. Hash-verified promotion copies remain permitted under the
-recorded August 4 decision. Profiles and safety defaults have not changed.
+At that checkpoint the SSD was onboarded, available selection history was preserved and another
+machine's older history was deferred. Later reconciliation must preserve current decisions rather
+than replacing them with that historical snapshot.
+
+No source-audio backup was verified in that retained evidence. A device-card backup or an export
+receipt does not fill that gap. Continue to require the appropriate verified backup before
+source-moving organisation, intake, deduplication or catalogue migration; do not infer that a later
+card transfer established one. The recorded permission for hash-verified promotion copies remains
+separate. Profiles and safety defaults have not changed.
 
 The July inventory's absent protected-pack entries and missing Foundation identity
 remain unresolved historical integrity findings. They are not a reason to repeat
