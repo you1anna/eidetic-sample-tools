@@ -11,15 +11,17 @@ import json
 import hashlib
 import io
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from pathlib import Path
 
 from .featurecache import FEATURE_COLUMNS
 from .curation_policy import TRUSTED_ROLES
 from .inventory import LibraryDatabase
 from .origin import is_generated_name
-from .review import _description, classify_role
+from .review import _description, classify_role, words_text
 
 # Review roles are broad folders; the exporter's crate vocabulary is per-instrument.  Where a
 # folder covers several instruments the filename decides, falling back to the commonest.
@@ -228,12 +230,18 @@ def _haystack(match: Match) -> set[str]:
     return words
 
 
+@lru_cache(maxsize=256)
+def _term_pattern(term: str) -> re.Pattern[str]:
+    """Whole words with an optional plural: 'rap' finds 'Rap_01' and 'raps', never 'Trap'."""
+    words = words_text(term)
+    if not words:
+        return re.compile(r"(?!)")
+    return re.compile(r"(?<!\S)" + re.escape(words) + r"(?:s|es)?(?!\S)")
+
+
 def matches_query(match: Match, query: Query) -> bool:
     if query.curated_only and match.zone != "CURATED":
         return False
-
-    haystack = _haystack(match)
-    text = match.path.as_posix().lower() + " " + " ".join(match.tags) + " " + match.origin
 
     for group, values in query.groups.items():
         tagged = {tag for tag in match.tags}
@@ -251,9 +259,11 @@ def matches_query(match: Match, query: Query) -> bool:
 
     if not query.terms:
         return True
+    haystack = _haystack(match)
+    text = words_text(match.path.as_posix() + " " + " ".join(match.tags) + " " + match.origin)
     hits = [
         term for term in query.terms
-        if term in haystack or term in text
+        if term in haystack or _term_pattern(term).search(text)
     ]
     return bool(hits) if query.any_ else len(hits) == len(query.terms)
 

@@ -28,7 +28,8 @@ from .models import (
 )
 
 
-EXCERPT_POLICY = "three-10s-v1"
+# v2: short excerpts use the checkpoint's repeat padding; v1 vectors were zero-padded.
+EXCERPT_POLICY = "three-10s-v2"
 DEFAULT_BATCH_SIZE = 2
 DEFAULT_THREADS = 2
 DEFAULT_TIMEOUT = 300.0

@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-16
+**Updated:** 2026-09-22
 
 ## Current position
 
@@ -76,6 +76,14 @@ outside this public repository.
 - September 16 maintenance clarified installed-command selection, dated trial state and the
   distinction between staged receipts, card copy and device import. The exporter and collection-plan
   regression suites passed **99 tests**. No runtime code, hardware profiles or safety defaults changed.
+
+- September 22 fixed three detection faults: path roles and curation-packet suggestions now read
+  whole words from the filename outwards, search terms match whole words, and CLAP no longer
+  receives short clips padded with silence. **899 tests passed, two model-download checks
+  skipped**; the synthetic planner benchmark was unchanged. The pinned transformers feature
+  extractor confirmed the padding change (a 0.3-second hit fell from 97% to 1% silent input
+  frames); the real checkpoints were not run. Earlier `three-10s-v1` embeddings are kept but not
+  reused. Profiles and safety defaults did not change.
 
 ## Next bounded increments
 

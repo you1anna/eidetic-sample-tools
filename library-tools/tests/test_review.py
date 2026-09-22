@@ -82,6 +82,54 @@ def test_cryptic_sean_names_stay_in_review():
     assert review.classify_role(Path("_PACKS/Sean/cloud 909/dms2.wav")).role == "_REVIEW"
 
 
+def test_role_words_never_match_inside_other_words():
+    # grime/rim, sunrise/rise, what/hat, bottom/tom, subtle/sub, Cymatics/cym
+    for path in (
+        "PACKS/Grime Vocals/phrase_01.wav",
+        "PACKS/Sunrise Vox/vox_01.wav",
+        "PACKS/What The Funk/Vocals/shout.wav",
+        "PACKS/Bottom Heavy/Vocal Chops/chop_02.wav",
+        "PACKS/Subtle Grooves/vocal_loop_125bpm.wav",
+        "PACKS/Cymatics Vocal Essentials/phrase_01.wav",
+    ):
+        assert review.classify_role(Path(path)).role == "VOCALS", path
+
+
+def test_filename_and_nearest_folder_outrank_the_pack_name():
+    assert review.classify_role(
+        Path("PACKS/Tribal Techno Vol 2/Vocal Loops/rap_phrase_140bpm.wav")
+    ).role == "VOCALS"
+    assert review.classify_role(Path("PACKS/Deep Kicks and Bass/Bass/bass_01.wav")).role == "BASS"
+
+
+def test_style_words_do_not_decide_sound_type():
+    assert review.classify_role(
+        Path("PACKS/Tribal Techno Vol 2/Loops/tribal_groove_03_140bpm.wav")
+    ).role == "DRUM-LOOPS"
+    assert review.classify_role(
+        Path("PACKS/Tribal Techno Vol 2/One Shots/tribal_03.wav")
+    ).role == "_REVIEW"
+    assert review.classify_role(
+        Path("PACKS/Acid Techno/Loops/acid_line_140bpm.wav")
+    ).role == "SYNTH-STAB-CHORD"
+    assert review.classify_role(Path("PACKS/Acid House Vocals/vocal_01.wav")).role == "VOCALS"
+
+
+def test_fused_and_camel_case_names_still_classify():
+    assert review.classify_role(Path("PACKS/Pack/BigKick01.wav")).role == "KICKS"
+    assert review.classify_role(Path("PACKS/Pack/hardkick_02.wav")).role == "KICKS"
+    assert review.classify_role(Path("PACKS/Pack/RimShot_3.wav")).role == "CLAP-SNARE"
+    assert review.classify_role(Path("PACKS/Pack/BD909_01.wav")).role == "KICKS"
+
+
+def test_vendor_names_containing_loop_do_not_make_a_loop():
+    item = review.build_item(
+        Path("/samples/PACKS/Loopmasters Tech/Shots/zap_01.wav"), Path("/samples"),
+    )
+    assert item.main_category == "_REVIEW"
+    assert item.sample_type == "unknown"
+
+
 def test_loop_context_can_extract_bare_bpm_without_treating_drum_machines_as_bpm():
     loop = review.build_item(
         Path("/samples/_PACKS/Sean/Analogue Underground 2/Wav/modular drum loops/au2_132.wav"),

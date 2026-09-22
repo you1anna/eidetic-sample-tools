@@ -103,11 +103,15 @@ def feature_array(output):
 
 
 def clap_audio_inputs(processor, excerpts):
+    # Leave padding to the checkpoint's feature extractor: it repeats clips shorter than
+    # the 10-second window, as in training. padding=True replaced that with silence, so a
+    # one-shot reached the model as almost nothing but zeros.
+    if any(len(excerpt) == 0 for excerpt in excerpts):
+        raise ClassificationError("cannot embed an empty audio excerpt")
     return processor(
         audio=excerpts,
         sampling_rate=48_000,
         return_tensors="pt",
-        padding=True,
     )
 
 

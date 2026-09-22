@@ -29,6 +29,7 @@ from librarytools.packet_classifier import (
     write_benchmark_sheet,
     write_classifications,
 )
+from librarytools.classification.domain import ClassificationError
 from librarytools.inventory import LibraryDatabase, scan_library
 
 
@@ -149,6 +150,19 @@ def test_clap_audio_inputs_uses_transformers_five_audio_keyword():
 
     result = clap_audio_inputs(Processor(), [np.array([0.0])])
     assert result["sampling_rate"] == 48_000
+
+
+def test_clap_audio_inputs_leave_short_clip_padding_to_the_checkpoint():
+    # An explicit padding value overrides the extractor's configured repeat padding, so a
+    # 0.3-second hit would reach CLAP as a 10-second window of mostly silence.
+    class Processor:
+        def __call__(self, **kwargs):
+            return kwargs
+
+    result = clap_audio_inputs(Processor(), [np.zeros(14_400)])
+    assert "padding" not in result
+    with pytest.raises(ClassificationError, match="empty audio excerpt"):
+        clap_audio_inputs(Processor(), [np.zeros(14_400), np.array([])])
 
 
 def test_clap_excerpt_offsets_bound_long_source_decoding():

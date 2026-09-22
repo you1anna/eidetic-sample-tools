@@ -134,31 +134,41 @@ def apply_migration(
     return counts
 
 
+_SUGGESTED_ROLE_WORDS = tuple((role, review.word_pattern(needles)) for role, needles in (
+    ("HAT-OPEN", ("open hat*", "open hihat*", "open hi hat*", "openh*", "ohh")),
+    ("HAT-CLOSED", ("closed hat*", "closed hihat*", "closed hi hat*", "closedh*", "chh")),
+    ("DRUM-LOOP", ("drum loop*", "top loop*", "beat loop*")),
+    ("BASS-LOOP", ("bass loop*", "bassloop*")),
+    ("SYNTH-LOOP", ("synth loop*", "chord loop*")),
+    ("VOCAL-LOOP", ("vocal loop*", "vox loop*")),
+    ("TEXTURE-DRONE", ("texture*", "drone*", "atmos*", "ambient")),
+    ("KICK", ("*kick*", "*bassdrum*", "bass drum*", "bd")),
+    ("SNARE", ("*snare*", "sd")),
+    ("CLAP", ("*clap*",)), ("RIM", ("rim", "rims", "rimshot*")),
+    ("SHAKER", ("*shaker*",)), ("RIDE", ("ride", "rides")),
+    ("CYMBAL", ("*cymbal*", "cym", "cyms", "crash", "crashes")), ("TOM", ("tom", "toms")),
+    ("PERC", ("perc*", "*conga*", "*bongo*", "*cowbell*", "clave*")),
+    ("BASS", ("bass*", "subbass*", "sub", "subs", "reese*")),
+    ("STAB-CHORD", ("stab", "stabs", "chord*", "synth*", "pluck*")),
+    ("FX", ("fx", "impact*", "riser*", "noise*")),
+    ("VOCAL", ("*vocal*", "vox", "voice*")),
+))
+# One-hit drum roles. A path that also names a loop holds a rhythm loop, not a hit.
+_DRUM_HIT_ROLES = frozenset({
+    "HAT-OPEN", "HAT-CLOSED", "KICK", "SNARE", "CLAP", "RIM", "SHAKER", "RIDE",
+    "CYMBAL", "TOM", "PERC",
+})
+
+
 def _suggested_role(path: Path) -> str:
-    text = " ".join(part.lower().replace("_", " ").replace("-", " ") for part in path.parts)
-    checks = (
-        ("HAT-OPEN", ("open hat", "openh", "ohh")),
-        ("HAT-CLOSED", ("closed hat", "closedh", "chh")),
-        ("DRUM-LOOP", ("drum loop", "top loop", "beat loop")),
-        ("BASS-LOOP", ("bass loop", "bassloop")),
-        ("SYNTH-LOOP", ("synth loop", "chord loop")),
-        ("VOCAL-LOOP", ("vocal loop", "vox loop")),
-        ("TEXTURE-DRONE", ("texture", "drone", "atmos", "ambient")),
-        ("KICK", ("kick", "bassdrum", "bass drum", " bd ")),
-        ("SNARE", ("snare", " sd ")),
-        ("CLAP", ("clap",)), ("RIM", ("rim",)),
-        ("SHAKER", ("shaker",)), ("RIDE", ("ride",)),
-        ("CYMBAL", ("cymbal", " cym ", "crash")), ("TOM", ("tom",)),
-        ("PERC", ("perc", "conga", "bongo", "cowbell", "clave")),
-        ("BASS", ("bass", "sub", "reese")),
-        ("STAB-CHORD", ("stab", "chord", "synth", "pluck")),
-        ("FX", (" fx ", "impact", "riser", "noise")),
-        ("VOCAL", ("vocal", "vox", "voice")),
-    )
-    padded = f" {text} "
-    for role, tokens in checks:
-        if any(token in padded for token in tokens):
-            return role
+    """Suggest a crate role from whole words; the filename outranks its folders and pack."""
+    for part in reversed(path.parts):
+        text = review.words_text(part)
+        for role, pattern in _SUGGESTED_ROLE_WORDS:
+            if pattern.search(text):
+                if role in _DRUM_HIT_ROLES and review.has_loop_words(path):
+                    return "DRUM-LOOP"
+                return role
     return ""
 
 

@@ -46,8 +46,9 @@ sample-find --root "$SAMPLES_ROOT" perc tribal analog --limit 20 \
 ```
 
 These commands write derived data and leave audio in place. Terms combine with
-AND; `--any` broadens the query. Default ranking spreads results across sound
-families to reduce repeated variants.
+AND; `--any` broadens the query. Each term matches whole words, so `rap` does not
+find `Trap`. Default ranking spreads results across sound families to reduce
+repeated variants.
 
 For a measured comparison, replace `YOUR_SAMPLE_ID` with an indexed ID or a
 unique path fragment:

@@ -8,6 +8,7 @@ import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from . import config, probe
@@ -66,21 +67,69 @@ class ReviewItem:
     warnings: str
 
 
-def _contains(text: str, needles: tuple[str, ...]) -> str | None:
-    for needle in needles:
-        if needle in text:
-            return needle
-    return None
-
-
 def _parts_text(rel: Path) -> str:
     return " / ".join(part.lower().replace("_", " ").replace(".", " ") for part in rel.parts)
 
 
-def _tokens(rel: Path) -> set[str]:
-    """Whole-token set of the normalised path (folders + filename)."""
-    return {t for t in _TOKEN_SPLIT_RE.split(_parts_text(rel)) if t}
+_CAMEL_RE = re.compile(r"(?<=[a-z])(?=[A-Z])")
+_WORD_RE = re.compile(r"[a-z]+|[0-9]+")
 
+
+def words_text(text: str) -> str:
+    """Lowercase whole words joined by single spaces.
+
+    camelCase and letter/digit runs split, so 'BigKick01_Hard' reads 'big kick 01 hard'
+    and 'SA909_BD' reads 'sa 909 bd'.
+    """
+    return " ".join(_WORD_RE.findall(_CAMEL_RE.sub(" ", text).lower()))
+
+
+def word_pattern(needles: tuple[str, ...]) -> re.Pattern[str]:
+    """Match needles as whole words in :func:`words_text` output, never inside other words.
+
+    A ``*`` marks where a needle may continue inside a longer word: ``kick*`` also finds
+    'kicks' and 'kickdrum', ``*loop`` finds 'toploop' and ``*vocal*`` finds 'leadvocals'.
+    Without one, 'rim' never matches 'grime', 'hat' never matches 'what' and 'sub' never
+    matches 'subtle'.
+    """
+    return re.compile(_needle_regex(needles))
+
+
+def _needle_regex(needles: tuple[str, ...]) -> str:
+    alternatives = []
+    for needle in needles:
+        head = r"\S*?" if needle.startswith("*") else ""
+        tail = r"\S*" if needle.endswith("*") else r"(?!\S)"
+        alternatives.append(head + re.escape(needle.strip("*")) + tail)
+    # One word-start check per position keeps a long needle list cheap to search.
+    return r"(?<!\S)(?:" + "|".join(alternatives) + ")"
+
+
+_DRUM_LOOP_WORDS = word_pattern(("drum loop*", "top loop*", "beat loop*", "beats"))
+_LOOP_WORDS = word_pattern(("*loop", "*loops", "groove", "grooves"))
+
+# Checked in this order within one path part. Distinctive stems may sit inside longer
+# words; short or ambiguous ones must stand alone.
+_ROLE_WORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("KICKS", ("*bassdrum*", "bass drum*", "bdrum*", "*kick*", "bd")),
+    ("CLAP-SNARE", ("*clap*", "*snare*", "rim", "rims", "rimshot*", "sd")),
+    ("HATS-CYM", (
+        "*hihat*", "hi hat*", "hat", "hats", "openhat*", "closedhat*", "closedhh", "openhh",
+        "*cymbal*", "cym", "cyms", "ride", "rides", "crash", "crashes", "*shaker*",
+    )),
+    ("PERC", ("perc*", "*conga*", "*bongo*", "tom", "toms", "agogo*", "cabasa*", "cabassa*")),
+    ("BASS", ("bass*", "subbass*", "sub", "subs", "reese*")),
+    ("SYNTH-STAB-CHORD", (
+        "synth*", "stab", "stabs", "chord*", "pluck*", "arp", "arps", "arpeggi*",
+        "lead", "leads", "sh 101", "guitar*", "keys", "piano*",
+    )),
+    ("DRONE-ATMOS", ("drone*", "pad", "pads", "atmos*", "ambien*", "texture*", "field*")),
+    ("FX-RISE-IMPACT", (
+        "fx", "sfx", "impact*", "riser*", "rise", "uplifter*", "downlifter*", "sweep*",
+        "swell*", "noise*",
+    )),
+    ("VOCALS", ("*vocal*", "vox", "voice*", "acapella*", "accapella*")),
+)
 
 # Short, ambiguous instrument codes matched ONLY as whole tokens, so 'chord'
 # never hits 'ch' and 'ohio' never hits 'oh'. Drum-machine model names excluded.
@@ -90,7 +139,7 @@ ROLE_ABBREV_TOKEN: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 # Unambiguous instrument stems matched as a token PREFIX, so fused names like
-# 'CowHigh' -> 'cowhigh' and 'Congas' still classify.
+# 'cowhigh' and plurals like 'Congas' still classify.
 ROLE_ABBREV_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("PERC", (
         "cow", "clave", "cabasa", "conga", "block", "tamb", "agogo",
@@ -99,44 +148,71 @@ ROLE_ABBREV_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
     )),
 )
 
+# Words for a 303-style line: they hint at a role but must not outrank an instrument word
+# anywhere in the path, so a vocal in an 'Acid House' pack is still a vocal. Style words
+# such as 'tribal' say nothing about the sound type and are left to tags.
+_ROLE_HINT_WORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("SYNTH-STAB-CHORD", ("acid",)),
+    ("BASS", ("303",)),
+)
+
+_PART_RULES = tuple(
+    [(role, word_pattern(needles), "path") for role, needles in _ROLE_WORDS]
+    + [(role, word_pattern(codes), "token") for role, codes in ROLE_ABBREV_TOKEN]
+    + [(role, word_pattern(tuple(f"{stem}*" for stem in stems)), "token")
+       for role, stems in ROLE_ABBREV_PREFIX]
+)
+_HINT_RULES = tuple((role, word_pattern(needles)) for role, needles in _ROLE_HINT_WORDS)
+
+
+_part_words = lru_cache(maxsize=65536)(words_text)
+
+
+def _part_texts(rel: Path) -> list[str]:
+    """Words of each path part, filename first, so the most specific evidence is read first."""
+    return [_part_words(part) for part in reversed(rel.parts)]
+
+
+@lru_cache(maxsize=65536)
+def _part_role(text: str) -> tuple[str, str] | None:
+    """Role evidence from one part's words; folder names repeat, so results are cached."""
+    for role, pattern, kind in _PART_RULES:
+        match = pattern.search(text)
+        if match:
+            return role, f"{kind}:{match.group(0)}"
+    return None
+
+
+def has_loop_words(rel: Path) -> bool:
+    """Loop or groove named anywhere in the path, as a whole word ('Loopmasters' is not)."""
+    return any(_LOOP_WORDS.search(text) for text in _part_texts(rel))
+
 
 def classify_role(rel: Path, duration: float | None = None) -> RoleResult:
-    """Classify an in-scope sample path into the library's role taxonomy."""
-    text = _parts_text(rel)
+    """Classify an in-scope sample path into the library's role taxonomy.
 
-    drum_loop = _contains(text, ("drum loop", "drum loops", "top loop", "top loops", "beat loop", "beats"))
-    if drum_loop:
-        return RoleResult("DRUM-LOOPS", "high", f"path:{drum_loop}")
+    The filename is read first, then each folder outwards to the pack name, so the most
+    specific evidence wins: 'Kicks & Bass/Bass/bass_01.wav' is bass, not a kick.
+    """
+    texts = _part_texts(rel)
 
-    role_rules: tuple[tuple[str, tuple[str, ...]], ...] = (
-        ("KICKS", ("bassdrum", "bass drum", "bdrum", "kick", "kicks", "bd ", " bd", "sa909 bd")),
-        ("CLAP-SNARE", ("clap", "claps", "snare", "snares", "rim", "sd ", " sd", "sa909 sd")),
-        ("HATS-CYM", ("hihat", "hi hat", "hi-hat", "closedhh", "openhh", "hat", "hats", "cymbal", "cym", "ride", "crash", "shaker")),
-        ("PERC", ("perc", "percussion", "conga", "bongo", "tom", "agogo", "tribal", "cabasa", "cabassa")),
-        ("BASS", ("bass", "sub", "reese", "303")),
-        ("SYNTH-STAB-CHORD", ("synth", "stab", "chord", "pluck", "arp", "lead", "sh101", "acid", "guitar", "keys", "piano")),
-        ("DRONE-ATMOS", ("drone", "drones", "pad", "pads", "atmos", "ambience", "ambient", "texture", "textures", "field")),
-        ("FX-RISE-IMPACT", ("fx", "sfx", "impact", "riser", "rise", "uplifter", "downlifter", "sweep", "swell", "noise")),
-        ("VOCALS", ("vocal", "vocals", "vox", "voice", "voices", "acapella", "accapella")),
-    )
-    for role, needles in role_rules:
-        matched = _contains(text, needles)
-        if matched:
-            return RoleResult(role, "high", f"path:{matched}")
+    for text in texts:
+        drum_loop = _DRUM_LOOP_WORDS.search(text)
+        if drum_loop:
+            return RoleResult("DRUM-LOOPS", "high", f"path:{drum_loop.group(0)}")
 
-    tokens = _tokens(rel)
-    for role, codes in ROLE_ABBREV_TOKEN:
-        hit = tokens.intersection(codes)
-        if hit:
-            return RoleResult(role, "high", f"token:{sorted(hit)[0]}")
-    for role, stems in ROLE_ABBREV_PREFIX:
-        for tok in sorted(tokens):
-            stem = next((s for s in stems if tok.startswith(s)), None)
-            if stem:
-                return RoleResult(role, "high", f"token:{stem}")
+    for text in texts:
+        found = _part_role(text)
+        if found:
+            return RoleResult(found[0], "high", found[1])
 
-    loop = _contains(text, ("loop", "loops", "groove", "grooves"))
-    if loop or _BPM_RE.search(str(rel)):
+    for text in texts:
+        for role, pattern in _HINT_RULES:
+            hint = pattern.search(text)
+            if hint:
+                return RoleResult(role, "high", f"path:{hint.group(0)}")
+
+    if any(_LOOP_WORDS.search(text) for text in texts) or _BPM_RE.search(str(rel)):
         return RoleResult("DRUM-LOOPS", "medium", "path:loop")
 
     if duration is not None:
@@ -169,7 +245,7 @@ def _extract_bpm(rel: Path) -> str | None:
     match = _BPM_RE.search(text) or _BRACKET_BPM_RE.search(text)
     if match:
         return match.group(1)
-    if _contains(_parts_text(rel), ("loop", "loops", "groove", "grooves")):
+    if has_loop_words(rel):
         bare = _BARE_BPM_RE.search(text)
         if bare:
             return bare.group(1)
@@ -189,8 +265,7 @@ def _extract_key(stem: str) -> str | None:
 
 def sample_type(rel: Path, main_category: str, duration: float | None = None) -> str:
     """Return loop/one-shot/texture/unknown without changing the main category."""
-    text = _parts_text(rel)
-    if _contains(text, ("loop", "loops", "groove", "grooves")) or _extract_bpm(rel):
+    if has_loop_words(rel) or _extract_bpm(rel):
         return "loop"
     if main_category == "DRONE-ATMOS":
         return "texture"

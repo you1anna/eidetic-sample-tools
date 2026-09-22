@@ -87,7 +87,10 @@ foreign keys. Upgrades are explicit; see [state lifecycle](../docs/STATE-AND-CON
 `sample-find` loads indexed identities, collapses exact copies and prefers
 curated locations. Terms combine with AND by default or OR with `--any`.
 Vocabulary rules derive role, style, gear and character tags from origins,
-names and measurements. Origin recovery uses surviving pack paths, recognised
+names and measurements. The [path role](src/librarytools/review.py) reads whole
+words from the filename first, then each folder outwards, so a pack name cannot
+override a more specific folder or filename. Style words such as `tribal` do not
+decide a role. Origin recovery uses surviving pack paths, recognised
 tokens and byte-identical copies with known provenance.
 
 Acoustic `--like` search uses min-max normalised Euclidean distance across
@@ -135,7 +138,9 @@ The [model specifications](src/librarytools/classification/models.py) pin
 `laion/clap-htsat-unfused` and `laion/larger_clap_music_and_speech` to explicit
 revisions. Production inference runs sequentially in short-lived CPU subprocesses
 so one model's memory can be released before the next loads. Audio excerpts are
-bounded, decoded to 48 kHz mono; the excerpt policy is part of cache identity.
+bounded, decoded to 48 kHz mono and padded by each checkpoint's own feature
+extractor, which repeats clips shorter than ten seconds. The excerpt policy
+(`three-10s-v2`) is part of cache identity; `v1` vectors were padded with silence.
 
 Audio cache keys are `(sample_id, model_id, model_revision, excerpt_policy)`.
 Prompt keys also include prompt policy and label, allowing prompt changes to

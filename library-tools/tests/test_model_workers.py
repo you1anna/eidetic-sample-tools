@@ -10,6 +10,7 @@ import pytest
 from librarytools.classification.cache import EmbeddingCache, EmbeddingKey
 from librarytools.classification.models import MODEL_SPECS, ModelSpec
 from librarytools.classification.workers import (
+    EXCERPT_POLICY,
     EmbeddingWorker,
     SampleRef,
     generate_model_votes,
@@ -66,7 +67,7 @@ def test_worker_is_cache_first_and_commits_batches_of_at_most_eight(tmp_path) ->
     spec = ModelSpec("fake/model", "revision", embedding_dimensions=4)
     samples = _samples(10)
     cache.put(
-        EmbeddingKey("sample-0", spec.model_id, spec.revision, "three-10s-v1"),
+        EmbeddingKey("sample-0", spec.model_id, spec.revision, EXCERPT_POLICY),
         np.ones(4),
     )
     runtime = FakeRuntime(4)
@@ -79,7 +80,7 @@ def test_worker_is_cache_first_and_commits_batches_of_at_most_eight(tmp_path) ->
     assert report.batch_sizes == (8, 1)
     assert [len(batch) for batch in runtime.batches] == [8, 1]
     assert all(
-        cache.get(EmbeddingKey(sample.sample_id, spec.model_id, spec.revision, "three-10s-v1"))
+        cache.get(EmbeddingKey(sample.sample_id, spec.model_id, spec.revision, EXCERPT_POLICY))
         is not None
         for sample in samples
     )
@@ -108,7 +109,7 @@ def test_default_worker_uses_a_short_lived_process_without_model_load_on_cache_h
     spec = ModelSpec("fake/model", "revision", embedding_dimensions=4)
     sample = SampleRef("sample-0", Path("/already-cached.wav"))
     cache.put(
-        EmbeddingKey(sample.sample_id, spec.model_id, spec.revision, "three-10s-v1"),
+        EmbeddingKey(sample.sample_id, spec.model_id, spec.revision, EXCERPT_POLICY),
         np.ones(4),
     )
 
@@ -184,7 +185,7 @@ def test_real_workers_persist_both_pinned_model_embeddings(tmp_path) -> None:
     assert [report.embedded for report in reports] == [1, 1]
     assert len(votes["tone"]) == 2
     for spec in MODEL_SPECS:
-        vector = cache.get(EmbeddingKey("tone", spec.model_id, spec.revision, "three-10s-v1"))
+        vector = cache.get(EmbeddingKey("tone", spec.model_id, spec.revision, EXCERPT_POLICY))
         assert vector is not None
         assert vector.shape == (spec.embedding_dimensions,)
 

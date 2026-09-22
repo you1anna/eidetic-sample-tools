@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Read sample roles from whole words, filename first, so pack and vendor names no
+  longer decide them: `Grime` is not a rim, `Cymatics` is not a cymbal and a vocal
+  loop in a `Tribal Techno` pack is a vocal. Curation packets suggest `DRUM-LOOP`
+  rather than a one-shot drum role when the path names a loop. Search terms match
+  whole words, so `rap` no longer finds `Trap`.
+- Leave CLAP padding to each checkpoint's feature extractor. Clips shorter than ten
+  seconds were padded with silence instead of repeated; the excerpt policy is now
+  `three-10s-v2`, so earlier embeddings are recomputed rather than reused.
 - Redraw the architecture diagram around the sample path, from the sample drive
   to supported devices, in the Eidetic Engineering figure style. It is generated
   by `scripts/generate_figures.py`, checked for drift in CI and shown in full in

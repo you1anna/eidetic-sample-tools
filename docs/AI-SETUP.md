@@ -97,6 +97,8 @@ hard RAM quota or a guarantee that Ableton will be unaffected. Use `--threads 1
 The model's internal excerpt batches remain bounded at eight excerpts. Do not
 change model revisions or excerpt policies casually: those changes invalidate
 embedding reuse. Existing cached embeddings are retained; no forced rebuild occurs.
+The September 22 change to `three-10s-v2` stops silence padding of short clips, so
+earlier `three-10s-v1` vectors stay in the cache but are not reused.
 
 Two 512-dimensional float16 vectors per sample require about **43 MiB for 22,000
 samples**, before SQLite keys/indexes, prompt embeddings and other library data.

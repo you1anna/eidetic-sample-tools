@@ -32,6 +32,18 @@ def test_terms_are_and_by_default_and_or_with_any():
     assert matches_query(match, Query(terms=("tribal", "metallic"), any_=True))
 
 
+def test_terms_match_whole_words_not_fragments():
+    rap = Match("id-rap", Path("PACKS/Hip Hop Vox/rap_phrase_01.wav"), "VOCALS", "hip-hop-vox")
+    trap = Match("id-trap", Path("PACKS/Trap Essentials/808s/trap_808_C.wav"), "BASS", "trap")
+    therapy = Match("id-pad", Path("PACKS/Therapy Chords/pad_01.wav"), "DRONE-ATMOS", "therapy")
+    assert search([rap, trap, therapy], Query(terms=("rap",))) == [rap]
+    assert matches_query(rap, Query(terms=("hip hop",)))
+    assert matches_query(_match("Vocals/shout"), Query(terms=("vocal",)))
+    kick = Match("id-bd", Path("PACKS/SA909/SA909_BD_01.wav"), "KICKS", "goldbaby")
+    assert matches_query(kick, Query(terms=("909", "bd")))
+    assert not matches_query(kick, Query(terms=("#",)))
+
+
 def test_group_filters_are_restrictions():
     match = _match("x", role="KICKS", origin="goldbaby-909", tags=("subby",))
     assert matches_query(match, Query(groups={"role": ("kicks",)}))

@@ -8,6 +8,11 @@ now saves metadata selections with explicit repeat handling, shortages and pins.
 It does not yet connect to browser decisions, local-AI retrieval or device budgets.
 The observations below retain their original trial scope.
 
+**22 September follow-up:** the one-shot `PERC` suggestion for kept loops came from
+substring role matching, now replaced by whole-word matching. The same change stops
+short clips reaching CLAP padded with silence, so the retained trial embeddings are
+not reused; the next model run recomputes them.
+
 Test whether a musical brief can become a useful Octatrack collection with less
 selection effort. The initial brief is hypnotic, groovy tribal techno with rap
 vocals, using 140 BPM as the trial's working tempo. Machine speed and musical

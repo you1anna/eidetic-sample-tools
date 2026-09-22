@@ -148,6 +148,8 @@ sample-find [TERMS...] [--root PATH] [--library-db FILE]
 ```
 
 Terms combine with AND across tags, origins and names; `--any` matches any term.
+Each term matches whole words, with an optional plural: `rap` finds `Rap_01` and
+`raps` but not `Trap`. Use `--role` or a tag for a broader category.
 Default ranking spreads results across sound families. `--no-spread` sorts
 alphabetically; `--like` ranks acoustic distance to an indexed ID or unique path
 fragment; `--preferred` ranks recorded kit picks.

@@ -28,7 +28,8 @@ sample-collection plan tribal perc --root "$SAMPLES_ROOT" \
   --output-dir "$RUNS/collection-01"
 ```
 
-Terms combine with AND; `--any` uses OR. Repeated `--role` and `--origin` filters
+Terms combine with AND; `--any` uses OR. Each term matches whole words, with an
+optional plural, so `rap` does not find `Trap`. Repeated `--role` and `--origin` filters
 narrow the results. Search considers original aliases even when a curated copy
 has a different name. Exact copies share one candidate identity.
 

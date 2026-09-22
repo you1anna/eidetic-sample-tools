@@ -88,6 +88,17 @@ def test_apply_migration_moves_without_overwrite_and_creates_empty_curated(tmp_p
     assert undo.is_file()
 
 
+def test_suggested_role_reads_whole_words_and_keeps_loops_out_of_hit_roles():
+    assert curate._suggested_role(
+        Path("PACKS/Tribal Techno/Loops/tribal_perc_loop_03.wav")) == "DRUM-LOOP"
+    assert curate._suggested_role(
+        Path("PACKS/Tribal Techno/Percussion/conga_hit_01.wav")) == "PERC"
+    # 'grime' is not a rim and 'custom' is not a tom.
+    assert curate._suggested_role(Path("PACKS/Grime Vocals/Custom/phrase_01.wav")) == "VOCAL"
+    assert curate._suggested_role(
+        Path("PACKS/Subtle Grooves/Vocal Loops/rap_01.wav")) == "VOCAL-LOOP"
+
+
 def test_prepare_packet_writes_identity_labels_and_playlist(tmp_path):
     root = tmp_path / "SAMPLES"
     _audio(root / "CATALOGUE" / "KICKS" / "big-kick.wav")
