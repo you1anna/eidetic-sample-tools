@@ -51,6 +51,10 @@ Hardware playback and save/reload checks remain separate from software tests.
 
 ## Verify installed packages
 
+Prepare and validate the release manifest using the [release procedure](RELEASING.md)
+before building wheels. Changed runtime code or resources require an independent
+package version bump; documentation and tests alone do not.
+
 Build all four wheels, install the core and optional layers separately in a fresh
 environment, and run the same
 smoke check used by CI:
@@ -80,7 +84,8 @@ it asserts that neither Flask nor `eidetic-live-tools` leaked into the ordinary 
 install. The second check imports all four installed packages, exercises browser
 resources and probes the Live API and command help without requiring a running Set.
 
-The check rejects editable imports. It verifies installed commands and resources,
+The check rejects editable imports. It verifies installed byte provenance, the
+readiness/refresh contract, installed commands and resources,
 onboards two synthetic machines in sequence, scans generated audio, checks approval
 requirements, converts with FFmpeg, reuses exports after a changed mount path, and
 verifies historical capture, backup and restore. Its temporary library is removed
@@ -148,6 +153,8 @@ real-model tests; checkpoint pins alone do not pin the inference environment.
 
 ## Before committing a release
 
+- Follow the [version and manifest procedure](RELEASING.md); run the release check
+  against the previous committed revision so same-version runtime edits fail.
 - Run the suite and installed-package check against the final code.
 - Keep package versions, bundled resources and the [changelog](../CHANGELOG.md)
   consistent. Tests compare copied profiles and manifests with canonical sources.

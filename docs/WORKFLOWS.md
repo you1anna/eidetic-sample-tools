@@ -37,10 +37,14 @@ the index. This preserves available older history and can record another Mac's
 history as pending. State, labels and recovery records travel with the SSD under
 `.eidetic/`.
 
-Build the index once, then write a shortlist to a playlist:
+Preview and apply the necessary inventory/measurement/tag work, then write a
+shortlist to a playlist. Repeat this refresh after adding packs; unchanged
+measurements are reused. See [updates and refresh](UPDATES-AND-REFRESH.md) for
+the distinct conditions that require an inventory scan or only new tags.
 
 ```bash
-sample-tag --root "$SAMPLES_ROOT" --rescan --apply
+sample-library refresh --root "$SAMPLES_ROOT"
+sample-library refresh --root "$SAMPLES_ROOT" --apply
 sample-find --root "$SAMPLES_ROOT" perc tribal analog --limit 20 \
   --m3u8 "$RUNS/percussion.m3u8"
 ```

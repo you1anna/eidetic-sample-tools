@@ -1,6 +1,9 @@
 # Portable library lifecycle
 
-Release 0.2 introduces explicit database upgrades and portable state. Each library
+Release 0.3 adds release identity and derived-data readiness to the explicit
+database upgrades and portable state introduced in 0.2. For routine software
+updates or newly added samples, start with [updates and refresh](UPDATES-AND-REFRESH.md).
+Each library
 has one identity and one writer. Move the SSD between Macs after commands finish
 and eject it normally. Each Mac can be installed and onboarded independently;
 install a compatible release on a returning Mac before using the SSD there.

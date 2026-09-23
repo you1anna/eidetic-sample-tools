@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sqlite3
 import sys
 from pathlib import Path
@@ -22,6 +23,9 @@ def _parser():
     parser.add_argument('--json', action='store_true', help='print a structured JSON report')
     commands = parser.add_subparsers(dest='command', required=True)
     descriptions = {
+        'version': 'Identify loaded packages and compare their bytes with the release or a checkout.',
+        'status': 'Report release and derived-data readiness without writes or audio decoding.',
+        'refresh': 'Preview or apply the inventory, measurement and tag work actually needed.',
         'doctor': 'Inspect state, runtime, recovery records and historical coverage without writes.',
         'onboard': 'Set up this machine and preserve its history; other machines can join later.',
         'init': 'Create an empty index; prefer onboard to account for per-machine history.',
@@ -39,8 +43,17 @@ def _parser():
                          help='local historical database to preserve' if name == 'onboard' else 'database path override')
         sub.add_argument('--json', action='store_true', default=argparse.SUPPRESS,
                          help='print a structured JSON report')
-        if name not in ('doctor', 'maintenance'):
+        if name not in ('doctor', 'maintenance', 'version', 'status'):
             sub.add_argument('--apply', action='store_true', help='perform the operation; omission previews without writes')
+        if name in ('version', 'status', 'refresh'):
+            sub.add_argument('--checkout', type=Path, help='compare with this local toolkit checkout; never fetches the network')
+        if name in ('status', 'refresh'):
+            sub.add_argument('--vocabulary', type=Path, help='explicit rule file; otherwise preserve the selected default/custom vocabulary')
+        if name == 'status':
+            sub.add_argument('--check-files', action='store_true', help='enumerate the full root for new, changed or missing audio paths')
+        if name == 'refresh':
+            sub.add_argument('--retry-failed', action='store_true', help='also retry previously failed audio measurements')
+            sub.add_argument('--backup-dir', type=Path, help='new state-backup directory; default is a dated .eidetic/backups entry')
         if name in ('backup', 'restore'):
             sub.add_argument('--output', type=Path, required=True)
         if name == 'restore':
@@ -98,10 +111,24 @@ def _migrate(args):
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.command != 'restore':
+        if args.command not in ('restore', 'version'):
             args.root = config.require_root(args.root)
         code = 0
-        if args.command == 'doctor':
+        if args.command == 'version':
+            from .release_runtime import runtime_report
+            report = runtime_report(args.checkout)
+            code = {'ready': 0, 'action_required': 1, 'blocked': 2}[report['status']]
+        elif args.command in ('status', 'refresh'):
+            from . import maintenance
+            if args.command == 'status':
+                report = maintenance.status(args.root, args.library_db, args.checkout, args.check_files,
+                                            vocabulary=args.vocabulary)
+            else:
+                report = maintenance.refresh(args.root, args.library_db, apply=args.apply,
+                    retry_failed=args.retry_failed, vocabulary=args.vocabulary,
+                    backup_dir=args.backup_dir, checkout=args.checkout)
+            code = {'ready': 0, 'action_required': 1, 'blocked': 2}[report['status']]
+        elif args.command == 'doctor':
             report = doctor(args.root, args.library_db)
             code = 2 if report['database']['status'] in {'missing', 'error'} else (1 if report['issues'] or report['database']['status'] == 'migration_required' else 0)
         elif args.command == 'init':
@@ -148,6 +175,33 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _text_report(report):
+    if report.get('contract_version') == 1:
+        lines = [f"Status: {report['status'].replace('_', ' ')}"]
+        runtime = report.get('runtime', report)
+        for name, package in runtime.get('packages', {}).items():
+            lines.append(f"  {name}: {package.get('loaded_version', 'unavailable')} ({package['status']})")
+        library = report.get('library', {})
+        if library:
+            lines.append(f"Library: {library['root']}")
+            if 'inventory' in library:
+                check = library['inventory']
+                lines.append('File inspection: ' + (f"{check['added']} added, {check['changed']} changed, {check['missing']} missing"
+                             if check['checked'] else 'not requested; use --check-files after adding audio'))
+            if 'features' in library:
+                lines.append('Measurements: ' + ', '.join(f'{v} {k}' for k, v in library['features'].items()))
+            if 'tags' in library:
+                lines.append(f"Generated tags: {library['tags']['status']}")
+        for issue in report.get('issues', []):
+            lines.append('Issue: ' + issue)
+        for warning in report.get('warnings', []):
+            lines.append('Note: ' + warning)
+        for action in report.get('actions', []):
+            lines.append(f"Required [{action['id']}]: {action['reason']}")
+            if action.get('argv'):
+                lines.append('  ' + shlex.join(action['argv']))
+        if report.get('receipt'):
+            lines.append('Refresh receipt: ' + report['receipt'])
+        return '\n'.join(lines)
     return '\n'.join(f'{key}: {json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value}'
                      for key, value in report.items())
 

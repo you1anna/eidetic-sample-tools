@@ -13,8 +13,10 @@ references document commands; architecture guides explain the systems underneath
 | Understand how the tools fit together | [Architecture](TECHNOLOGY.md) |
 | Inspect or cautiously edit a running Ableton Set | [Live control](LIVE.md) |
 | Move between Macs, back up state or recover work | [Library lifecycle](LIFECYCLE.md) |
+| Update tools, add samples or decide what needs refreshing | [Updates and refresh](UPDATES-AND-REFRESH.md) |
 | Check device configuration | [Profiles](SAMPLE-FOUNDATION-WORKFLOW.md) |
 | Develop or verify a change | [Development](DEVELOPMENT.md) |
+| Version and verify a toolkit release | [Releasing](RELEASING.md) |
 | Report a problem or contribute listening/device feedback | [Contributing](../CONTRIBUTING.md) |
 | See what is finished and what comes next | [Project status](../STATUS.md) and [roadmap](ROADMAP.md) |
 

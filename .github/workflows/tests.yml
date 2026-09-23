@@ -8,11 +8,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Check generated figures
         run: python scripts/generate_figures.py --check
+      - name: Check release source and independent versions
+        env:
+          RELEASE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$RELEASE_BASE" ] && [ "$RELEASE_BASE" != "0000000000000000000000000000000000000000" ]; then
+            python scripts/release.py check --base "$RELEASE_BASE"
+          else
+            python scripts/release.py check
+          fi
       - name: Install FFmpeg
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -38,6 +49,8 @@ jobs:
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
           cd "$RUNNER_TEMP"
           env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py" --core-only
+          env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/sample-library" version --json --checkout "$GITHUB_WORKSPACE"
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip install -c "$GITHUB_WORKSPACE/requirements-dev.txt" --find-links "$RUNNER_TEMP/eidetic-wheels" 'librarytools[review-ui,live]'
           "$RUNNER_TEMP/eidetic-installed/bin/python" -m pip check
           env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_packages.py"
+          env -u PYTHONPATH -u PYTHONHOME "$RUNNER_TEMP/eidetic-installed/bin/sample-library" version --json --checkout "$GITHUB_WORKSPACE"

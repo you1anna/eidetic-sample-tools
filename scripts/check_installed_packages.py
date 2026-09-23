@@ -29,6 +29,7 @@ def invoke(function, arguments, expected=0):
         result = function(arguments)
     if result != expected:
         raise AssertionError(f'{arguments}: expected exit {expected}, got {result}\n{output.getvalue()}')
+    return output.getvalue()
 
 
 def collection_command(*arguments):
@@ -214,6 +215,12 @@ def main():
     from sampletools.cli import main as export_main
     from sampletools.config import manifest_path
 
+    release = json.loads(invoke(library_main, ['version', '--json']))
+    assert release['contract_version'] == 1 and release['status'] == 'ready'
+    assert release['packages']['librarytools']['status'] == 'verified'
+    if args.core_only:
+        assert release['packages']['eidetic-live-tools']['status'] == 'missing_optional'
+
     resources = Path(profiles.__file__).parent / 'resources'
     assert profiles.resolve_profile('eidetic-studio', profile_root=resources / 'profiles').devices
     assert tagging.load_vocabulary(resources / 'vocabulary.toml')
@@ -244,6 +251,14 @@ def main():
         assert not (root / '.eidetic').exists()
         invoke(library_main, [*setup, '--apply'])
         invoke(tag_cli.main, ['--root', str(root), '--rescan', '--skip-features', '--apply'])
+        preview = json.loads(invoke(library_main, ['refresh', '--root', str(root), '--json'], expected=1))
+        assert {a['id'] for a in preview['actions']} == {'measure_features'}
+        refreshed = json.loads(invoke(library_main, ['refresh', '--root', str(root), '--apply', '--json']))
+        assert refreshed['features_result']['extracted'] == 2
+        assert refreshed['status'] == 'ready' and Path(refreshed['receipt']).is_file()
+        repeat = json.loads(invoke(library_main, ['refresh', '--root', str(root), '--apply', '--json']))
+        assert repeat['executed'] == [] and not repeat['actions']
+        assert 'backup' not in repeat and 'receipt' not in repeat
         if not args.core_only:
             check_audition(root, scratch, source)
 
@@ -289,7 +304,7 @@ def main():
         backup_bundle(remounted / '.eidetic/library.sqlite', scratch / 'backup', root=remounted)
         restore_bundle(scratch / 'backup', scratch / 'restored')
         assert next((scratch / 'restored').rglob('labels.tsv')).read_bytes() == (evidence / 'labels.tsv').read_bytes()
-    checks = 'commands, resources, onboarding, approval, export, collection planning, offline regeneration, handoff and restore'
+    checks = 'release provenance, selective refresh, commands, resources, onboarding, approval, export, collection planning, offline regeneration, handoff and restore'
     if not args.core_only:
         checks += ', legacy and plan audition, Live-control API and staged device resources'
     print(f'Installed-package checks passed: {checks}.')

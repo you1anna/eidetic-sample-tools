@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "librarytools"
-version = "0.2.0"
+version = "0.3.0"
 description = "Safely review, organise, curate, and analyse large sample libraries."
 requires-python = ">=3.12"
 dependencies = [
@@ -44,4 +44,4 @@ sample-ai = "librarytools.ai_cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-librarytools = ["resources/*.toml", "resources/*.html", "resources/*.js", "resources/*.css", "resources/profiles/devices/*.toml", "resources/profiles/studios/*.toml"]
+librarytools = ["resources/*.toml", "resources/*.json", "resources/*.html", "resources/*.js", "resources/*.css", "resources/profiles/devices/*.toml", "resources/profiles/studios/*.toml"]

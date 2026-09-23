@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## librarytools 0.3.0 — 2026-09-23
+
+`sampletools`, `abletontools` and `eidetic-live-tools` remain at 0.2.0. Package
+versions are independent; library discovery changes do not invalidate exporter
+receipts by changing the converter's version.
+
+- Add deterministic release manifests, installed-byte verification, independent
+  SemVer bumping and a CI guard against unversioned runtime changes.
+- Add `sample-library version`, `status` and preview-first `refresh`, with a
+  versioned JSON client contract. Refresh detects new audio, backs up state,
+  reconciles inventory only when required, reuses current measurements and
+  atomically publishes tags with dependency fingerprints. Repeated unchanged
+  refreshes do no work; custom vocabulary and stronger recovered origins persist.
+- Correct generated tag false positives (`Grime`/`wood`, `Warehouse`/`house`,
+  `TR808`/`tr8`) and restore explicit hi-hat/percussion aliases in text search.
+  Shipped vocabulary uses schema 2; schema 1 custom rules keep legacy semantics.
+- Document maintenance conditions for releases, occasional new packs, role/tag
+  changes, feature versions, database schema and optional AI caches. Installation
+  alone does not refresh existing tags: run the [refresh preview](docs/UPDATES-AND-REFRESH.md).
+
+### Changes accumulated since the 0.2.0 source release
+
 - Read sample roles from whole words, filename first, so pack and vendor names no
   longer decide them: `Grime` is not a rim, `Cymatics` is not a cymbal and a vocal
   loop in a `Tribal Techno` pack is a vocal. Curation packets suggest `DRUM-LOOP`

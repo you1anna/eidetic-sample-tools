@@ -14,8 +14,10 @@ import re
 import tomllib
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 
+from .lexical import terms_pattern, words_text
 from .review import classify_role
 
 DEFAULT_VOCABULARY = Path(__file__).resolve().parents[2] / "vocabulary.toml"
@@ -43,9 +45,19 @@ class Sample:
     def text(self) -> str:
         return self.path.as_posix().lower()
 
+    @cached_property
+    def text_words(self) -> str:
+        return words_text(self.path.as_posix())
+
+    @cached_property
+    def origin_words(self) -> str:
+        return words_text(self.origin)
+
 
 @dataclass(frozen=True)
 class Rule:
+    """A schema-2 lexical rule, or an explicitly loaded legacy schema-1 rule."""
+
     name: str
     group: str
     origins: tuple[str, ...] = ()
@@ -53,10 +65,12 @@ class Rule:
     name_matches: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
     features: tuple[tuple[str, str, float], ...] = ()
+    name_suffixes: tuple[str, ...] = ()
+    schema_version: int = 2
 
     @property
     def has_selectors(self) -> bool:
-        return bool(self.origins or self.origin_matches or self.name_matches)
+        return bool(self.origins or self.origin_matches or self.name_matches or self.name_suffixes)
 
     def matches(self, sample: Sample) -> bool:
         """Constraints must all hold; at least one selector must fire if any are given."""
@@ -71,9 +85,21 @@ class Rule:
             return bool(self.features)
         if sample.origin and sample.origin in self.origins:
             return True
-        if any(needle in sample.origin for needle in self.origin_matches):
+        if self.schema_version == 1:
+            # Existing custom files keep their declared substring semantics. They
+            # opt into lexical matching only by explicitly selecting schema 2.
+            return any(needle in sample.origin for needle in self.origin_matches) or any(
+                needle in sample.text for needle in self.name_matches
+            )
+        if self.origin_matches and terms_pattern(self.origin_matches).search(sample.origin_words):
             return True
-        return any(needle in sample.text for needle in self.name_matches)
+        if self.name_matches and terms_pattern(self.name_matches).search(sample.text_words):
+            return True
+        # Literal final stem tokens: `_x.wav` and `_x2.wav`, never a directory,
+        # `x20` or `x2extra`. Keep this separate from word/digit normalization.
+        stem = sample.path.stem.lower()
+        return any(stem.endswith(separator + suffix)
+                   for suffix in self.name_suffixes for separator in ("_", "-", " "))
 
 
 def _compare(value: float, op: str, threshold: float) -> bool:
@@ -110,7 +136,11 @@ def _lower_tuple(raw: object) -> tuple[str, ...]:
 
 
 def load_vocabulary(path: Path | None = None, *, payload: bytes | None = None) -> list[Rule]:
-    """Read and validate the rule file."""
+    """Read schema 2 word rules or schema 1 legacy substring rules.
+
+    Schema 1 remains supported without changing custom predicates. Schema 2 uses
+    the shared musical aliases and adds literal final-stem ``name_suffixes``.
+    """
     path = path or DEFAULT_VOCABULARY
     try:
         data = tomllib.loads((payload if payload is not None else path.read_bytes()).decode('utf-8'))
@@ -119,7 +149,8 @@ def load_vocabulary(path: Path | None = None, *, payload: bytes | None = None) -
     except tomllib.TOMLDecodeError as exc:
         raise VocabularyError(f"invalid TOML in {path}: {exc}") from exc
 
-    if data.get("schema_version") != 1:
+    schema_version = data.get("schema_version")
+    if schema_version not in (1, 2):
         raise VocabularyError(f"unsupported vocabulary schema in {path}")
 
     rules: list[Rule] = []
@@ -132,6 +163,15 @@ def load_vocabulary(path: Path | None = None, *, payload: bytes | None = None) -
         if (group, name) in seen:
             raise VocabularyError(f"duplicate tag {group}/{name}")
         seen.add((group, name))
+        raw_suffixes = entry.get("name_suffixes", [])
+        if not isinstance(raw_suffixes, list) or any(not isinstance(value, str) for value in raw_suffixes):
+            raise VocabularyError(f"tag {name!r}: name_suffixes must be an array of strings")
+        suffixes = _lower_tuple(raw_suffixes)
+        if suffixes and (schema_version != 2 or any(
+                not re.fullmatch(r"[a-z][a-z0-9]*", suffix) for suffix in suffixes)):
+            raise VocabularyError(
+                f"tag {name!r}: name_suffixes requires schema 2 and literal letter/digit tokens"
+            )
         rules.append(
             Rule(
                 name=name,
@@ -141,6 +181,8 @@ def load_vocabulary(path: Path | None = None, *, payload: bytes | None = None) -
                 name_matches=_lower_tuple(entry.get("name_matches")),
                 roles=tuple(str(role) for role in entry.get("roles", ())),
                 features=_parse_features(entry.get("features"), name),
+                name_suffixes=suffixes,
+                schema_version=schema_version,
             )
         )
     return rules

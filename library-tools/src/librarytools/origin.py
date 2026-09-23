@@ -225,6 +225,27 @@ def resolve_library(
     return best
 
 
+def resolve_and_store(database, locations: list) -> dict[str, Origin]:
+    """Refresh current origins without losing stronger identity-bound evidence.
+
+    A move can remove the pack folder from a path. Keep an equally or more
+    confident stored answer; only stronger new evidence supersedes it.
+    Publish the batch in one transaction for large libraries.
+    """
+    resolved = resolve_library([(loc.sample_id, loc.path) for loc in locations])
+    with database._connect() as conn:
+        stored = {row['sample_id']: Origin(row['origin'], row['confidence'], row['method'], row['token'])
+                  for row in conn.execute('select sample_id,origin,confidence,method,token from origins')}
+        for sid, current in resolved.items():
+            previous = stored.get(sid)
+            if previous is not None and not current.beats(previous):
+                resolved[sid] = previous
+        conn.executemany('insert or replace into origins(sample_id,origin,confidence,method,token) values(?,?,?,?,?)',
+                         [(sid, value.origin, value.confidence, value.method, value.token)
+                          for sid, value in resolved.items()])
+    return resolved
+
+
 def resolve_origin(
     rel: Path,
     vocabulary: Counter[str] | None = None,

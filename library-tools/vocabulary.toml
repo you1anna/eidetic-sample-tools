@@ -6,16 +6,20 @@
 # Each rule may carry:
 #   selectors  (at least one must match, if any are given)
 #     origins        exact origin match, as recovered by origin.py
-#     origin_matches substring match against the origin
-#     name_matches   substring match against the full path text
+#     origin_matches whole words/phrases in the origin
+#     name_matches   whole words/phrases in the full path text
+#     name_suffixes  literal final filename-stem tokens after _, - or a space
 #   constraints (all must hold, if given)
 #     roles          restrict to these review roles
 #     features       acoustic thresholds, e.g. { sub_ratio = ">=0.60" }
 #
-# Seeded from the real library: token counts come from the 23,088 indexed locations, so
-# every rule below has something to match. Delete what you don't think in; add what you do.
+# Word matching ignores case and punctuation, splits camel-case and letter/digit
+# boundaries, and permits a final plural. Explicit aliases equate hihat/hi hat/hi-hat
+# and perc/percussion. Intentional gear compounds are listed below; arbitrary
+# substring or wildcard matching is not part of schema 2. Custom schema-1 files
+# remain supported with their original substring semantics until explicitly migrated.
 
-schema_version = 1
+schema_version = 2
 
 # ---------------------------------------------------------------- gear
 # Drum machines and synths are named all over this library, both in pack names and in the
@@ -59,13 +63,13 @@ name_matches = ["cr78", "cr-78"]
 [[tag]]
 name = "tr8"
 group = "gear"
-origin_matches = ["tr-8", "tr8"]
-name_matches = ["tr-8", "tr8"]
+origin_matches = ["tr-8", "tr8", "tr8s"]
+name_matches = ["tr-8", "tr8", "tr8s"]
 
 [[tag]]
 name = "tape"
 group = "gear"
-name_matches = ["tape", "cass", "fatso"]
+name_matches = ["tape", "tapesh101", "cass", "cassette", "fatso"]
 
 [[tag]]
 name = "analog"
@@ -197,14 +201,17 @@ roles = ["PERC"]
 name_matches = ["wood", "clave", "block", "rim"]
 
 # ---------------------------------------------------------------- processing
-# Caught-on-Tape style suffixes, already parsed by analyze_sources.parse_processing_suffix.
+# Caught-on-Tape final stem tokens. The bounded aorig word also preserves named
+# round-robin takes such as hit-aorig-r1; it does not match aoriginal.
 
 [[tag]]
 name = "processed"
 group = "character"
-name_matches = ["_x.", "_x2.", "-x.", "processed"]
+name_matches = ["processed"]
+name_suffixes = ["x", "x2"]
 
 [[tag]]
 name = "original"
 group = "character"
-name_matches = ["_orig", "-orig", "aorig"]
+name_matches = ["aorig"]
+name_suffixes = ["orig", "original"]

@@ -158,16 +158,19 @@ current checkout. On a returning machine, onboarding captures its older history
 without replacing the active SSD database. Historical review stays visible in
 `sample-library doctor` while new work can continue.
 
-Build the content-hash inventory, recover pack origins and generate tags:
+Preview the initial inventory, measurements and tags, then apply:
 
 ```bash
-sample-tag --root "$SAMPLES_ROOT" --rescan --apply
+sample-library refresh --root "$SAMPLES_ROOT" --json
+sample-library refresh --root "$SAMPLES_ROOT" --apply --json
 ```
 
 This writes the derived index, including acoustic measurements, without moving
 or converting audio. The default database is
 `$SAMPLES_ROOT/.eidetic/library.sqlite`. If you supply `--library-db`, use
-that same path for subsequent search, analysis and curation commands.
+that same path for subsequent search, analysis and curation commands. Use this
+same preview/apply sequence after adding packs. The [refresh guide](UPDATES-AND-REFRESH.md)
+explains which changes need a scan, measurements or only tags.
 
 Find a shortlist and write an audition playlist:
 
@@ -188,9 +191,10 @@ uses measured acoustic features and needs no AI models. See the
 
 To tune the tags, copy [`vocabulary.toml`](../library-tools/vocabulary.toml) to
 `$RUNS/vocabulary.toml`, edit it and pass `--vocabulary "$RUNS/vocabulary.toml"`
-to `sample-tag`. Omit `--apply` to preview coverage. Scanning and feature extraction
-may still update derived data; `--apply` replaces generated tags while retaining
-human and unclassified legacy tags.
+to the refresh preview and apply. That choice is preserved on later refreshes.
+`sample-tag` remains available for a detailed coverage proposal; its proposal
+mode can still update origins and measurements. Refresh previews are read-only.
+Both preserve human and unclassified legacy tags.
 
 ## Browser listening and local AI
 
@@ -227,11 +231,13 @@ code revision and dependency versions can be identified. An editable installatio
 changes when its checkout changes.
 
 After selecting the intended revision, rerun the installation command, including
-any optional extras you use, and `python -m pip check`. Run
-`sample-library doctor --root "$SAMPLES_ROOT" --json` before writing library data.
-Package installation does not migrate the database; use the explicit lifecycle
-commands when an upgrade is needed. Do not downgrade tools against a newer live
-schema; rehearse recovery using a separate restored backup.
+any optional extras you use, and `python -m pip check`. Verify actual installed
+code with `sample-library version --checkout "$PWD" --json` from the toolkit
+checkout, then preview `sample-library refresh --root "$SAMPLES_ROOT" --json`.
+The [update and refresh guide](UPDATES-AND-REFRESH.md) gives the complete conditions
+and apply sequence. Package installation does not migrate the database; use the
+explicit lifecycle commands when requested. Do not downgrade tools against a
+newer live schema; rehearse recovery using a separate restored backup.
 
 ## Next steps
 

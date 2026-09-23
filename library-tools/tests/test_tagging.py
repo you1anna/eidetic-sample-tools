@@ -101,3 +101,97 @@ def test_count_rules_reports_every_rule_even_at_zero():
     rules = [Rule(name="nothing", group="style", name_matches=("zzzz",))]
     counts = count_rules([build_sample("a", Path("k.wav"))], rules)
     assert counts[("style", "nothing")][0] == 0
+
+
+@pytest.mark.parametrize(("path", "group", "tag"), [
+    ("PACKS/Grime/perc_01.wav", "character", "wood"),
+    ("PACKS/Warehouse/perc_01.wav", "style", "house"),
+    ("PACKS/TR808/perc_01.wav", "gear", "tr8"),
+    ("PACKS/Dubai/perc_01.wav", "style", "dub"),
+    ("PACKS/Tapestry/perc_01.wav", "gear", "tape"),
+])
+def test_shipped_word_rules_exclude_nearby_words(path, group, tag):
+    sample = build_sample("a", Path(path), origin=Path(path).parent.name)
+    assert (group, tag) not in tags_for(sample, load_vocabulary())
+
+
+@pytest.mark.parametrize(("path", "expected"), [
+    ("SA909_BD_01.wav", {("gear", "909")}),
+    ("TapeSH101_Bass_01.wav", {("gear", "sh101"), ("gear", "tape")}),
+    ("tapesh101_bass_01.wav", {("gear", "sh101"), ("gear", "tape")}),
+    ("TR-8_Kick_01.wav", {("gear", "tr8")}),
+    ("TR8S_Kick_01.wav", {("gear", "tr8")}),
+    ("TR808_Kick_01.wav", {("gear", "808")}),
+    ("Perc_Wood_Block_01.wav", {("character", "wood")}),
+    ("House_Dub_01.wav", {("style", "house"), ("style", "dub")}),
+])
+def test_shipped_rules_keep_explicit_gear_compounds_and_words(path, expected):
+    assert expected <= set(tags_for(build_sample("a", Path(path)), load_vocabulary()))
+
+
+@pytest.mark.parametrize(("path", "expected"), [
+    ("hit_orig.wav", "original"),
+    ("hit_original.wav", "original"),
+    ("hit-Orig.aif", "original"),
+    ("hit_aorig-r1.wav", "original"),
+    ("hit_x.wav", "processed"),
+    ("hit_X2.wav", "processed"),
+    ("hit-x.wav", "processed"),
+    ("hit_processed.wav", "processed"),
+])
+def test_shipped_processing_rules_preserve_named_suffixes(path, expected):
+    assert ("character", expected) in tags_for(build_sample("a", Path(path)), load_vocabulary())
+
+
+@pytest.mark.parametrize("path", [
+    "hit_originality.wav", "hit_aoriginal.wav",
+    "hit_x20.wav", "hit_x2extra.wav", "PACKS/pack_orig/hit.wav", "PACKS/pack_x.wav/hit.wav",
+])
+def test_processing_suffixes_exclude_longer_words_and_folder_names(path):
+    tags = tags_for(build_sample("a", Path(path)), load_vocabulary())
+    assert ("character", "original") not in tags
+    assert ("character", "processed") not in tags
+
+
+def test_schema_one_custom_vocabulary_preserves_legacy_substrings(tmp_path):
+    path = _vocab(tmp_path, '[[tag]]\nname="custom"\ngroup="style"\nname_matches=["dub"]\norigin_matches=["house"]\n')
+    rules = load_vocabulary(path)
+    assert ("style", "custom") in tags_for(build_sample("a", Path("Dubai.wav")), rules)
+    assert ("style", "custom") in tags_for(build_sample("b", Path("hit.wav"), origin="warehouse"), rules)
+
+
+def test_schema_two_custom_vocabulary_uses_words_aliases_and_suffixes(tmp_path):
+    path = tmp_path / "vocabulary.toml"
+    path.write_text('''schema_version = 2
+[[tag]]
+name = "custom-hat"
+group = "style"
+name_matches = ["hi-hat"]
+[[tag]]
+name = "custom-house"
+group = "style"
+origin_matches = ["house"]
+[[tag]]
+name = "custom-processed"
+group = "character"
+name_suffixes = ["x2"]
+''', encoding="utf-8")
+    rules = load_vocabulary(path)
+    tags = tags_for(build_sample("a", Path("HiHat_Closed_x2.wav"), origin="warehouse"), rules)
+    assert ("style", "custom-hat") in tags
+    assert ("character", "custom-processed") in tags
+    assert ("style", "custom-house") not in tags
+    assert ("style", "custom-house") in tags_for(build_sample("b", Path("hit.wav"), origin="deep-house"), rules)
+
+
+def test_custom_suffix_selector_rejects_arbitrary_patterns():
+    payload = b'schema_version=2\n[[tag]]\nname="x"\ngroup="style"\nname_suffixes=["*orig*"]\n'
+    with pytest.raises(VocabularyError, match="name_suffixes"):
+        load_vocabulary(payload=payload)
+
+
+@pytest.mark.parametrize("suffixes", ['"orig"', '[false]', '["orig", 2]'])
+def test_custom_suffix_selector_requires_an_array_of_strings(suffixes):
+    payload = f'schema_version=2\n[[tag]]\nname="x"\ngroup="style"\nname_suffixes={suffixes}\n'.encode()
+    with pytest.raises(VocabularyError, match="name_suffixes"):
+        load_vocabulary(payload=payload)

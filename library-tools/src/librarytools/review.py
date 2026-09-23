@@ -12,6 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from . import config, probe
+from .lexical import words_text
 
 DIGITAKT_NAME_WARN = 24
 
@@ -69,19 +70,6 @@ class ReviewItem:
 
 def _parts_text(rel: Path) -> str:
     return " / ".join(part.lower().replace("_", " ").replace(".", " ") for part in rel.parts)
-
-
-_CAMEL_RE = re.compile(r"(?<=[a-z])(?=[A-Z])")
-_WORD_RE = re.compile(r"[a-z]+|[0-9]+")
-
-
-def words_text(text: str) -> str:
-    """Lowercase whole words joined by single spaces.
-
-    camelCase and letter/digit runs split, so 'BigKick01_Hard' reads 'big kick 01 hard'
-    and 'SA909_BD' reads 'sa 909 bd'.
-    """
-    return " ".join(_WORD_RE.findall(_CAMEL_RE.sub(" ", text).lower()))
 
 
 def word_pattern(needles: tuple[str, ...]) -> re.Pattern[str]:

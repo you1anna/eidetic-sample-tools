@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-22
+**Updated:** 2026-09-23
 
 ## Current position
 
@@ -24,6 +24,7 @@ sounds had unsuitable tempo or a poorer musical fit.
 | Library, export and Ableton packages | Search, listening, approved-copy export and read-only saved-Set reports. |
 | Experimental Live package | Loopback inspection, versioned snapshots, profile checks, explicit device staging and identity-bound allowlisted edit plans with receipts. |
 | Portable library state | Identity, onboarding, history capture, guarded writes, backup and recovery. |
+| [Release and refresh contract](docs/UPDATES-AND-REFRESH.md) | Independent versions, installed-file verification, client readiness and selective backed-up maintenance after updates or new packs. Librarytools 0.3.0; other packages 0.2.0. |
 | [Collection planner](docs/COLLECTION-PLANNER.md) | Saved metadata selections, explicit export history, repeat handling, retained pins and visible shortages. Regeneration works offline. |
 | [Development tools](docs/DEVELOPMENT.md) | Environment discovery, tests against the checkout, installed-command checks and a repeatable synthetic scale benchmark. |
 | [Documentation](docs/README.md) | Functionality-first READMEs, a real interface example, contribution guidance and detailed package/state architecture. |
@@ -85,7 +86,7 @@ outside this public repository.
   frames); the real checkpoints were not run. Earlier `three-10s-v1` embeddings are kept but not
   reused. Profiles and safety defaults did not change.
 
-- A September 23 review of that fix found gaps, reproduced against the checkout but not yet fixed:
+- A September 23 review identified the following gaps before the 0.3.0 work:
   - The tag vocabulary still matches raw substrings: `Grime` gets `wood` (from `rim`), `TR808`
     gets gear `tr8`, `Warehouse` gets style `house`. Tags feed search, so the whole-word search
     fix is bypassed through them.
@@ -94,6 +95,19 @@ outside this public repository.
     `Percussion` folder unless the role is PERC. `OHat_01` is no longer read as a hat.
   - The fix is Unreleased and every package still reads `0.2.0`, so an installed copy cannot be
     told apart from the fixed checkout. Non-editable installs need reinstalling to get it.
+
+  Librarytools 0.3.0 resolves those source gaps and adds the release-to-library
+  lifecycle contract. Install the selected release, check `version`, and preview
+  `refresh`; legacy unstamped tags need one regeneration. The readiness report
+  distinguishes that from a content scan, feature extraction or schema migration.
+  Machine-specific installation, library counts and refresh receipts remain in
+  private operational records. See [release checks](docs/RELEASING.md).
+
+- Final 0.3.0 verification: **1,041 tests passed, two optional model checks skipped**.
+  Fresh core-only and optional installed-wheel checks passed, including release
+  hashes, refresh/no-op behavior, retained approvals, export reuse and recovery.
+  The version guard also rejects same-version dependency, Python requirement and
+  entry-point changes. Per-machine deployment still requires its own recorded check.
 
 ## Next bounded increments
 

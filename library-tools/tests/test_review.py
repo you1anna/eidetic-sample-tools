@@ -122,6 +122,12 @@ def test_fused_and_camel_case_names_still_classify():
     assert review.classify_role(Path("PACKS/Pack/BD909_01.wav")).role == "KICKS"
 
 
+def test_ohat_alias_restores_open_hat_role_without_matching_other_words():
+    for name in ("OHat_01.wav", "ohat_01.wav", "OHats_02.wav", "HiHat_Closed_01.wav"):
+        assert review.classify_role(Path("PACKS/Pack") / name).role == "HATS-CYM", name
+    assert review.classify_role(Path("PACKS/Pack/Mohat_01.wav")).role == "_REVIEW"
+
+
 def test_vendor_names_containing_loop_do_not_make_a_loop():
     item = review.build_item(
         Path("/samples/PACKS/Loopmasters Tech/Shots/zap_01.wav"), Path("/samples"),

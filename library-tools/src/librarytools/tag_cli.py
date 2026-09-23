@@ -9,11 +9,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import hashlib
 import sqlite3
 from pathlib import Path
 
-from . import config, features as features_mod, origin as origin_mod, tagging
+from . import config, features as features_mod, origin as origin_mod, tagging, tagstate
 from .inventory import LibraryDatabase, scan_library
 from .state import resolve_library_db
 from .locking import library_lock
@@ -24,12 +23,7 @@ def _load_locations(database: LibraryDatabase) -> list:
 
 
 def _resolve_origins(database: LibraryDatabase, locations: list) -> dict[str, origin_mod.Origin]:
-    resolved = origin_mod.resolve_library([(loc.sample_id, loc.path) for loc in locations])
-    for sample_id, found in resolved.items():
-        database.record_origin(
-            sample_id, found.origin, found.confidence, found.method, found.token,
-        )
-    return resolved
+    return origin_mod.resolve_and_store(database, locations)
 
 
 def _write_proposal(
@@ -75,7 +69,8 @@ def _main(argv: list[str] | None = None) -> int:
         default=None,
         help="library index to read and update",
     )
-    ap.add_argument("--vocabulary", type=Path, help="rule file (default: vocabulary.toml)")
+    ap.add_argument("--vocabulary", type=Path,
+                    help="explicit rule file; otherwise preserve the selected default/custom vocabulary")
     ap.add_argument(
         "--legacy-cache",
         type=Path,
@@ -106,20 +101,18 @@ def _main(argv: list[str] | None = None) -> int:
 
 
 def _run(args) -> int:
-    args.vocabulary = args.vocabulary or tagging.DEFAULT_VOCABULARY
-
     if args.rescan and not args.root.is_dir():
         print(f"root not found: {args.root}", file=sys.stderr)
         return 2
 
+    database = LibraryDatabase(args.library_db)
     try:
-        vocabulary = args.vocabulary.read_bytes()
+        vocabulary, kind = tagstate.select_vocabulary(args.root, database, args.vocabulary)
         rules = tagging.load_vocabulary(args.vocabulary, payload=vocabulary)
     except tagging.VocabularyError as exc:
         print(f"vocabulary error: {exc}", file=sys.stderr)
         return 2
 
-    database = LibraryDatabase(args.library_db)
     database.bind_root(args.root)
     if args.rescan:
         result = scan_library(args.root, database)
@@ -187,15 +180,9 @@ def _run(args) -> int:
         if tags:
             generated[sample.sample_id] = tags
             written += len(tags)
-    digest = hashlib.sha256(vocabulary).hexdigest()
-    snapshot = args.root / '.eidetic' / 'configurations' / f'vocabulary-{digest}.toml'
-    snapshot.parent.mkdir(parents=True, exist_ok=True)
-    if not snapshot.exists():
-        with snapshot.open('xb') as out:
-            out.write(vocabulary)
-    elif snapshot.read_bytes() != vocabulary:
-        raise ValueError(f'configuration snapshot has changed: {snapshot}')
-    database.replace_generated_tags(generated, vocabulary_digest=digest)
+    tagstate.preserve_vocabulary(args.root, vocabulary)
+    evidence = tagstate.publication_metadata(database, vocabulary, kind, generated)
+    database.replace_generated_tags(generated, vocabulary_digest=tagstate.digest(vocabulary), metadata=evidence)
     print(f"  tags written: {written} across {len(samples)} samples")
     return 0
 

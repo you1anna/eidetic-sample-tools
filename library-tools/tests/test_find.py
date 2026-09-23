@@ -36,12 +36,43 @@ def test_terms_match_whole_words_not_fragments():
     rap = Match("id-rap", Path("PACKS/Hip Hop Vox/rap_phrase_01.wav"), "VOCALS", "hip-hop-vox")
     trap = Match("id-trap", Path("PACKS/Trap Essentials/808s/trap_808_C.wav"), "BASS", "trap")
     therapy = Match("id-pad", Path("PACKS/Therapy Chords/pad_01.wav"), "DRONE-ATMOS", "therapy")
-    assert search([rap, trap, therapy], Query(terms=("rap",))) == [rap]
+    vibraphone = Match("id-vibes", Path("PACKS/Vibraphone/tone_01.wav"), "PERC", "vibraphone")
+    assert search([rap, trap, therapy, vibraphone], Query(terms=("rap",))) == [rap]
     assert matches_query(rap, Query(terms=("hip hop",)))
     assert matches_query(_match("Vocals/shout"), Query(terms=("vocal",)))
     kick = Match("id-bd", Path("PACKS/SA909/SA909_BD_01.wav"), "KICKS", "goldbaby")
     assert matches_query(kick, Query(terms=("909", "bd")))
     assert not matches_query(kick, Query(terms=("#",)))
+
+
+@pytest.mark.parametrize("name", ["HiHat_Closed_01", "hihat_closed_01", "HIHAT_01", "hi-hat_01"])
+@pytest.mark.parametrize("term", ["hihat", "hi hat", "hi-hat"])
+def test_hihat_queries_accept_explicit_compound_aliases(name, term):
+    assert matches_query(_match(name, role="HATS-CYM"), Query(terms=(term,)))
+
+
+def test_perc_query_matches_percussion_independently_of_inferred_role():
+    hat = Match("hat", Path("PACKS/Percussion/HiHat_Closed_01.wav"), "HATS-CYM", "pack")
+    percolator = Match("synth", Path("PACKS/Percolator/tone.wav"), "SYNTH-STAB-CHORD", "pack")
+    assert search([hat, percolator], Query(terms=("perc",))) == [hat]
+    assert matches_query(_match("perc_01", role="HATS-CYM"), Query(terms=("percussion",)))
+
+
+def test_generated_tags_do_not_reintroduce_substring_search_hits():
+    from librarytools.tagging import build_sample, load_vocabulary, tags_for
+
+    rules = load_vocabulary()
+    samples = [
+        build_sample("false", Path("PACKS/Warehouse Grime Dubai/TR808_Tapestry_perc.wav")),
+        build_sample("true", Path("PACKS/House Dub/perc_wood_TR8S_tape.wav")),
+    ]
+    matches = [
+        Match(sample.sample_id, sample.path, sample.role, sample.origin,
+              tags=tuple(tag for _, tag in tags_for(sample, rules)))
+        for sample in samples
+    ]
+    for term in ("wood", "house", "dub", "tr8", "tape"):
+        assert search(matches, Query(terms=(term,))) == [matches[1]], term
 
 
 def test_group_filters_are_restrictions():
@@ -95,6 +126,10 @@ def test_export_role_refines_broad_folders():
     assert export_role("HATS-CYM", "hat-cym-open-909.wav") == "HAT-OPEN"
     assert export_role("HATS-CYM", "hat-cym-closed-909.wav") == "HAT-CLOSED"
     assert export_role("HATS-CYM", "ride-01.wav") == "RIDE"
+
+
+def test_export_role_recognises_ohat_as_open_hat():
+    assert export_role("HATS-CYM", "OHat_01.wav") == "HAT-OPEN"
 
 
 def test_export_roles_are_all_known_to_the_exporter():

@@ -50,6 +50,7 @@ retains an identity without approving it as a favourite or export.
 | Classification | [packet_classifier.py](src/librarytools/packet_classifier.py), [classification/](src/librarytools/classification/) | Acoustic form, local model votes, caching, review and grouped playlists. |
 | Curation | [curate.py](src/librarytools/curate.py), [curation_policy.py](src/librarytools/curation_policy.py), [promotion_health.py](src/librarytools/promotion_health.py) | Validate favourite labels, copy approved bytes and track promotion health. |
 | Lifecycle | [locking.py](src/librarytools/locking.py), [operations.py](src/librarytools/operations.py), [onboarding.py](src/librarytools/onboarding.py), [lifecycle.py](src/librarytools/lifecycle.py) | Writer coordination, recovery, historical capture, backups and upgrades. |
+| Release and freshness | [release_runtime.py](src/librarytools/release_runtime.py), [maintenance.py](src/librarytools/maintenance.py), [refresh.py](src/librarytools/refresh.py), [tagstate.py](src/librarytools/tagstate.py) | Installed-byte identity, client readiness, selective refresh and atomic tag dependency records. |
 
 CLI modules translate arguments into these operations. Bundled profiles,
 vocabulary and browser resources make the installed wheel independent of the
@@ -60,8 +61,9 @@ checkout's working directory.
 The schema separates an asset from its locations. `assets.sample_id` is the hash
 of the entire file; `locations` records relative paths, zones and observations.
 Exact duplicates therefore share features and identity even when several paths
-exist. Hash-cache entries use device, inode, size and modification time to reuse
-unchanged-file observations.
+exist. Full scans verify file contents; the historical device/inode hash-cache
+table is not trusted as portable content identity. Refresh first compares paths
+and file stats and avoids a scan when no inventory change is detected.
 
 Schema 5 groups state by purpose:
 
@@ -83,6 +85,16 @@ Opening the database validates its known shape, declared version, integrity and
 foreign keys. Upgrades are explicit; see [state lifecycle](../docs/STATE-AND-CONTRACTS.md).
 
 ## Search is distinct from collection planning
+
+Client readiness is exposed by `sample-library version/status`, not by clients
+reading private SQLite tables. Release checks hash loaded package files against
+the bundled manifest and optionally a selected checkout. `maintenance.py` compares
+inventory metadata, feature versions and tag dependencies; `refresh.py` applies
+the required stages under the existing writer lock after a verified backup.
+`tagstate.py` fingerprints generation code, vocabulary, active inputs and generated
+outputs; tags and that record publish in one transaction. A no-op refresh creates
+neither a backup nor a receipt. The [update guide](../docs/UPDATES-AND-REFRESH.md)
+defines scan costs, retries, custom rules and the versioned JSON boundary.
 
 `sample-find` loads indexed identities, collapses exact copies and prefers
 curated locations. Terms combine with AND by default or OR with `--any`.

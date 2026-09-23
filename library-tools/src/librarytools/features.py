@@ -125,8 +125,8 @@ def sync_features(
     metadata = database.feature_metadata() if resume else {}
     done = {
         sample_id for sample_id, item in metadata.items()
-        if item['extractor_version'] == FEATURE_VERSION
-        and (not item['audio_error'] or not retry_failed)
+        if (item['audio_error'] and not retry_failed)
+        or (not item['audio_error'] and item['extractor_version'] == FEATURE_VERSION)
     }
 
     migrated = extracted = failed = skipped = 0

@@ -340,7 +340,10 @@ class LibraryDatabase:
         }
 
     def record_features(self, sample_id: str, payload_json: str, audio_error: str = "", *,
-                        extractor_version: str = 'acoustic-v1', provenance: str = 'measured') -> None:
+                        extractor_version: str | None = None, provenance: str = 'measured') -> None:
+        if extractor_version is None:
+            from .features import FEATURE_VERSION
+            extractor_version = FEATURE_VERSION
         with self._connect() as conn:
             conn.execute(
                 """
@@ -350,8 +353,11 @@ class LibraryDatabase:
                 (sample_id, payload_json, audio_error, extractor_version, provenance, _now()),
             )
 
-    def features(self, *, extractor_version: str = 'acoustic-v1') -> dict[str, str]:
+    def features(self, *, extractor_version: str | None = None) -> dict[str, str]:
         """Return ``sample_id -> payload_json`` for assets whose extraction succeeded."""
+        if extractor_version is None:
+            from .features import FEATURE_VERSION
+            extractor_version = FEATURE_VERSION
         with self._connect() as conn:
             rows = conn.execute(
                 "select sample_id,payload_json from asset_features where audio_error='' and extractor_version=?",
@@ -409,7 +415,8 @@ class LibraryDatabase:
                     (sample_id, group, tag, source),
                 )
 
-    def replace_generated_tags(self, mapping: dict[str, list[tuple[str, str]]], *, vocabulary_digest: str = '') -> None:
+    def replace_generated_tags(self, mapping: dict[str, list[tuple[str, str]]], *, vocabulary_digest: str = '',
+                               metadata: dict[str, str] | None = None) -> None:
         """Publish a whole vocabulary run atomically, retaining human/legacy tags."""
         with self._connect() as conn:
             conn.execute("delete from tags where source='generated'")
@@ -418,6 +425,8 @@ class LibraryDatabase:
                                  [(sample_id, group, tag) for group, tag in tags])
             conn.execute("insert or replace into state_metadata(key,value) values('vocabulary_digest',?)",
                          (vocabulary_digest,))
+            if metadata:
+                conn.executemany('insert or replace into state_metadata(key,value) values(?,?)', metadata.items())
 
     def tags_for(self, sample_id: str) -> list[tuple[str, str]]:
         with self._connect() as conn:

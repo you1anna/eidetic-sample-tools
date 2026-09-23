@@ -33,7 +33,9 @@ include them when onboarding and backing up.
 
 ## Long-lived and shared-drive installations
 
-Use `sample-library doctor --root "$SAMPLES_ROOT" --json` before upgrading.
+Use `sample-library version --checkout "$TOOLKIT_DIR" --json` to check actual
+installed files against the selected checkout, and `sample-library status
+--root "$SAMPLES_ROOT" --check-files --json` before a new selection.
 `sample-library onboard --root "$SAMPLES_ROOT" --machine NAME` previews repeatable
 setup on the current Mac; repeat with `--apply`. Use `--defer-machine NAME` for
 another Mac's unavailable history. Later onboarding captures that history without
@@ -41,8 +43,9 @@ overwriting newer SSD decisions. No connection to the other Mac is required.
 
 `sample-library` also provides explicit init, migrate, backup, restore and recovery
 commands plus a maintenance preview. Follow the [lifecycle guide](../docs/LIFECYCLE.md)
-before adopting old machine-local state onto the SSD. `sample-tag --retry-failed`
-retries failed measurements; successful results retain versioned provenance.
+before adopting old machine-local state onto the SSD. Use the
+[update and refresh guide](../docs/UPDATES-AND-REFRESH.md) after installing a release
+or adding samples. Successful measurements retain versioned provenance.
 
 ## Command map
 
@@ -111,6 +114,31 @@ retired; use review and sort for new workflows.
 
 ## Search
 
+### `sample-library` readiness and refresh
+
+```text
+sample-library version [--checkout PATH] [--json]
+sample-library status --root PATH [--library-db FILE] [--checkout PATH]
+                      [--check-files] [--vocabulary FILE] [--json]
+sample-library refresh --root PATH [--library-db FILE] [--checkout PATH]
+                       [--vocabulary FILE] [--retry-failed] [--backup-dir NEW_DIR]
+                       [--apply] [--json]
+```
+
+`version` needs no library. `status` reads installed release and library freshness;
+`--check-files` also walks the full library for added, changed and missing audio.
+`refresh` always includes that walk. Omission of `--apply` previews without writes.
+Apply locks and rechecks, backs up durable state, reconciles inventory if needed,
+measures missing/stale identities and regenerates tags. An unchanged apply does
+no work. Known failures are visible warnings; `--retry-failed` opts into retrying.
+Custom vocabulary snapshots are preserved unless explicitly replaced.
+
+JSON uses `contract_version: 1`, `status`, `issues`, `warnings` and `actions`.
+Library reports nest `runtime` and `library`. Exit status is 0 for `ready`, 1 for
+`action_required`, 2 for `blocked`. Action `argv` arrays describe preview commands.
+Clients must select this command from the same installation as their search tool.
+See [maintenance conditions and client contract](../docs/UPDATES-AND-REFRESH.md).
+
 ### `sample-tag`
 
 ```text
@@ -124,6 +152,8 @@ or extracts acoustic features; evaluates [`vocabulary.toml`](vocabulary.toml).
 Tags are rules over evidence:
 
 ```toml
+schema_version = 2
+
 [[tag]]
 name = "tribal"
 group = "style"
@@ -136,7 +166,10 @@ can still update the derived index. `--apply` replaces generated tags from the
 vocabulary while preserving human and unclassified legacy tags; neither mode
 moves, renames or converts audio. The coverage proposal defaults to
 `$RUNS/vocabulary-proposal.txt`. `--legacy-cache` can import compatible measurements
-from an older installation; it does not import listening approval.
+from an older installation; it does not import listening approval. The selected
+custom vocabulary is retained when `--vocabulary` is omitted. Schema 2 matches
+whole words/phrases and explicit aliases; `name_suffixes` matches literal final
+stem tokens such as `_orig`. Schema 1 custom files keep legacy substring behavior.
 
 ### `sample-find`
 
@@ -149,7 +182,9 @@ sample-find [TERMS...] [--root PATH] [--library-db FILE]
 
 Terms combine with AND across tags, origins and names; `--any` matches any term.
 Each term matches whole words, with an optional plural: `rap` finds `Rap_01` and
-`raps` but not `Trap`. Use `--role` or a tag for a broader category.
+`raps` but not `Trap`. Explicit aliases recognise `hihat`, `hi hat`, `hi-hat`
+and `perc`/`percussion`; camel-case filenames also separate words.
+Use `--role` or a tag for a broader category.
 Default ranking spreads results across sound families. `--no-spread` sorts
 alphabetically; `--like` ranks acoustic distance to an indexed ID or unique path
 fragment; `--preferred` ranks recorded kit picks.
