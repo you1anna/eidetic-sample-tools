@@ -85,6 +85,16 @@ outside this public repository.
   frames); the real checkpoints were not run. Earlier `three-10s-v1` embeddings are kept but not
   reused. Profiles and safety defaults did not change.
 
+- A September 23 review of that fix found gaps, reproduced against the checkout but not yet fixed:
+  - The tag vocabulary still matches raw substrings: `Grime` gets `wood` (from `rim`), `TR808`
+    gets gear `tr8`, `Warehouse` gets style `house`. Tags feed search, so the whole-word search
+    fix is bypassed through them.
+  - Role-conditioned tags stored in the index keep the old role reading until `sample-tag` is rerun.
+  - Joined search terms regressed: `hihat` no longer finds `HiHat_01`, and `perc` no longer finds a
+    `Percussion` folder unless the role is PERC. `OHat_01` is no longer read as a hat.
+  - The fix is Unreleased and every package still reads `0.2.0`, so an installed copy cannot be
+    told apart from the fixed checkout. Non-editable installs need reinstalling to get it.
+
 ## Next bounded increments
 
 1. Qualify collection-plan listening with a representative large plan: saved
