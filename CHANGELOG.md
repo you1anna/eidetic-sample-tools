@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add `scripts/setup_dev_env.sh`, one stamped setup for the pinned test environment
+  on every machine, and run it from a cloud session-start hook.
+
 ## librarytools 0.3.0 — 2026-09-23
 
 `sampletools`, `abletontools` and `eidetic-live-tools` remain at 0.2.0. Package

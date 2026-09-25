@@ -33,7 +33,23 @@ once. Repeat checks after a change or failure, not merely to accumulate passes.
 
 ## Reproduce the test environment
 
-From the repository root:
+Every machine uses the same environment, built from the pinned `requirements-dev.txt`:
+
+```bash
+scripts/setup_dev_env.sh
+python3 scripts/dev_check.py test
+```
+
+The script creates `~/.venvs/eidetic-sample-tools-dev` with Python 3.12, installs the
+pins and the four packages editable from this checkout, runs `pip check` and
+`doctor`. A stamp of the setup version, Python version and requirements hash
+skips reinstalling when nothing changed; `--force` reinstalls. On Linux as root it
+also installs FFmpeg and libsndfile; on macOS it only reports them
+(`brew install ffmpeg`). Cloud sessions run it from `.claude/hooks/session-start.sh`
+and export `EIDETIC_PYTHON`. Change a pin only in `requirements-dev.txt`, then run
+the full suite before committing it.
+
+The equivalent manual steps, from the repository root:
 
 ```bash
 python3.12 -m venv "$HOME/.venvs/eidetic-sample-tools-dev"
