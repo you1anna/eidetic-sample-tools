@@ -1,5 +1,7 @@
 # Operating brief assessment
 
+> Historical assessment. Command-center was retired on 15 October 2026; its tracking, registration and reconciliation actions below are superseded. Use this repository's `AGENTS.md`, `STATUS.md` and current guides; physical studio authority remains `eidetic-studio`.
+
 Date: 2026-06-25 (desk review). Updated notes: 2026-07-09.
 
 **Historical assessment, superseded for current work.** Its build order,
