@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "librarytools"
-version = "0.3.0"
+version = "0.3.1"
 description = "Safely review, organise, curate, and analyse large sample libraries."
 requires-python = ">=3.12"
 dependencies = [
@@ -16,8 +16,8 @@ dependencies = [
 dev = ["pytest>=8", "flask>=3.1,<4"]
 # Drum-role classifier vote (sample-analyze --classifier). Heavy + optional so the core
 # tidy tools stay light. Weights are user-supplied (unlicensed upstream), never shipped.
-classifier = ["torch>=2.2", "librosa>=0.10"]
-audio-classifier = ["torch>=2.6,<3", "librosa>=0.11,<0.12", "transformers>=4.57,<5"]
+classifier = ["torch>=2.13,<3", "librosa>=0.10"]
+audio-classifier = ["torch>=2.13,<3", "librosa>=0.11,<0.12", "transformers>=5.10,<6"]
 review-ui = ["flask>=3.1,<4"]
 live = ["flask>=3.1,<4", "eidetic-live-tools==0.2.0"]
 

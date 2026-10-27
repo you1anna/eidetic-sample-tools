@@ -38,7 +38,7 @@
     },
     "librarytools": {
       "files": {
-        "__init__.py": "961248e635960a18a01265b3ae403023e518c5f591cb79b8bfa2d5fbe591bea2",
+        "__init__.py": "e7010fece5133a172d8a51045912efdbe3699bc02170d592c792749979d1f2bb",
         "ai_cli.py": "a1fa0759f7da0ec8abdf321a219d58c15d8da82608bce3feb0f246bdb1aa8db2",
         "analysis_history.py": "2436ea2fcc418ccf756db6595e10629278fc1286266d273cc36aa5eab2268cb4",
         "analyze.py": "ab1d7c347007c2984077b4cd5c65ef5669f2ff963e892af12f14e83e779e063e",
@@ -129,7 +129,7 @@
       },
       "module": "librarytools",
       "path": "library-tools",
-      "version": "0.3.0"
+      "version": "0.3.1"
     },
     "sampletools": {
       "files": {

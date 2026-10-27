@@ -12,7 +12,7 @@ it to whole-library AI retrieval remains a [planned increment](ROADMAP.md).
 
 ## Install once per Apple Silicon Mac
 
-This tested snapshot targets **Python 3.12 on macOS arm64**. Intel Macs and Linux
+This tested snapshot targets **Python 3.12 on macOS 14 or newer, arm64**. Intel Macs and Linux
 need their own tested dependency resolution; do not assume this lock covers them.
 The core toolkit continues to have separate macOS/Linux checks.
 
@@ -147,3 +147,9 @@ The manually triggered [AI workflow](../.github/workflows/ai-checks.yml) install
 the hashed snapshot, caches checkpoint downloads, runs offline tests and retains
 the synthetic performance report. It has a 20-minute job limit. Ordinary push/PR
 tests continue to skip model downloads; remote AI CI has not been run by this work.
+
+## Security refresh, 27 October 2026
+
+The hashed snapshot uses Torch 2.13.0 and Transformers 5.10.2 (5.10.0 was yanked), plus repaired certificate/HTTP/file-lock dependencies. Torch wheels require macOS 14 or newer. Preserve the existing immutable model revisions, worker limits and cache schema. Regenerate on Apple Silicon with `MACOSX_DEPLOYMENT_TARGET=14.0 uv pip compile library-tools/pyproject.toml --extra audio-classifier --extra review-ui --extra dev --python-version 3.12 --python-platform aarch64-apple-darwin --generate-hashes --no-emit-index-url --output-file requirements-ai-macos-arm64.txt`. Review version changes and hashes before installing.
+
+On another Mac, first patch Python/pip and confirm the OS/architecture, then install the hashed requirements and rerun the checks above. Do not download models again when the pinned cache is already available. The standard synthetic suite passed 1,041 tests; two model integration tests are separate. No library-wide processing is part of this update.
