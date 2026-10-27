@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Pin MessagePack 1.2.3 in the ARM64 AI lock to fix
+  [GHSA-j586-36cw-2gc2](https://github.com/msgpack/msgpack-python/security/advisories/GHSA-j586-36cw-2gc2).
+  Other dependency versions and the macOS 14 minimum are unchanged.
+
 - Add `scripts/setup_dev_env.sh`, one stamped setup for the pinned test environment
   on every machine, and run it from a cloud session-start hook.
 
