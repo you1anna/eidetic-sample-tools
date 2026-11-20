@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "librarytools"
-version = "0.3.1"
+version = "0.3.2"
 description = "Safely review, organise, curate, and analyse large sample libraries."
 requires-python = ">=3.12"
 dependencies = [

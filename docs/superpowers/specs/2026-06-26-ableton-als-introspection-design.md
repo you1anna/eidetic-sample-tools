@@ -56,11 +56,11 @@ Two commands:
 | `samples.py` | `sample_refs(tree) -> list[SampleRef]`; resolve + present/missing classify. |
 | `cli.py` | `als-index` and `als-samples` mains + console scripts. |
 
-**Default roots (env-overridable):** `/Users/macbookair/Music/Ableton` and
+**Default roots (env-overridable):** `~/Music/Ableton` and
 `/Volumes/Extreme SSD/Production` (mirrors `config.py` env pattern).
 
 **Open item — machine of record.** Per `command-center/infrastructure.md`, Ableton's canonical home
-is the **MacBook Air** (`/Users/macbookair/Music/Ableton`), with the Mac mini as worker. This tool
+is the **MacBook Air** (`~/Music/Ableton`), with the Mac mini as worker. This tool
 defaults to that path and runs wherever the projects are mounted; reconcile the mini-vs-Air doc
 drift (flagged in the 2026-06-25 assessment) when convenient — not a blocker here.
 

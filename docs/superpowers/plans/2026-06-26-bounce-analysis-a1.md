@@ -93,8 +93,8 @@ isolated** in `~/.venvs/analysis-tools` — never added to the zero-dep `samplet
 - [ ] **Step 5: venv + suite**
 ```bash
 /opt/homebrew/bin/python3.12 -m venv ~/.venvs/analysis-tools
-~/.venvs/analysis-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-music-tools/analysis-tools[dev]"
-~/.venvs/analysis-tools/bin/pytest /Users/macmini/Projects/eidetic-music-tools/analysis-tools -v
+~/.venvs/analysis-tools/bin/pip install -e "$HOME/Projects/eidetic-music-tools/analysis-tools[dev]"
+~/.venvs/analysis-tools/bin/pytest ~/Projects/eidetic-music-tools/analysis-tools -v
 ```
 - [ ] **Step 6: Real-world smoke** — run on a real bounce in `Production/outputs`, sanity-check LUFS
   against Ableton's loudness meter (`verification-before-completion`).

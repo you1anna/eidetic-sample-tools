@@ -28,7 +28,7 @@
 - Test: `library-tools/tests/test_intake.py`
 
 **Interfaces:**
-- Produces: `normalize_pack_name(raw: str) -> str` — pure; lowercases, strips scene/format/release tags, converts `.`/space/`_` to `-`, collapses repeats, trims separators.
+- Produces: `normalize_pack_name(raw: str) -> str` — pure; lowercases, strips publisher, format and release-ID tags, converts `.`/space/`_` to `-`, collapses repeats, trims separators.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -41,9 +41,9 @@ from pathlib import Path
 from librarytools import intake
 
 
-def test_normalize_strips_scene_and_format_tags():
-    raw = "Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL"
-    assert intake.normalize_pack_name(raw) == "dark-magic-underground-techno"
+def test_normalize_strips_format_and_noise_tags():
+    raw = "Example.Samples.Deep.Techno.MULTiFORMAT-WAV"
+    assert intake.normalize_pack_name(raw) == "example-deep-techno"
 
 
 def test_normalize_spaces_to_hyphens_lowercase():
@@ -55,8 +55,8 @@ def test_normalize_collapses_repeats_and_trims():
 
 
 def test_normalize_drops_release_id_wrapper_token():
-    # release IDs like dcb-5289 / trailing numeric IDs are noise
-    assert intake.normalize_pack_name("SomePack-dcb-5289") == "somepack"
+    # release IDs like abc-1234 / trailing numeric IDs are noise
+    assert intake.normalize_pack_name("SomePack-abc-1234") == "somepack"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -78,19 +78,19 @@ from __future__ import annotations
 
 import re
 
-# Scene-release groups, format markers, and noise tokens dropped from pack names.
+# Publisher tags, format markers and other noise tokens dropped from pack names.
 _NOISE_TOKENS: frozenset[str] = frozenset(
     {
         "multiformat", "multi", "wav", "flac", "aiff", "aif", "scd", "mp3",
         "samples", "sample", "decibel", "decibel.", "pack",
     }
 )
-# Release-ID shapes like "dcb-5289" or a bare trailing number.
+# Release-ID shapes like "abc-1234" or a bare trailing number.
 _RELEASE_ID = re.compile(r"^[a-z]{2,4}-\d{3,6}$|^\d{3,6}$")
 
 
 def normalize_pack_name(raw: str) -> str:
-    """Lowercase, drop scene/format/release noise, hyphenate, collapse, trim."""
+    """Lowercase, drop format, publisher and release-ID noise, hyphenate, collapse, trim."""
     lowered = raw.lower()
     # Split on any run of separators (., space, _, -).
     tokens = [t for t in re.split(r"[.\s_-]+", lowered) if t]
@@ -153,14 +153,14 @@ def _mk(root: Path, rel: str) -> Path:
 
 def test_stray_pack_folder_is_planned_to_PACKS(tmp_path: Path):
     root = tmp_path / "SAMPLES"
-    _mk(root, "Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL/dcb/Kick 01.wav")
+    _mk(root, "Example.Samples.Deep.Techno.MULTiFORMAT-WAV/Kicks/Kick 01.wav")
 
     plan = intake.build_plan(root=root)
 
     assert len(plan) == 1
     move = plan[0]
-    assert move.src == root / "Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL"
-    assert move.dest == root / "PACKS" / "dark-magic-underground-techno"
+    assert move.src == root / "Example.Samples.Deep.Techno.MULTiFORMAT-WAV"
+    assert move.dest == root / "PACKS" / "example-deep-techno"
     assert move.tag.startswith("pack|")
 
 
@@ -548,7 +548,7 @@ git commit --allow-empty -m "chore(restructure): moved role folders -> CURATED/,
 - [ ] **Step 1: Dry-run intake**
 
 Run: `sample-intake`
-Expected: lists `Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL -> PACKS/dark-magic-underground-techno` and `Filterheadz Hardgroove Techno -> PACKS/filterheadz-hardgroove-techno` (plus any other strays). **Review the slugs.**
+Expected: lists `Example.Samples.Deep.Techno.MULTiFORMAT-WAV -> PACKS/example-deep-techno` and `Filterheadz Hardgroove Techno -> PACKS/filterheadz-hardgroove-techno` (plus any other strays). **Review the slugs.**
 
 - [ ] **Step 2: Apply intake**
 
