@@ -363,8 +363,8 @@ where = ["src"]
 - [ ] **Step 5: Set up venv + install + run full suite**
 ```bash
 /opt/homebrew/bin/python3.12 -m venv ~/.venvs/midi-tools
-~/.venvs/midi-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-music-tools/midi-tools[dev]"
-~/.venvs/midi-tools/bin/pytest /Users/macmini/Projects/eidetic-music-tools/midi-tools -v
+~/.venvs/midi-tools/bin/pip install -e "$HOME/Projects/eidetic-music-tools/midi-tools[dev]"
+~/.venvs/midi-tools/bin/pytest ~/Projects/eidetic-music-tools/midi-tools -v
 ```
 Expected: all tests pass; `~/.venvs/midi-tools/bin/midi-gen --help` works.
 - [ ] **Step 6: README + alias note** — document the venv setup and add a `mg()` alias suggestion to

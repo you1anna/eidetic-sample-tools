@@ -18,7 +18,7 @@ root and formats TSV/JSON. **Never writes a `.als`.** Zero third-party deps (std
 - **Read-only on `.als`**; outputs go to a chosen report dir only.
 - Tolerant parse: a malformed/locked Set is reported and skipped, never fatal across a sweep.
 - Default roots env-overridable: `ALS_ROOTS` (`:`-sep), default
-  `/Users/macbookair/Music/Ableton:/Volumes/Extreme SSD/Production`.
+  `~/Music/Ableton:/Volumes/Extreme SSD/Production`.
 
 ---
 
@@ -106,10 +106,10 @@ def test_bad_file_raises_parse_error(tmp_path):
 - [ ] **Step 5: venv + run suite**
 ```bash
 /opt/homebrew/bin/python3.12 -m venv ~/.venvs/ableton-tools
-~/.venvs/ableton-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-music-tools/ableton-tools[dev]"
-~/.venvs/ableton-tools/bin/pytest /Users/macmini/Projects/eidetic-music-tools/ableton-tools -v
+~/.venvs/ableton-tools/bin/pip install -e "$HOME/Projects/eidetic-music-tools/ableton-tools[dev]"
+~/.venvs/ableton-tools/bin/pytest ~/Projects/eidetic-music-tools/ableton-tools -v
 ```
-- [ ] **Step 6: Real-world smoke** — run `als-index` over `/Users/macbookair/Music/Ableton` (or the
+- [ ] **Step 6: Real-world smoke** — run `als-index` over `~/Music/Ableton` (or the
   mounted `Production/Ableton_Projects`), eyeball rows; this is `verification-before-completion`.
 - [ ] **Step 7: Commit** — `feat(als): als-index + als-samples CLIs + packaging`
 

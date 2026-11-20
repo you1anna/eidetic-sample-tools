@@ -5,9 +5,9 @@ from pathlib import Path
 from librarytools import intake
 
 
-def test_normalize_strips_scene_and_format_tags():
-    raw = "Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL"
-    assert intake.normalize_pack_name(raw) == "dark-magic-underground-techno"
+def test_normalize_strips_format_and_noise_tags():
+    raw = "Example.Samples.Deep.Techno.MULTiFORMAT-WAV"
+    assert intake.normalize_pack_name(raw) == "example-deep-techno"
 
 
 def test_normalize_spaces_to_hyphens_lowercase():
@@ -19,8 +19,8 @@ def test_normalize_collapses_repeats_and_trims():
 
 
 def test_normalize_drops_release_id_wrapper_token():
-    # release IDs like dcb-5289 / trailing numeric IDs are noise
-    assert intake.normalize_pack_name("SomePack-dcb-5289") == "somepack"
+    # release IDs like abc-1234 / trailing numeric IDs are noise
+    assert intake.normalize_pack_name("SomePack-abc-1234") == "somepack"
 
 
 def _mk(root: Path, rel: str) -> Path:
@@ -32,14 +32,14 @@ def _mk(root: Path, rel: str) -> Path:
 
 def test_stray_pack_folder_is_planned_to_PACKS(tmp_path: Path):
     root = tmp_path / "SAMPLES"
-    _mk(root, "Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL/dcb/Kick 01.wav")
+    _mk(root, "Example.Samples.Deep.Techno.MULTiFORMAT-WAV/Kicks/Kick 01.wav")
 
     plan = intake.build_plan(root=root)
 
     assert len(plan) == 1
     move = plan[0]
-    assert move.src == root / "Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL"
-    assert move.dest == root / "PACKS" / "dark-magic-underground-techno"
+    assert move.src == root / "Example.Samples.Deep.Techno.MULTiFORMAT-WAV"
+    assert move.dest == root / "PACKS" / "example-deep-techno"
     assert move.tag.startswith("pack|")
 
 

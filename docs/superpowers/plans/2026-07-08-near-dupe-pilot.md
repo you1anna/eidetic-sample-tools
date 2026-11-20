@@ -53,7 +53,7 @@
 
 **Files:**
 - Generated: `library-tools/manifests/near-dupes-pilot/*` (gitignored)
-- Modify: `/Users/macmini/Projects/command-center/tasks.md`
+- Modify: `~/Projects/command-center/tasks.md`
 
 - [ ] Run a real dry-run pilot against `manifests/sample-intelligence-pilot/sample-features-latest.tsv` with `--limit-groups 10`.
 - [ ] Inspect row count and sample checklist paths.

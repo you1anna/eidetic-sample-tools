@@ -87,9 +87,9 @@ def test_expected_outputs_keys(tmp_path: Path):
 - [ ] **Step 5: venv + suite (tests mock the model)**
 ```bash
 /opt/homebrew/bin/python3.12 -m venv ~/.venvs/stem-tools
-~/.venvs/stem-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-music-tools/library-tools"
-~/.venvs/stem-tools/bin/pip install -e "/Users/macmini/Projects/eidetic-music-tools/stem-tools[dev]"
-~/.venvs/stem-tools/bin/pytest /Users/macmini/Projects/eidetic-music-tools/stem-tools -v
+~/.venvs/stem-tools/bin/pip install -e "$HOME/Projects/eidetic-music-tools/library-tools"
+~/.venvs/stem-tools/bin/pip install -e "$HOME/Projects/eidetic-music-tools/stem-tools[dev]"
+~/.venvs/stem-tools/bin/pytest ~/Projects/eidetic-music-tools/stem-tools -v
 ```
 - [ ] **Step 6: Real-world smoke** — one `stem-split --apply` on a short bounce (first run downloads
   weights); confirm four stems land and a `--route-vocals` run files the vocal correctly named.

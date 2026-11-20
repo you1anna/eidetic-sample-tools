@@ -14,21 +14,21 @@ from pathlib import Path
 
 from . import config, moves, review
 
-# Scene-release groups, format markers, and noise tokens dropped from pack names.
+# Publisher tags, format markers and other noise tokens dropped from pack names.
 _NOISE_TOKENS: frozenset[str] = frozenset(
     {
         "multiformat", "multi", "wav", "flac", "aiff", "aif", "scd", "mp3",
         "samples", "sample", "decibel", "pack",
     }
 )
-# Release-ID shapes like "dcb-5289" (catalogue numbers) — stripped before tokenizing.
+# Release-ID shapes like "abc-1234" (catalogue numbers) — stripped before tokenizing.
 _RELEASE_ID = re.compile(r"[a-z]{2,4}-\d{3,6}")
 # A bare numeric token left after tokenizing is also noise.
 _BARE_NUM = re.compile(r"\d{3,6}")
 
 
 def normalize_pack_name(raw: str) -> str:
-    """Lowercase, drop scene/format/release noise, hyphenate, collapse, trim."""
+    """Lowercase, drop format, publisher and release-ID noise, hyphenate, collapse, trim."""
     lowered = _RELEASE_ID.sub(" ", raw.lower())
     # Split on any run of separators (., space, _, -).
     tokens = [t for t in re.split(r"[.\s_-]+", lowered) if t]

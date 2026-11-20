@@ -38,7 +38,7 @@
     },
     "librarytools": {
       "files": {
-        "__init__.py": "e7010fece5133a172d8a51045912efdbe3699bc02170d592c792749979d1f2bb",
+        "__init__.py": "1780a2caf62cde3637977e1dac113210b3bb3d3bb8f9c39660fa448afd34cd53",
         "ai_cli.py": "a1fa0759f7da0ec8abdf321a219d58c15d8da82608bce3feb0f246bdb1aa8db2",
         "analysis_history.py": "2436ea2fcc418ccf756db6595e10629278fc1286266d273cc36aa5eab2268cb4",
         "analyze.py": "ab1d7c347007c2984077b4cd5c65ef5669f2ff963e892af12f14e83e779e063e",
@@ -79,7 +79,7 @@
         "features.py": "4a1c90c0c1cd2007c1a83925faa0dc20d4eb34e6f15c8855220a8a5106b93add",
         "find.py": "f633266fbea729619643586340d97b8de9710b83d20a1f4b679edd1c727bcd22",
         "find_cli.py": "c56a7960b753c9e50303ed9596a49e9793bbdf1029f66149fb970195e6b545c8",
-        "intake.py": "f1ad7109d3121308a240f93953a93761e4e77204c7ba5696ebff7e579b3fddf3",
+        "intake.py": "7f6a9161a4106a1e76dff18e28ae1290194b3c210e4b3b8d41e6c83cb810a099",
         "inventory.py": "3a9dbe65282e12b662b0b61f6f4bc83d498492f925d282bd1dfbf3d9a29978fe",
         "lexical.py": "88d8637d1fa166eb6522595d25d0be5d3b1855f7371aeb22b1c43616a8f05563",
         "library_cli.py": "88c729f10622c7a8bc7807681f4fa41ab477491fb54192e495141421cf5b0bcb",
@@ -129,7 +129,7 @@
       },
       "module": "librarytools",
       "path": "library-tools",
-      "version": "0.3.1"
+      "version": "0.3.2"
     },
     "sampletools": {
       "files": {

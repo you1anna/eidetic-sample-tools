@@ -108,7 +108,7 @@ The near-term priorities are: apply and verify the catalogue foundation, complet
 Run:
 
 ```bash
-rg -n 'Robin|/Users/macmini|/Volumes/Extreme|open.source|production.ready|AI-powered' README.md docs/ROADMAP.md
+rg -n 'Robin|/Users/|/Volumes/Extreme|open.source|production.ready|AI-powered' README.md docs/ROADMAP.md
 rg -n '\]\([^)]*\)' README.md docs/ROADMAP.md
 ```
 
@@ -167,7 +167,7 @@ Requirements:
 - Use `/path/to/eidetic-music-tools` and `/path/to/SAMPLES` placeholders only in shell examples, with a sentence telling the reader to replace them.
 - Explain that `sample-review` writes TSV output only when `--output` or `--index-dir` is supplied and never moves audio.
 - Link to `WORKFLOWS.md`, `SAFETY.md`, both package READMEs, and `ROADMAP.md`.
-- Keep the existing `/Users/macmini`, `/Volumes/Extreme SSD`, and `~/.venvs/` values under `Robin's current setup` only.
+- Keep the existing `/Users/<name>`, `/Volumes/Extreme SSD`, and `~/.venvs/` values under `Robin's current setup` only.
 
 - [ ] **Step 3: Align package descriptions**
 
@@ -480,7 +480,7 @@ Expected: the script prints the checked file count and exits 0.
 Run:
 
 ```bash
-rg -n '/Users/macmini|/Volumes/Extreme SSD' README.md docs library-tools/README.md sample-tools/README.md STATUS.md
+rg -n '/Users/|/Volumes/Extreme SSD' README.md docs library-tools/README.md sample-tools/README.md STATUS.md
 rg -n 'Stable|Beta|Experimental|Planned|Retired' README.md docs/ROADMAP.md library-tools/README.md STATUS.md
 rg -n -- '--apply|--sync' README.md docs/GETTING-STARTED.md docs/WORKFLOWS.md docs/SAFETY.md library-tools/README.md sample-tools/README.md
 ```
