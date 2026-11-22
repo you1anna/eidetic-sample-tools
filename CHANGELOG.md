@@ -9,6 +9,10 @@
 - Add `scripts/setup_dev_env.sh`, one stamped setup for the pinned test environment
   on every machine, and run it from a cloud session-start hook.
 
+- librarytools 0.3.2: reword the pack-name intake comments. Pack-name behaviour is
+  unchanged. Intake tests and design examples now use synthetic pack names.
+  Historical plans use `~/` paths in place of machine-specific home directories.
+
 ## librarytools 0.3.0 — 2026-09-23
 
 `sampletools`, `abletontools` and `eidetic-live-tools` remain at 0.2.0. Package

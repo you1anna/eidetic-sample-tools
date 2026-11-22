@@ -82,7 +82,7 @@ def test_write_kick_audit_outputs_required_columns(tmp_path: Path):
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 PYTHONPATH=src ~/.venvs/library-tools/bin/python -m pytest tests/test_analyze.py::test_write_kick_audit_outputs_required_columns -v -p no:cacheprovider
 ```
 
@@ -268,7 +268,7 @@ Add one regression test named `test_kick_gate_does_not_pass_failed_kicks_auditio
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 PYTHONPATH=src ~/.venvs/library-tools/bin/python -m pytest \
   tests/test_analyze.py::test_kick_gate_marks_strong_compact_low_transient_as_likely \
   tests/test_analyze.py::test_kick_gate_rejects_role_conflicts_and_loops \
@@ -350,7 +350,7 @@ def test_build_crates_excludes_non_likely_kicks():
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 PYTHONPATH=src ~/.venvs/library-tools/bin/python -m pytest \
   tests/test_analyze.py::test_kick_audit_includes_only_kicks_candidates_sorted_by_path \
   tests/test_analyze.py::test_cluster_within_role_uses_only_likely_kicks_for_kicks \
@@ -387,7 +387,7 @@ Then require `_passes_kick_gate(row)` in `_cluster_vector`, `_device_one_shot_ca
 Run the focused command from Step 2, then:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 PYTHONPATH=src ~/.venvs/library-tools/bin/python -m pytest \
   tests/test_analyze.py::test_cluster_within_role_separates_synthetic_audio_groups_deterministically \
   tests/test_analyze.py::test_build_crates_keeps_digitakt_and_tr8s_one_shot_oriented \
@@ -436,7 +436,7 @@ Assert the report contains:
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 PYTHONPATH=src ~/.venvs/library-tools/bin/python -m pytest \
   tests/test_analyze.py::test_main_writes_full_pilot_artifacts_without_moving_sources \
   tests/test_analyze.py::test_report_includes_kick_gate_counts \
@@ -495,7 +495,7 @@ Expected: PASS.
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 PYTHONPATH=src ~/.venvs/library-tools/bin/python -m pytest -q -p no:cacheprovider
 ```
 
@@ -506,7 +506,7 @@ Expected: all tests pass.
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 ~/.venvs/library-tools/bin/sample-analyze --root "/Volumes/Extreme SSD/Production/SAMPLES" --pilot
 ```
 
@@ -517,7 +517,7 @@ Expected: command exits 0, prints `[MANIFEST-ONLY]`, and writes under `library-t
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 python3 -c 'import csv,collections,pathlib; rows=csv.DictReader(pathlib.Path("manifests/sample-intelligence-pilot/kick-audit-latest.tsv").open(), delimiter="\t"); print(collections.Counter(row["kick_gate"] for row in rows))'
 ```
 
@@ -528,7 +528,7 @@ Expected: output includes `likely_kick` and `review`. If the counter prints only
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 python3 -c 'import csv,pathlib; audit={r["path"]: r["kick_gate"] for r in csv.DictReader(pathlib.Path("manifests/sample-intelligence-pilot/kick-audit-latest.tsv").open(), delimiter="\t")}; bad=[]; rows=csv.DictReader(pathlib.Path("manifests/sample-intelligence-pilot/clusters-latest.tsv").open(), delimiter="\t"); [bad.append((r["path"], audit.get(r["path"]))) for r in rows if r["role"]=="KICKS" and r["is_representative"]=="yes" and audit.get(r["path"])!="likely_kick"]; print(bad)'
 ```
 
@@ -539,7 +539,7 @@ Expected: `[]`.
 Run:
 
 ```bash
-cd /Users/macmini/Projects/eidetic-music-tools/library-tools
+cd ~/Projects/eidetic-music-tools/library-tools
 python3 -c 'import csv,pathlib; audit={r["path"]: r["kick_gate"] for r in csv.DictReader(pathlib.Path("manifests/sample-intelligence-pilot/kick-audit-latest.tsv").open(), delimiter="\t")}; bad=[]; root=pathlib.Path("manifests/sample-intelligence-pilot/crates"); files=list(root.rglob("*.txt")); [bad.append((p.as_posix(), line.strip(), audit.get(line.strip()))) for p in files for line in p.read_text().splitlines() if line and not line.startswith("#") and line.strip() in audit and audit[line.strip()]!="likely_kick"]; print(bad)'
 ```
 

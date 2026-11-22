@@ -10,7 +10,7 @@ even after the 2026-06-17 reorg. Root cause: the current rule keeps vendor packs
 principles at once — convention-named one-shots *and* whole vendor pack trees with
 vendor naming and arbitrary depth. Mixing principles in one place can never read as
 cohesive. Separately, new downloads have no reliable intake path, so vendor packs pile
-up loose at the top level (e.g. `Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL/`,
+up loose at the top level (e.g. `Example.Samples.Deep.Techno.MULTiFORMAT-WAV/`,
 `Filterheadz Hardgroove Techno/`), violating the "top level = sound role" rule.
 
 ## Target model: two zones
@@ -93,13 +93,13 @@ def normalize_pack_name(raw: str) -> str: ...
 ```
 
 - lowercase
-- drop scene-release group tags, format markers, and release IDs
-  (`-DECiBEL`, `MULTiFORMAT`, `WAV`, `FLAC`, `AIFF`, `SCD`, `dcb-5289`, trailing IDs)
+- drop publisher tags, format markers and release IDs
+  (`MULTiFORMAT`, `WAV`, `FLAC`, `AIFF`, `SCD`, `abc-1234`, trailing IDs)
 - `.`, space, `_` → `-`
 - collapse repeated separators; strip leading/trailing separators
 
 Examples:
-- `Dark.Magic.Samples.Underground.Techno.MULTiFORMAT-DECiBEL` → `dark-magic-underground-techno`
+- `Example.Samples.Deep.Techno.MULTiFORMAT-WAV` → `example-deep-techno`
 - `Filterheadz Hardgroove Techno` → `filterheadz-hardgroove-techno`
 
 **Traceability:** original folder names recorded in `PACKS/_manifest.tsv`
@@ -108,7 +108,7 @@ Examples:
 **Safety:** reuses `moves.py`; dry-run by default (`--apply` to execute); writes plan +
 undo TSV to `manifests/`; `-N` collision suffixing.
 
-**Tests** (`tests/test_intake.py`): normalization cases (scene tags, format markers,
+**Tests** (`tests/test_intake.py`): normalization cases (publisher tags, format markers,
 release IDs, spaces, collapse), stray-vs-known detection, plan building against a temp
 tree, dry-run produces no moves, collision suffixing.
 

@@ -7,8 +7,7 @@ Project: eidetic-sample-tools
 Studio-wiring documentation (the MIDI-sync and Method-A session guides added in
 `e649ad7`) is **removed from this public repo**. All physical-studio knowledge —
 knowledge base, diagrams, guides, issues log — now lives in the separate
-**private** repo `eidetic-studio` (`~/Projects/eidetic-studio`,
-`github.com/you1anna/eidetic-studio`, private), which is the single source of truth
+**private** repo `eidetic-studio` (`~/Projects/eidetic-studio`), which is the single source of truth
 for studio setup.
 
 This repo stays public and product-only: the sample-library CLI packages. Added

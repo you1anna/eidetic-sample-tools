@@ -335,7 +335,7 @@ git commit -m "data: split tribal 140 audition packet by category"
 ### Task 5: Update the private studio masterplan and complete verification
 
 **Files:**
-- Modify: `/Users/macmini/Projects/eidetic-studio/guides/sample-device-masterplan.md`
+- Modify: `~/Projects/eidetic-studio/guides/sample-device-masterplan.md`
 - Verify: all files changed by Tasks 1-4.
 
 **Interfaces:**
