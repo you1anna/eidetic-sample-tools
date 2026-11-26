@@ -2,6 +2,8 @@
 
 Follow [AGENTS.md](AGENTS.md) for the read order, repository boundaries, safety
 rules and Git workflow. It is the shared entry point for all coding assistants.
+This repository is public. Before a commit, obey the "Public repository" rules in
+[AGENTS.md](AGENTS.md#public-repository).
 
 Use the existing environment and test the current checkout:
 

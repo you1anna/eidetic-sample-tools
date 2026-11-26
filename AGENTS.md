@@ -75,6 +75,16 @@ command inventories or session history to crowd the READMEs.
 - `external/` (vendored third-party clones) and `.spikes/` (throwaway experiments) are gitignored.
 - Ableton projects: archive at `/Volumes/Extreme SSD/Production/ABLETON_PROJECTS`, active scratch at `~/Projects/Production`.
 
+## Public repository
+
+This repository is public. Each commit, commit message, branch and author address is published.
+
+- Do not commit personal data or private intent, for example career, legal, health or money matters.
+- Do not add host paths, machine names, network addresses, credentials, session URLs or names of
+  private repositories. The documented `eidetic-studio` boundary above is the only exception.
+- Use the GitHub noreply address as the commit author. Use synthetic data in examples and tests.
+- If you are not sure that content is safe to publish, stop and ask Robin.
+
 ## Do not change without asking
 
 - `profiles/` (studio + device TOML) — these mirror real hardware constraints.
