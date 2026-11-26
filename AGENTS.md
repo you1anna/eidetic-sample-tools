@@ -18,8 +18,8 @@ musicians. Four independently installable Python packages: `library-tools` (inde
 `live-tools` bridge for inspecting and applying guarded edits to a running Live Set.
 
 This repo is **not** the studio setup source of truth. Physical studio wiring, MIDI
-sync, and session workflow live in the **private** `eidetic-studio` repo
-(`~/Projects/eidetic-studio`). Do not add studio-wiring docs here — it is public.
+sync, and session workflow live in a separate **private** studio repository. Do not add
+studio-wiring docs here — it is public.
 
 ## Verify a change
 
@@ -71,9 +71,9 @@ command inventories or session history to crowd the READMEs.
 
 ## Sensitive / generated (do not commit)
 
-- Sample library data lives at `/Volumes/Extreme SSD/Production/SAMPLES` — never copy it in.
+- Sample library data lives on an external drive outside this repo — never copy it in.
 - `external/` (vendored third-party clones) and `.spikes/` (throwaway experiments) are gitignored.
-- Ableton projects: archive at `/Volumes/Extreme SSD/Production/ABLETON_PROJECTS`, active scratch at `~/Projects/Production`.
+- Ableton projects (archive and active scratch) live outside this repo — never copy them in.
 
 ## Public repository
 
@@ -81,7 +81,7 @@ This repository is public. Each commit, commit message, branch and author addres
 
 - Do not commit personal data or private intent, for example career, legal, health or money matters.
 - Do not add host paths, machine names, network addresses, credentials, session URLs or names of
-  private repositories. The documented `eidetic-studio` boundary above is the only exception.
+  private repositories.
 - Use the GitHub noreply address as the commit author. Use synthetic data in examples and tests.
 - If you are not sure that content is safe to publish, stop and ask Robin.
 
